@@ -11,7 +11,7 @@
 body{
   background:#060a06;min-height:100vh;
   display:flex;flex-direction:column;align-items:center;justify-content:center;
-  font-family:'Inter',sans-serif;color:#fff;overflow:hidden;touch-action:none;
+  font-family:'Inter',sans-serif;color:#fff;touch-action:none;
 }
 
 /* ── LOBBY ──────────────────────────────────────────── */
@@ -64,10 +64,14 @@ input[type=text]::placeholder{font-family:'Inter',sans-serif;letter-spacing:1px;
 #lobby-msg{font-size:12px;color:#ffdd66;min-height:16px;text-align:center}
 
 /* ── GAME ───────────────────────────────────────────── */
-#game{display:none;flex-direction:column;align-items:center;gap:0;width:100%}
+#game{
+  display:none;flex-direction:column;align-items:center;gap:0;
+  width:100%;height:100vh;overflow:hidden;
+  position:fixed;inset:0;background:#060a06;z-index:10;
+}
 #hud{
   width:100%;display:flex;align-items:center;justify-content:space-between;
-  padding:8px 16px 6px;
+  padding:6px 12px 4px;flex-shrink:0;
 }
 .team-score{display:flex;align-items:center;gap:10px}
 .team-name{font-size:11px;font-weight:700;letter-spacing:2px;opacity:.5}
@@ -93,9 +97,14 @@ input[type=text]::placeholder{font-family:'Inter',sans-serif;letter-spacing:1px;
 .badge-host{background:rgba(255,60,60,.15);color:#ff6666;border:1px solid rgba(255,60,60,.25)}
 .badge-guest{background:rgba(60,130,255,.15);color:#6699ff;border:1px solid rgba(60,130,255,.25)}
 #ping{font-size:10px;color:rgba(255,255,255,.3)}
-#msg-bar{font-size:13px;font-weight:600;min-height:20px;color:#ffdd44;text-align:center;padding:1px 0 3px;letter-spacing:.3px}
-#wrap{position:relative;line-height:0}
-canvas{display:block}
+#msg-bar{font-size:13px;font-weight:600;min-height:20px;color:#ffdd44;text-align:center;padding:1px 0 3px;letter-spacing:.3px;flex-shrink:0}
+#wrap{
+  position:relative;line-height:0;
+  flex:1;display:flex;align-items:center;justify-content:center;
+  overflow:hidden;width:100%;
+}
+/* Il canvas viene scalato via JS con transform:scale — mantiene dimensioni interne */
+canvas{display:block;transform-origin:center center;}
 #goal-flash{
   position:absolute;inset:0;pointer-events:none;opacity:0;
   background:radial-gradient(ellipse at center,rgba(255,220,50,.6) 0%,rgba(255,150,0,.2) 40%,transparent 70%);
@@ -105,7 +114,7 @@ canvas{display:block}
 /* ── CTRL BAR (desktop) ─────────────────────────────── */
 #ctrl-bar{
   display:flex;justify-content:space-between;width:100%;
-  padding:6px 16px 2px;font-size:10px;color:rgba(255,255,255,.28);
+  padding:4px 16px 2px;font-size:10px;color:rgba(255,255,255,.28);flex-shrink:0;
 }
 .ctrl-side{display:flex;flex-direction:column;gap:2px}
 kbd{background:rgba(255,255,255,.1);border-radius:3px;padding:1px 5px;font-size:9px;font-family:monospace;border:1px solid rgba(255,255,255,.15)}
@@ -265,10 +274,10 @@ const P_ACCEL  = 0.55;  // era 0.9 (risposta rapida ma non istantanea)
 const P_FRIC   = 0.68;  // era 0.60 (si ferma deciso ma non di colpo)
 
 const B_FRIC   = 0.985;
-const B_BOUNCE = 0.68;
-const B_HIT_R  = 0.78;
+const B_BOUNCE = 0.82;  // era 0.68 — rimbalza molto di più
+const B_HIT_R  = 0.80;
 
-const KICK_MIN     = 4.5;
+const KICK_MIN     = 4.0;
 const KICK_MAX     = 13.0;
 const KICK_CHG_F   = 50;   // frame per max carica
 // distanza max da palla per attivare il tiro (fix bug particelle a distanza)
@@ -340,7 +349,7 @@ function mkPlayer(x,y,col,num){
 }
 function mkBall(){
   const a=Math.random()*Math.PI*2;
-  return {x:W/2,y:H/2,vx:Math.cos(a)*1.5,vy:Math.sin(a)*1.5,r:BR,trail:[]};
+  return {x:W/2,y:H/2,vx:Math.cos(a)*1.0,vy:Math.sin(a)*1.0,r:BR,trail:[]};
 }
 function reset(full){
   players=[mkPlayer(W*.22,H/2,'#ff3333',0), mkPlayer(W*.78,H/2,'#3388ff',1)];
@@ -496,7 +505,7 @@ function doKick(p,force){
 
 function applyInput(p,inp){
   const charging=inp.kick;
-  const topSpd=charging?P_SPEED*.78:P_SPEED;
+  const topSpd=charging?P_SPEED*.42:P_SPEED;  // molto più lento mentre carica
 
   if(charging){
     p.charge=Math.min(p.charge+1,KICK_CHG_F);
@@ -817,8 +826,22 @@ function applyRemoteState(){
 }
 
 // ════════════════════════════════════════════════════════
-// GAME LOOP  — delta time reale
+// SCALING CANVAS — adatta al viewport (fix mobile)
 // ════════════════════════════════════════════════════════
+function scaleCanvas(){
+  const wrap = $('wrap');
+  const ww = wrap.clientWidth  || window.innerWidth;
+  const wh = wrap.clientHeight || (window.innerHeight - 120); // sottrai hud+msg
+  // Calcola scala mantenendo aspect ratio 900×520
+  const scaleX = ww / W;
+  const scaleY = wh / H;
+  const scale  = Math.min(scaleX, scaleY, 1); // mai più grande del 100% su desktop
+  canvas.style.transform = `scale(${scale})`;
+  // Ridimensiona il wrap alla dimensione visiva del canvas scalato
+  wrap.style.height = Math.round(H * scale) + 'px';
+}
+window.addEventListener('resize', scaleCanvas);
+// verrà chiamata anche in startGame
 let running=false;
 function loop(ts){
   if(!running)return;
@@ -855,7 +878,9 @@ function startGame(mode){
     // Mostra ugualmente per online/singolo
   }
   reset(true);updateHUD();
-  lastFrameTime=0;running=true;requestAnimationFrame(loop);
+  lastFrameTime=0;running=true;
+  // Scala il canvas dopo che il DOM si è aggiornato
+  requestAnimationFrame(()=>{ scaleCanvas(); requestAnimationFrame(loop); });
 }
 
 async function createRoom(){
