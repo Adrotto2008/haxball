@@ -1,452 +1,924 @@
 <!DOCTYPE html>
 <html lang="it">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>HaxBall 2</title>
-  <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      background: #111;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      min-height: 100vh;
-      font-family: 'Segoe UI', sans-serif;
-      color: #fff;
-    }
-    h1 { font-size: 22px; font-weight: 500; margin-bottom: 10px; letter-spacing: 2px; opacity: .8; }
-    #gb { background: #1a3a1a; border-radius: 12px; padding: 14px; user-select: none; }
-    #hud {
-      display: flex; align-items: center; justify-content: space-between;
-      margin-bottom: 8px; font-size: 14px; font-weight: 500;
-    }
-    .score-box { display: flex; align-items: center; gap: 10px; }
-    .team-label { font-size: 12px; opacity: .7; }
-    .score { font-size: 30px; font-weight: 500; min-width: 36px; text-align: center; }
-    #timer {
-      font-size: 16px; opacity: .85;
-      background: rgba(0,0,0,.35); padding: 4px 16px; border-radius: 20px;
-    }
-    #msg { text-align: center; font-size: 13px; min-height: 20px; color: #ffe07a; margin-bottom: 6px; font-weight: 500; }
-    canvas { display: block; border-radius: 8px; }
-    #controls {
-      display: flex; justify-content: space-between;
-      margin-top: 8px; font-size: 11px; color: rgba(255,255,255,.4);
-    }
-    .ctrl-group { display: flex; flex-direction: column; gap: 2px; }
-    .ctrl-group span { display: flex; align-items: center; gap: 4px; }
-    kbd {
-      background: rgba(255,255,255,.12); border-radius: 3px;
-      padding: 1px 5px; font-size: 10px; font-family: monospace;
-    }
-    #btn-restart {
-      background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.2);
-      color: #fff; border-radius: 6px; padding: 4px 14px;
-      font-size: 12px; cursor: pointer;
-    }
-    #btn-restart:hover { background: rgba(255,255,255,.2); }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>HaxBall 2</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  background:#060a06;min-height:100vh;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  font-family:'Inter',sans-serif;color:#fff;overflow:hidden;touch-action:none;
+}
+
+/* ── LOBBY ──────────────────────────────────────────── */
+#lobby{display:flex;flex-direction:column;align-items:center;gap:24px;animation:fadeIn .4s ease}
+@keyframes fadeIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+.logo{
+  font-size:48px;font-weight:900;letter-spacing:-1px;
+  background:linear-gradient(135deg,#ff3333 0%,#ff7700 50%,#ffdd00 100%);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+  filter:drop-shadow(0 0 30px rgba(255,80,0,.4));
+}
+.logo-sub{font-size:11px;letter-spacing:6px;color:rgba(255,255,255,.3);margin-top:-18px;text-align:center}
+.card{
+  background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);
+  border-radius:16px;padding:24px 28px;min-width:320px;
+  display:flex;flex-direction:column;gap:12px;
+}
+.card-title{font-size:11px;font-weight:700;letter-spacing:3px;color:rgba(255,255,255,.35);text-transform:uppercase}
+.row{display:flex;gap:10px}
+.btn{
+  flex:1;padding:13px 16px;border:none;border-radius:10px;
+  font-family:'Inter',sans-serif;font-size:13px;font-weight:700;
+  letter-spacing:.5px;cursor:pointer;transition:all .12s;outline:none;
+}
+.btn:active{transform:scale(.97)}
+.btn-red{background:linear-gradient(135deg,#ff3333,#cc1111);color:#fff;box-shadow:0 4px 20px rgba(255,50,50,.25)}
+.btn-red:hover{filter:brightness(1.15)}
+.btn-blue{background:linear-gradient(135deg,#3388ff,#1155cc);color:#fff;box-shadow:0 4px 20px rgba(50,130,255,.25)}
+.btn-blue:hover{filter:brightness(1.15)}
+.btn-green{background:linear-gradient(135deg,#22cc55,#118833);color:#fff}
+.btn-green:hover{filter:brightness(1.15)}
+.btn-ghost{background:rgba(255,255,255,.07);color:rgba(255,255,255,.6);border:1px solid rgba(255,255,255,.1)}
+.btn-ghost:hover{background:rgba(255,255,255,.12);color:#fff}
+input[type=text]{
+  background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);
+  border-radius:8px;padding:12px 16px;color:#fff;width:100%;outline:none;
+  font-family:'Courier New',monospace;font-size:18px;font-weight:700;
+  letter-spacing:6px;text-align:center;text-transform:uppercase;transition:border-color .15s;
+}
+input[type=text]:focus{border-color:rgba(80,150,255,.5)}
+input[type=text]::placeholder{font-family:'Inter',sans-serif;letter-spacing:1px;font-size:13px;font-weight:400;color:rgba(255,255,255,.2)}
+.divider{font-size:10px;letter-spacing:3px;color:rgba(255,255,255,.18);text-align:center}
+.code-box{background:rgba(50,120,255,.1);border:1px solid rgba(50,120,255,.25);border-radius:12px;padding:16px;text-align:center}
+.code-big{font-size:36px;font-weight:900;letter-spacing:10px;color:#5599ff;font-family:'Courier New',monospace}
+.code-hint{font-size:11px;color:rgba(255,255,255,.3);margin-top:6px}
+.waiting{display:flex;align-items:center;justify-content:center;gap:8px;color:rgba(255,255,255,.4);font-size:12px}
+.dot{width:5px;height:5px;border-radius:50%;background:#5599ff;animation:blink 1.2s infinite}
+.dot:nth-child(2){animation-delay:.2s}.dot:nth-child(3){animation-delay:.4s}
+@keyframes blink{0%,80%,100%{opacity:.2;transform:scale(.7)}40%{opacity:1;transform:scale(1)}}
+#lobby-msg{font-size:12px;color:#ffdd66;min-height:16px;text-align:center}
+
+/* ── GAME ───────────────────────────────────────────── */
+#game{display:none;flex-direction:column;align-items:center;gap:0;width:100%}
+#hud{
+  width:100%;display:flex;align-items:center;justify-content:space-between;
+  padding:8px 16px 6px;
+}
+.team-score{display:flex;align-items:center;gap:10px}
+.team-name{font-size:11px;font-weight:700;letter-spacing:2px;opacity:.5}
+.score-num{font-size:38px;font-weight:900;line-height:1;min-width:44px;text-align:center}
+.score-red{color:#ff4444}.score-blue{color:#4488ff}
+.hud-center{display:flex;flex-direction:column;align-items:center;gap:5px}
+#timer{
+  font-size:20px;font-weight:700;letter-spacing:2px;
+  background:rgba(255,255,255,.07);padding:5px 18px;border-radius:20px;
+  border:1px solid rgba(255,255,255,.08);
+}
+.hud-btns{display:flex;gap:6px}
+.hud-btn{
+  background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);
+  color:rgba(255,255,255,.6);border-radius:6px;padding:4px 10px;
+  font-family:'Inter',sans-serif;font-size:11px;font-weight:600;cursor:pointer;transition:all .12s;
+}
+.hud-btn:hover{background:rgba(255,255,255,.14);color:#fff}
+.hud-btn-danger{border-color:rgba(255,60,60,.3);color:rgba(255,100,100,.7)}
+.hud-btn-danger:hover{background:rgba(255,60,60,.15);color:#ff8888}
+#net-badge{font-size:9px;font-weight:700;letter-spacing:2px;padding:2px 8px;border-radius:10px;text-transform:uppercase}
+.badge-local{background:rgba(40,180,80,.15);color:#44cc66;border:1px solid rgba(40,180,80,.25)}
+.badge-host{background:rgba(255,60,60,.15);color:#ff6666;border:1px solid rgba(255,60,60,.25)}
+.badge-guest{background:rgba(60,130,255,.15);color:#6699ff;border:1px solid rgba(60,130,255,.25)}
+#ping{font-size:10px;color:rgba(255,255,255,.3)}
+#msg-bar{font-size:13px;font-weight:600;min-height:20px;color:#ffdd44;text-align:center;padding:1px 0 3px;letter-spacing:.3px}
+#wrap{position:relative;line-height:0}
+canvas{display:block}
+#goal-flash{
+  position:absolute;inset:0;pointer-events:none;opacity:0;
+  background:radial-gradient(ellipse at center,rgba(255,220,50,.6) 0%,rgba(255,150,0,.2) 40%,transparent 70%);
+  transition:opacity .08s;
+}
+
+/* ── CTRL BAR (desktop) ─────────────────────────────── */
+#ctrl-bar{
+  display:flex;justify-content:space-between;width:100%;
+  padding:6px 16px 2px;font-size:10px;color:rgba(255,255,255,.28);
+}
+.ctrl-side{display:flex;flex-direction:column;gap:2px}
+kbd{background:rgba(255,255,255,.1);border-radius:3px;padding:1px 5px;font-size:9px;font-family:monospace;border:1px solid rgba(255,255,255,.15)}
+
+/* ── TOUCH CONTROLS ─────────────────────────────────── */
+#touch-controls{
+  display:none; /* mostrato solo su touch */
+  position:fixed;inset:0;pointer-events:none;z-index:100;
+}
+/* joystick zona */
+#joy-zone{
+  position:absolute;left:20px;bottom:24px;
+  width:140px;height:140px;pointer-events:all;
+}
+#joy-base{
+  width:140px;height:140px;border-radius:50%;
+  background:rgba(255,255,255,.08);border:2px solid rgba(255,255,255,.18);
+  position:absolute;top:0;left:0;
+}
+#joy-stick{
+  width:56px;height:56px;border-radius:50%;
+  background:rgba(255,255,255,.28);border:2px solid rgba(255,255,255,.5);
+  position:absolute;top:42px;left:42px;
+  transition:box-shadow .1s;
+  box-shadow:0 0 16px rgba(255,255,255,.1);
+}
+/* kick button */
+#kick-btn{
+  position:absolute;right:24px;bottom:28px;
+  width:100px;height:100px;border-radius:50%;
+  background:rgba(255,180,0,.18);border:3px solid rgba(255,200,0,.5);
+  pointer-events:all;display:flex;align-items:center;justify-content:center;
+  font-size:13px;font-weight:700;color:rgba(255,220,80,.8);letter-spacing:1px;
+  user-select:none;-webkit-user-select:none;
+  transition:background .08s, transform .08s;
+}
+#kick-btn.pressed{
+  background:rgba(255,200,0,.4);border-color:rgba(255,220,0,.9);
+  transform:scale(.93);box-shadow:0 0 24px rgba(255,200,0,.4);
+}
+/* charge arc overlay inside kick btn */
+#kick-arc-canvas{position:absolute;right:24px;bottom:28px;width:100px;height:100px;pointer-events:none}
+</style>
 </head>
 <body>
-  <h1>⚽ HAXBALL 2</h1>
-  <div id="gb">
-    <div id="hud">
-      <div class="score-box">
-        <span class="team-label">🔴 Rossi</span>
-        <span class="score" id="sr">0</span>
-      </div>
-      <div style="display:flex;flex-direction:column;align-items:center;gap:4px">
-        <span id="timer">3:00</span>
-        <button id="btn-restart">↺ Restart</button>
-      </div>
-      <div class="score-box">
-        <span class="score" id="sb">0</span>
-        <span class="team-label">Blu 🔵</span>
-      </div>
+
+<!-- LOBBY -->
+<div id="lobby">
+  <div>
+    <div class="logo">⚽ HAXBALL 2</div>
+    <div class="logo-sub">BROWSER FOOTBALL</div>
+  </div>
+  <div class="card">
+    <div class="card-title">🌐 Online</div>
+    <div class="row">
+      <button class="btn btn-red" id="btn-create">Crea stanza</button>
+      <button class="btn btn-blue" id="btn-join-show">Entra con codice</button>
     </div>
-    <div id="msg">WASD + Ctrl per tirare &nbsp;|&nbsp; Frecce + Spazio per tirare</div>
-    <canvas id="c"></canvas>
-    <div id="controls">
-      <div class="ctrl-group">
-        <b style="color:rgba(255,255,255,.6)">🔴 Giocatore 1</b>
-        <span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> Muovi</span>
-        <span><kbd>Ctrl</kbd> Tiro (tieni per caricare)</span>
-      </div>
-      <div class="ctrl-group" style="text-align:right;align-items:flex-end">
-        <b style="color:rgba(255,255,255,.6)">Giocatore 2 🔵</b>
-        <span><kbd>↑</kbd><kbd>←</kbd><kbd>↓</kbd><kbd>→</kbd> Muovi</span>
-        <span><kbd>Spazio</kbd> Tiro (tieni per caricare)</span>
-      </div>
+    <div class="divider">── oppure ──</div>
+    <button class="btn btn-green" id="btn-local">Gioca in locale (stesso PC)</button>
+  </div>
+  <div class="card" id="card-join" style="display:none">
+    <div class="card-title">Inserisci codice stanza</div>
+    <input type="text" id="code-input" maxlength="6" placeholder="es. AB12CD">
+    <div class="row">
+      <button class="btn btn-blue" id="btn-join-go">Entra →</button>
+      <button class="btn btn-ghost" id="btn-join-cancel">Annulla</button>
     </div>
   </div>
+  <div class="card" id="card-wait" style="display:none">
+    <div class="card-title">In attesa del secondo giocatore</div>
+    <div class="code-box">
+      <div class="code-big" id="room-code-shown">------</div>
+      <div class="code-hint">Manda questo codice all'avversario</div>
+    </div>
+    <div class="waiting">
+      <div class="dot"></div><div class="dot"></div><div class="dot"></div>
+      <span>Aspettando connessione…</span>
+    </div>
+    <button class="btn btn-ghost" id="btn-cancel-wait">Annulla</button>
+  </div>
+  <div id="lobby-msg"></div>
+</div>
 
+<!-- GAME -->
+<div id="game">
+  <div id="hud">
+    <div class="team-score">
+      <span class="team-name">ROSSI</span>
+      <span class="score-num score-red" id="sr">0</span>
+    </div>
+    <div class="hud-center">
+      <div id="timer">3:00</div>
+      <div class="hud-btns">
+        <button class="hud-btn" id="btn-restart">↺ Restart</button>
+        <button class="hud-btn hud-btn-danger" id="btn-leave">✕ Esci</button>
+      </div>
+      <span id="net-badge" class="badge-local">LOCAL</span>
+      <span id="ping"></span>
+    </div>
+    <div class="team-score">
+      <span class="score-num score-blue" id="sb">0</span>
+      <span class="team-name">BLU</span>
+    </div>
+  </div>
+  <div id="msg-bar"></div>
+  <div id="wrap">
+    <canvas id="c"></canvas>
+    <div id="goal-flash"></div>
+  </div>
+  <div id="ctrl-bar">
+    <div class="ctrl-side">
+      <b style="color:rgba(255,255,255,.4)">🔴 P1</b>
+      <span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> o Frecce · <kbd>Ctrl</kbd> o <kbd>Spazio</kbd> o <kbd>0</kbd> tiro</span>
+    </div>
+    <div class="ctrl-side" style="text-align:right;align-items:flex-end">
+      <b style="color:rgba(255,255,255,.4)">P2 🔵</b>
+      <span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> o Frecce · <kbd>Ctrl</kbd> o <kbd>Spazio</kbd> o <kbd>0</kbd> tiro</span>
+    </div>
+  </div>
+</div>
+
+<!-- TOUCH CONTROLS -->
+<div id="touch-controls">
+  <div id="joy-zone">
+    <div id="joy-base"></div>
+    <div id="joy-stick"></div>
+  </div>
+  <canvas id="kick-arc-canvas" width="100" height="100"></canvas>
+  <div id="kick-btn">TIRO</div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script>
-const canvas = document.getElementById('c');
-const ctx = canvas.getContext('2d');
+// ════════════════════════════════════════════════════════
+// SUPABASE
+// ════════════════════════════════════════════════════════
+const SUPABASE_URL = 'https://qtmqdeluofnwhtftjnkc.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_WzKJ-bi-KddPFEbUw30Avw_RzoIHZ4r';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-// ── DIMENSIONI CAMPO GRANDE ───────────────────────────────────────────────────
-const W = 1100, H = 620;
+// ════════════════════════════════════════════════════════
+// CANVAS & DIMENSIONI
+// ════════════════════════════════════════════════════════
+const canvas = document.getElementById('c');
+const ctx    = canvas.getContext('2d');
+const W = 900, H = 520;
 canvas.width = W; canvas.height = H;
 
-// ── COSTANTI ──────────────────────────────────────────────────────────────────
-const GOAL_W = 14, GOAL_H = 140;
-const PLAYER_R = 18, BALL_R = 13;
+// ════════════════════════════════════════════════════════
+// COSTANTI FISICA  — arcade fluido, leggermente più lento
+// ════════════════════════════════════════════════════════
+const PR = 16, BR = 11;
 
-const PLAYER_SPEED_NORMAL = 1.6;
-const PLAYER_SPEED_KICK   = 1.0;   // più lento mentre carica
-const PLAYER_ACCEL        = 0.38;
-const PLAYER_FRICTION     = 0.72;
-const BALL_FRICTION       = 0.982;
-const BALL_BOUNCE         = 0.55;
-const BALL_HIT_RESTITUTION = 0.6;
+const P_SPEED  = 2.4;   // era 3.2 (ora ~75% — più vicino all'originale)
+const P_ACCEL  = 0.55;  // era 0.9 (risposta rapida ma non istantanea)
+const P_FRIC   = 0.68;  // era 0.60 (si ferma deciso ma non di colpo)
 
-const KICK_FORCE_MIN  = 2.5;
-const KICK_FORCE_MAX  = 6.5;
-const KICK_CHARGE_MAX = 45;
+const B_FRIC   = 0.985;
+const B_BOUNCE = 0.68;
+const B_HIT_R  = 0.78;
 
-// Raggio del cerchio decorativo intorno al player
-const AURA_R_BASE   = 10;  // quanto supera il raggio del player
-const AURA_R_CHARGE = 10;  // espansione extra al massimo della carica
+const KICK_MIN     = 4.5;
+const KICK_MAX     = 13.0;
+const KICK_CHG_F   = 50;   // frame per max carica
+// distanza max da palla per attivare il tiro (fix bug particelle a distanza)
+const KICK_DIST    = PR + BR + 14;
 
 const MATCH_TIME = 180;
+const FL = {l:40, r:W-40, t:40, b:H-40};
+const GH = 120, GW = 12, GY = H/2 - 60;
 
-const FIELD = {
-  left: 50, right: W - 50, top: 50, bottom: H - 50,
-  get goalY() { return H / 2 - GOAL_H / 2; },
-  get goalH() { return GOAL_H; }
-};
+// ════════════════════════════════════════════════════════
+// STATO
+// ════════════════════════════════════════════════════════
+let score=[0,0], timeLeft=MATCH_TIME, gameOver=false;
+let goalCD=0, ticker=0;
+let lastFrameTime=0;   // per delta-time reale
+let secondAccum=0;     // accumula ms → decrementa timer ogni 1000ms esatti
+let players, ball, particles=[];
 
-// ── STATO ─────────────────────────────────────────────────────────────────────
-let score = [0, 0], timeLeft = MATCH_TIME, gameOver = false;
-let goalCooldown = 0, ticker = 0;
-let players, ball;
-const keys = {};
+const keys={};
+let touchKick=false;    // input touch kick
+let joyX=0, joyY=0;    // joystick normalizzato -1..1
 
-function mkPlayer(x, y, col, num, kickKey) {
-  return {
-    x, y, vx: 0, vy: 0,
-    r: PLAYER_R, col, num, kickKey,
-    kickCharge: 0,
-    kickHeld: false
-  };
+let netMode='local', roomCode=null, channel=null, pingMs=0;
+let remoteInput={up:false,dn:false,lt:false,rt:false,kick:false};
+let remoteState=null, lastSent=0;
+
+// ════════════════════════════════════════════════════════
+// HELPERS
+// ════════════════════════════════════════════════════════
+const $     = id => document.getElementById(id);
+const setMsg    = t => $('msg-bar').textContent = t;
+const setStatus = t => $('lobby-msg').textContent = t;
+const lerp  = (a,b,t) => a+(b-a)*t;
+const dist  = (a,b) => Math.hypot(b.x-a.x, b.y-a.y);
+
+// ════════════════════════════════════════════════════════
+// PARTICELLE
+// ════════════════════════════════════════════════════════
+function spawnP(x,y,n,col,spd,life){
+  for(let i=0;i<n;i++){
+    const a=Math.random()*Math.PI*2, s=spd*(0.4+Math.random()*.6);
+    particles.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,life,maxLife:life,col,r:2+Math.random()*3});
+  }
 }
-function mkBall() {
-  return {
-    x: W / 2, y: H / 2,
-    vx: (Math.random() - 0.5) * 1.5,
-    vy: (Math.random() - 0.5) * 1.5,
-    r: BALL_R
-  };
+function goalBurst(x,y){
+  spawnP(x,y,60,'#ffdd00',8,50);
+  spawnP(x,y,40,'#ff8800',6,40);
+  spawnP(x,y,25,'#ffffff',10,35);
+}
+function tickParticles(){
+  particles=particles.filter(p=>{
+    p.x+=p.vx;p.y+=p.vy;p.vx*=0.94;p.vy*=0.94;p.life--;return p.life>0;
+  });
+}
+function drawParticles(){
+  for(const p of particles){
+    const a=p.life/p.maxLife;
+    ctx.globalAlpha=a;ctx.fillStyle=p.col;
+    ctx.beginPath();ctx.arc(p.x,p.y,p.r*a,0,Math.PI*2);ctx.fill();
+  }
+  ctx.globalAlpha=1;
 }
 
-function reset(full) {
-  players = [
-    mkPlayer(W * 0.25, H / 2, '#e84444', 0, 'ControlLeft'),
-    mkPlayer(W * 0.75, H / 2, '#4488ee', 1, 'Space')
-  ];
-  ball = mkBall();
-  if (full) { score = [0, 0]; timeLeft = MATCH_TIME; gameOver = false; ticker = 0; }
-  goalCooldown = 80;
-  if (full) document.getElementById('msg').textContent = 'WASD + Ctrl per tirare  |  Frecce + Spazio per tirare';
-  else      document.getElementById('msg').textContent = '';
+// ════════════════════════════════════════════════════════
+// INIT
+// ════════════════════════════════════════════════════════
+function mkPlayer(x,y,col,num){
+  return {x,y,vx:0,vy:0,r:PR,col,num,charge:0,held:false};
 }
-reset(true);
+function mkBall(){
+  const a=Math.random()*Math.PI*2;
+  return {x:W/2,y:H/2,vx:Math.cos(a)*1.5,vy:Math.sin(a)*1.5,r:BR,trail:[]};
+}
+function reset(full){
+  players=[mkPlayer(W*.22,H/2,'#ff3333',0), mkPlayer(W*.78,H/2,'#3388ff',1)];
+  ball=mkBall();
+  remoteInput={up:false,dn:false,lt:false,rt:false,kick:false};
+  remoteState=null; particles=[];
+  if(full){score=[0,0];timeLeft=MATCH_TIME;gameOver=false;ticker=0;secondAccum=0;}
+  goalCD=90;
+  if(full) setMsg(
+    netMode==='host'  ?'🔴 Sei il Rosso — WASD/Frecce + Ctrl/Spazio/0':
+    netMode==='guest' ?'🔵 Sei il Blu — WASD/Frecce + Ctrl/Spazio/0':
+    'WASD/Frecce per muoverti · Ctrl, Spazio o 0 per tirare'
+  );
+  else setMsg('');
+}
 
-// ── INPUT ─────────────────────────────────────────────────────────────────────
-document.addEventListener('keydown', e => {
-  keys[e.code] = true;
-  // previeni scroll pagina
-  if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space','ControlLeft','ControlRight'].includes(e.code))
+// ════════════════════════════════════════════════════════
+// INPUT TASTIERA
+// ════════════════════════════════════════════════════════
+document.addEventListener('keydown',e=>{
+  keys[e.code]=true;
+  if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',
+      'Space','ControlLeft','ControlRight','Digit0','Numpad0'].includes(e.code))
     e.preventDefault();
 });
-document.addEventListener('keyup', e => { keys[e.code] = false; });
-document.getElementById('btn-restart').onclick = () => { reset(true); updateHUD(); };
+document.addEventListener('keyup',e=>{ keys[e.code]=false; });
 
-// ── HUD ───────────────────────────────────────────────────────────────────────
-function updateHUD() {
-  document.getElementById('sr').textContent = score[0];
-  document.getElementById('sb').textContent = score[1];
-  const m = Math.floor(timeLeft / 60), s = timeLeft % 60;
-  document.getElementById('timer').textContent = m + ':' + (s < 10 ? '0' : '') + s;
+function isKickKey(){
+  return !!(keys['ControlLeft']||keys['ControlRight']||keys['Space']
+            ||keys['Digit0']||keys['Numpad0']||touchKick);
 }
 
-// ── FISICA ────────────────────────────────────────────────────────────────────
-function circleCollide(a, b, restitution) {
-  const rest = restitution !== undefined ? restitution : 1.0;
-  const dx = b.x - a.x, dy = b.y - a.y;
-  const d = Math.sqrt(dx * dx + dy * dy);
-  const minD = a.r + b.r;
-  if (d < minD && d > 0.01) {
-    const nx = dx / d, ny = dy / d;
-    const overlap = (minD - d) / 2;
-    a.x -= nx * overlap; a.y -= ny * overlap;
-    b.x += nx * overlap; b.y += ny * overlap;
-    const rv = (b.vx - a.vx) * nx + (b.vy - a.vy) * ny;
-    if (rv < 0) {
-      const imp = rv * rest;
-      a.vx += imp * nx; a.vy += imp * ny;
-      b.vx -= imp * nx; b.vy -= imp * ny;
+// Input P0 (locale - WASD+Ctrl/0)
+function inpP0(){
+  return {
+    up: !!keys['KeyW'],    dn: !!keys['KeyS'],
+    lt: !!keys['KeyA'],    rt: !!keys['KeyD'],
+    kick: !!(keys['ControlLeft']||keys['ControlRight']||keys['Digit0']||keys['Numpad0'])
+  };
+}
+// Input P1 (locale - Frecce+Spazio)
+function inpP1(){
+  return {
+    up: !!keys['ArrowUp'],   dn: !!keys['ArrowDown'],
+    lt: !!keys['ArrowLeft'], rt: !!keys['ArrowRight'],
+    kick: !!keys['Space']
+  };
+}
+// Input online/touch - tutti i tasti + joystick
+function inpLocal(){
+  const anyUp  = !!(keys['KeyW']||keys['ArrowUp']   ||(joyY<-0.25));
+  const anyDn  = !!(keys['KeyS']||keys['ArrowDown'] ||(joyY>0.25));
+  const anyLt  = !!(keys['KeyA']||keys['ArrowLeft'] ||(joyX<-0.25));
+  const anyRt  = !!(keys['KeyD']||keys['ArrowRight']||(joyX>0.25));
+  return {up:anyUp, dn:anyDn, lt:anyLt, rt:anyRt, kick:isKickKey()};
+}
+
+// ════════════════════════════════════════════════════════
+// TOUCH — joystick + kick button
+// ════════════════════════════════════════════════════════
+const joyZone  = $('joy-zone');
+const joyStick = $('joy-stick');
+const kickBtn  = $('kick-btn');
+const arcCvs   = $('kick-arc-canvas');
+const arcCtx   = arcCvs.getContext('2d');
+let joyTouchId=null, kickTouchId=null;
+let joyOrigin={x:70,y:70}; // centro base joystick
+const JOY_R=60; // raggio max stick
+
+function detectTouch(){
+  if('ontouchstart' in window || navigator.maxTouchPoints>0){
+    $('touch-controls').style.display='block';
+    $('ctrl-bar').style.display='none';
+  }
+}
+detectTouch();
+
+function updateJoyStick(cx,cy){
+  const dx=cx-joyOrigin.x, dy=cy-joyOrigin.y;
+  const d=Math.hypot(dx,dy);
+  const clamped=Math.min(d,JOY_R);
+  const nx=d>1?dx/d:0, ny=d>1?dy/d:0;
+  joyX=nx*(clamped/JOY_R);
+  joyY=ny*(clamped/JOY_R);
+  joyStick.style.left=(70+nx*clamped-28)+'px';
+  joyStick.style.top= (70+ny*clamped-28)+'px';
+}
+function resetJoy(){
+  joyX=0;joyY=0;
+  joyStick.style.left='42px';joyStick.style.top='42px';
+}
+
+document.addEventListener('touchstart',e=>{
+  for(const t of e.changedTouches){
+    const el=document.elementFromPoint(t.clientX,t.clientY);
+    if(el===joyStick||el===joyZone||el?.id==='joy-base'){
+      if(joyTouchId===null){
+        joyTouchId=t.identifier;
+        const r=joyZone.getBoundingClientRect();
+        joyOrigin={x:r.left+70,y:r.top+70};
+        updateJoyStick(t.clientX,t.clientY);
+      }
+    }
+    if(el===kickBtn||el?.id==='kick-btn'){
+      if(kickTouchId===null){kickTouchId=t.identifier;touchKick=true;kickBtn.classList.add('pressed');}
     }
   }
+},{passive:true});
+
+document.addEventListener('touchmove',e=>{
+  for(const t of e.changedTouches){
+    if(t.identifier===joyTouchId) updateJoyStick(t.clientX,t.clientY);
+  }
+},{passive:true});
+
+document.addEventListener('touchend',e=>{
+  for(const t of e.changedTouches){
+    if(t.identifier===joyTouchId){joyTouchId=null;resetJoy();}
+    if(t.identifier===kickTouchId){kickTouchId=null;touchKick=false;kickBtn.classList.remove('pressed');}
+  }
+},{passive:true});
+
+// Disegna arco carica sul bottone kick
+function drawKickArc(ratio){
+  arcCtx.clearRect(0,0,100,100);
+  if(ratio<=0)return;
+  arcCtx.beginPath();
+  arcCtx.arc(50,50,44,-Math.PI/2,-Math.PI/2+ratio*Math.PI*2);
+  arcCtx.strokeStyle=`rgba(255,220,80,${0.5+ratio*.5})`;
+  arcCtx.lineWidth=5;arcCtx.lineCap='round';arcCtx.stroke();
 }
 
-function doKick(p, b, force) {
-  const dx = b.x - p.x, dy = b.y - p.y;
-  const d = Math.sqrt(dx * dx + dy * dy);
-  if (d < p.r + b.r + 8) {
-    const nx = d > 0.01 ? dx / d : 1;
-    const ny = d > 0.01 ? dy / d : 0;
-    b.vx = nx * force + p.vx * 0.25;
-    b.vy = ny * force + p.vy * 0.25;
+// ════════════════════════════════════════════════════════
+// FISICA
+// ════════════════════════════════════════════════════════
+function circleCollide(a,b,res){
+  const dx=b.x-a.x, dy=b.y-a.y, d=Math.hypot(dx,dy), md=a.r+b.r;
+  if(d<md&&d>0.01){
+    const nx=dx/d,ny=dy/d,ov=(md-d)/2;
+    a.x-=nx*ov;a.y-=ny*ov;b.x+=nx*ov;b.y+=ny*ov;
+    const rv=(b.vx-a.vx)*nx+(b.vy-a.vy)*ny;
+    if(rv<0){const imp=rv*(res||1);a.vx+=imp*nx;a.vy+=imp*ny;b.vx-=imp*nx;b.vy-=imp*ny;}
   }
 }
 
-// ── UPDATE ────────────────────────────────────────────────────────────────────
-function updatePlayer(p, upKey, downKey, leftKey, rightKey) {
-  const isCharging = keys[p.kickKey];
-  const maxSpeed = isCharging ? PLAYER_SPEED_KICK : PLAYER_SPEED_NORMAL;
+function doKick(p,force){
+  // FIX: tira solo se la palla è abbastanza vicina
+  if(dist(p,ball)>KICK_DIST) return;
+  const dx=ball.x-p.x, dy=ball.y-p.y, d=Math.hypot(dx,dy)||1;
+  ball.vx=(dx/d)*force+p.vx*.3;
+  ball.vy=(dy/d)*force+p.vy*.3;
+}
 
-  if (isCharging) {
-    p.kickCharge = Math.min(p.kickCharge + 1, KICK_CHARGE_MAX);
+function applyInput(p,inp){
+  const charging=inp.kick;
+  const topSpd=charging?P_SPEED*.78:P_SPEED;
+
+  if(charging){
+    p.charge=Math.min(p.charge+1,KICK_CHG_F);
   } else {
-    if (p.kickHeld && p.kickCharge > 0) {
-      const t = p.kickCharge / KICK_CHARGE_MAX;
-      doKick(p, ball, KICK_FORCE_MIN + t * (KICK_FORCE_MAX - KICK_FORCE_MIN));
+    if(p.held&&p.charge>0){
+      const t=p.charge/KICK_CHG_F;
+      const force=KICK_MIN+t*(KICK_MAX-KICK_MIN);
+      doKick(p,force);
+      // Particelle SOLO se palla vicina
+      if(dist(p,ball)<=KICK_DIST)
+        spawnP(ball.x,ball.y,10,p.col,force*.55,18);
     }
-    p.kickCharge = 0;
+    p.charge=0;
   }
-  p.kickHeld = isCharging;
+  p.held=charging;
 
-  if (keys[upKey])    p.vy -= PLAYER_ACCEL;
-  if (keys[downKey])  p.vy += PLAYER_ACCEL;
-  if (keys[leftKey])  p.vx -= PLAYER_ACCEL;
-  if (keys[rightKey]) p.vx += PLAYER_ACCEL;
+  if(inp.up) p.vy-=P_ACCEL;
+  if(inp.dn) p.vy+=P_ACCEL;
+  if(inp.lt) p.vx-=P_ACCEL;
+  if(inp.rt) p.vx+=P_ACCEL;
 
-  const speed = Math.sqrt(p.vx * p.vx + p.vy * p.vy);
-  if (speed > maxSpeed) { p.vx = (p.vx / speed) * maxSpeed; p.vy = (p.vy / speed) * maxSpeed; }
+  const spd=Math.hypot(p.vx,p.vy);
+  if(spd>topSpd){p.vx=p.vx/spd*topSpd;p.vy=p.vy/spd*topSpd;}
+  p.x+=p.vx;p.y+=p.vy;
+  p.vx*=P_FRIC;p.vy*=P_FRIC;
 
-  p.x += p.vx; p.y += p.vy;
-  p.vx *= PLAYER_FRICTION; p.vy *= PLAYER_FRICTION;
-
-  if (p.x < FIELD.left  + p.r) { p.x = FIELD.left  + p.r; p.vx *= -0.3; }
-  if (p.x > FIELD.right - p.r) { p.x = FIELD.right - p.r; p.vx *= -0.3; }
-  if (p.y < FIELD.top   + p.r) { p.y = FIELD.top   + p.r; p.vy *= -0.3; }
-  if (p.y > FIELD.bottom - p.r){ p.y = FIELD.bottom - p.r; p.vy *= -0.3; }
+  if(p.x<FL.l+p.r){p.x=FL.l+p.r;p.vx*=-.4;}
+  if(p.x>FL.r-p.r){p.x=FL.r-p.r;p.vx*=-.4;}
+  if(p.y<FL.t+p.r){p.y=FL.t+p.r;p.vy*=-.4;}
+  if(p.y>FL.b-p.r){p.y=FL.b-p.r;p.vy*=-.4;}
 }
 
-function update() {
-  if (gameOver) return;
-  if (goalCooldown > 0) { goalCooldown--; return; }
+// ════════════════════════════════════════════════════════
+// UPDATE  — usa delta time reale per il timer
+// ════════════════════════════════════════════════════════
+function update(dt){
+  if(gameOver)return;
+  if(goalCD>0){goalCD--;return;}
   ticker++;
 
-  updatePlayer(players[0], 'KeyW', 'KeyS', 'KeyA', 'KeyD');
-  updatePlayer(players[1], 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight');
-
-  circleCollide(players[0], players[1], 0.7);
-
-  ball.x += ball.vx; ball.y += ball.vy;
-  ball.vx *= BALL_FRICTION; ball.vy *= BALL_FRICTION;
-
-  for (const p of players) circleCollide(p, ball, BALL_HIT_RESTITUTION);
-
-  const inGoalY = ball.y > FIELD.goalY && ball.y < FIELD.goalY + GOAL_H;
-
-  if (ball.x - ball.r < FIELD.left) {
-    if (inGoalY) { goal(1); return; }
-    ball.x = FIELD.left + ball.r; ball.vx *= -BALL_BOUNCE;
+  // Timer REALE: accumula millisecondi
+  if(timeLeft>0){
+    secondAccum+=dt;
+    if(secondAccum>=1000){
+      secondAccum-=1000;
+      timeLeft--;
+      updateHUD();
+      if(timeLeft===0){endGame();return;}
+    }
   }
-  if (ball.x + ball.r > FIELD.right) {
-    if (inGoalY) { goal(0); return; }
-    ball.x = FIELD.right - ball.r; ball.vx *= -BALL_BOUNCE;
-  }
-  if (ball.y - ball.r < FIELD.top)    { ball.y = FIELD.top    + ball.r; ball.vy *= -BALL_BOUNCE; }
-  if (ball.y + ball.r > FIELD.bottom) { ball.y = FIELD.bottom - ball.r; ball.vy *= -BALL_BOUNCE; }
 
-  if (ticker % 60 === 0 && timeLeft > 0) {
-    timeLeft--;
-    updateHUD();
-    if (timeLeft === 0) endGame();
+  if(netMode==='guest'){
+    sendGuestInput();
+    applyRemoteState();
+    tickParticles();
+    // aggiorna arco kick touch
+    const myP=players[1];
+    if($('touch-controls').style.display!=='none') drawKickArc(myP.charge/KICK_CHG_F);
+    return;
+  }
+
+  let inp0,inp1;
+  if(netMode==='local'){inp0=inpP0();inp1=inpP1();}
+  else{inp0=inpLocal();inp1=remoteInput;}
+
+  applyInput(players[0],inp0);
+  applyInput(players[1],inp1);
+  circleCollide(players[0],players[1],0.8);
+
+  ball.trail.push({x:ball.x,y:ball.y});
+  if(ball.trail.length>8)ball.trail.shift();
+
+  ball.x+=ball.vx;ball.y+=ball.vy;
+  ball.vx*=B_FRIC;ball.vy*=B_FRIC;
+  for(const p of players)circleCollide(p,ball,B_HIT_R);
+  tickParticles();
+
+  // Arco kick touch (host/local)
+  if($('touch-controls').style.display!=='none'){
+    const myP=netMode==='local'?players[0]:players[0];
+    drawKickArc(myP.charge/KICK_CHG_F);
+  }
+
+  const inGoal=ball.y>GY&&ball.y<GY+GH;
+  if(ball.x-ball.r<FL.l){if(inGoal){goal(1);return;}ball.x=FL.l+ball.r;ball.vx*=-B_BOUNCE;}
+  if(ball.x+ball.r>FL.r){if(inGoal){goal(0);return;}ball.x=FL.r-ball.r;ball.vx*=-B_BOUNCE;}
+  if(ball.y-ball.r<FL.t){ball.y=FL.t+ball.r;ball.vy*=-B_BOUNCE;}
+  if(ball.y+ball.r>FL.b){ball.y=FL.b-ball.r;ball.vy*=-B_BOUNCE;}
+
+  if(netMode==='host'){
+    const now=Date.now();
+    if(now-lastSent>=50){lastSent=now;broadcastState();}
   }
 }
 
-function goal(team) {
-  score[team]++;
-  updateHUD();
-  const who = team === 0 ? '🔴 Rossi' : '🔵 Blu';
-  document.getElementById('msg').textContent = `⚽ GOOOL! ${who} segnano! (${score[0]} - ${score[1]})`;
-  goalCooldown = 130;
-  reset(false);
+// ════════════════════════════════════════════════════════
+// GOL / FINE
+// ════════════════════════════════════════════════════════
+function goal(team){
+  score[team]++;updateHUD();
+  const who=team===0?'🔴 ROSSI':'🔵 BLU';
+  setMsg(`⚽ GOOOL! ${who}! (${score[0]}–${score[1]})`);
+  const gx=team===0?FL.l:FL.r;
+  goalBurst(gx,H/2);
+  const fl=$('goal-flash');fl.style.opacity='1';
+  setTimeout(()=>fl.style.opacity='0',140);
+  goalCD=140;reset(false);
+  if(netMode==='host')broadcastState();
+}
+function endGame(){
+  gameOver=true;
+  const msg=score[0]>score[1]?`🏆 Vincono i ROSSI! (${score[0]}–${score[1]})`:
+            score[1]>score[0]?`🏆 Vincono i BLU! (${score[0]}–${score[1]})`:
+            `🤝 Pareggio! (${score[0]}–${score[1]})`;
+  setMsg(msg+' — Restart per rigiocare');
+  if(netMode==='host')broadcastState();
 }
 
-function endGame() {
-  gameOver = true;
-  let msg;
-  if      (score[0] > score[1]) msg = `🏆 Vincono i ROSSI! (${score[0]}-${score[1]}) — Restart per rigiocare.`;
-  else if (score[1] > score[0]) msg = `🏆 Vincono i BLU! (${score[0]}-${score[1]}) — Restart per rigiocare.`;
-  else                           msg = `🤝 Pareggio! (${score[0]}-${score[1]}) — Restart per rigiocare.`;
-  document.getElementById('msg').textContent = msg;
+// ════════════════════════════════════════════════════════
+// HUD
+// ════════════════════════════════════════════════════════
+function updateHUD(){
+  $('sr').textContent=score[0];$('sb').textContent=score[1];
+  const m=Math.floor(timeLeft/60),s=timeLeft%60;
+  $('timer').textContent=m+':'+(s<10?'0':'')+s;
 }
 
-// ── DRAW ──────────────────────────────────────────────────────────────────────
-function drawField() {
-  const fw = FIELD.right - FIELD.left, fh = FIELD.bottom - FIELD.top;
+// ════════════════════════════════════════════════════════
+// DISEGNO
+// ════════════════════════════════════════════════════════
+function drawField(){
+  const fw=FL.r-FL.l, fh=FL.b-FL.t;
+  // Sfondo erba con gradiente radiale
+  const g=ctx.createRadialGradient(W/2,H/2,40,W/2,H/2,W*.7);
+  g.addColorStop(0,'#1d5a1d');g.addColorStop(.5,'#174d17');g.addColorStop(1,'#0d2d0d');
+  ctx.fillStyle=g;ctx.fillRect(FL.l,FL.t,fw,fh);
 
-  ctx.fillStyle = '#2a5c2a';
-  ctx.fillRect(FIELD.left, FIELD.top, fw, fh);
+  // Strisce
+  const sw=fw/12;ctx.fillStyle='rgba(0,0,0,.065)';
+  for(let i=0;i<12;i+=2)ctx.fillRect(FL.l+i*sw,FL.t,sw,fh);
 
-  // Strisce erba
-  ctx.fillStyle = 'rgba(0,0,0,.04)';
-  for (let i = 0; i < 10; i++) ctx.fillRect(FIELD.left + i * fw / 10, FIELD.top, fw / 20, fh);
+  // Riflettore centrale
+  const sg=ctx.createRadialGradient(W/2,H/2,0,W/2,H/2,200);
+  sg.addColorStop(0,'rgba(255,255,220,.055)');sg.addColorStop(1,'rgba(0,0,0,0)');
+  ctx.fillStyle=sg;ctx.fillRect(FL.l,FL.t,fw,fh);
 
-  // Bordo campo
-  ctx.strokeStyle = 'rgba(255,255,255,.3)'; ctx.lineWidth = 1.5;
-  ctx.strokeRect(FIELD.left, FIELD.top, fw, fh);
-  ctx.beginPath(); ctx.moveTo(W / 2, FIELD.top); ctx.lineTo(W / 2, FIELD.bottom); ctx.stroke();
+  // Bordi
+  ctx.strokeStyle='rgba(255,255,255,.5)';ctx.lineWidth=2;ctx.strokeRect(FL.l,FL.t,fw,fh);
+  ctx.beginPath();ctx.moveTo(W/2,FL.t);ctx.lineTo(W/2,FL.b);
+  ctx.strokeStyle='rgba(255,255,255,.38)';ctx.lineWidth=1.5;ctx.stroke();
 
-  // Cerchio centrale
-  ctx.beginPath(); ctx.arc(W / 2, H / 2, 65, 0, Math.PI * 2);
-  ctx.strokeStyle = 'rgba(255,255,255,.22)'; ctx.stroke();
-  ctx.fillStyle = 'rgba(255,255,255,.05)'; ctx.fill();
-  ctx.fillStyle = 'rgba(255,255,255,.6)';
-  ctx.beginPath(); ctx.arc(W / 2, H / 2, 3, 0, Math.PI * 2); ctx.fill();
+  // Cerchio
+  ctx.beginPath();ctx.arc(W/2,H/2,55,0,Math.PI*2);
+  ctx.strokeStyle='rgba(255,255,255,.32)';ctx.lineWidth=1.5;ctx.stroke();
+  ctx.fillStyle='rgba(255,255,255,.03)';ctx.fill();
+  ctx.fillStyle='rgba(255,255,255,.7)';ctx.beginPath();ctx.arc(W/2,H/2,2.5,0,Math.PI*2);ctx.fill();
 
-  // Aree rigore
-  ctx.strokeStyle = 'rgba(255,255,255,.15)'; ctx.lineWidth = 1;
-  const aW = 110, aH = 220, aY = (H - aH) / 2;
-  ctx.strokeRect(FIELD.left, aY, aW, aH);
-  ctx.strokeRect(FIELD.right - aW, aY, aW, aH);
-
-  // Piccola area
-  const pW = 50, pH = 120, pY = (H - pH) / 2;
-  ctx.strokeRect(FIELD.left, pY, pW, pH);
-  ctx.strokeRect(FIELD.right - pW, pY, pW, pH);
+  // Aree
+  const aW=85,aH=180,aY=(H-aH)/2;
+  ctx.strokeStyle='rgba(255,255,255,.22)';ctx.lineWidth=1;
+  ctx.strokeRect(FL.l,aY,aW,aH);ctx.strokeRect(FL.r-aW,aY,aW,aH);
+  const pW=36,pH=100,pY=(H-pH)/2;
+  ctx.strokeRect(FL.l,pY,pW,pH);ctx.strokeRect(FL.r-pW,pY,pW,pH);
 
   // Porte
-  ctx.fillStyle = 'rgba(255,255,255,.08)';
-  ctx.fillRect(FIELD.left - GOAL_W, FIELD.goalY, GOAL_W, GOAL_H);
-  ctx.fillRect(FIELD.right,         FIELD.goalY, GOAL_W, GOAL_H);
-  ctx.strokeStyle = '#fff'; ctx.lineWidth = 2.5;
-  ctx.beginPath();
-  ctx.moveTo(FIELD.left, FIELD.goalY);
-  ctx.lineTo(FIELD.left - GOAL_W, FIELD.goalY);
-  ctx.lineTo(FIELD.left - GOAL_W, FIELD.goalY + GOAL_H);
-  ctx.lineTo(FIELD.left, FIELD.goalY + GOAL_H);
-  ctx.stroke();
-  ctx.beginPath();
-  ctx.moveTo(FIELD.right, FIELD.goalY);
-  ctx.lineTo(FIELD.right + GOAL_W, FIELD.goalY);
-  ctx.lineTo(FIELD.right + GOAL_W, FIELD.goalY + GOAL_H);
-  ctx.lineTo(FIELD.right, FIELD.goalY + GOAL_H);
-  ctx.stroke();
+  const gg=ctx.createLinearGradient(FL.l-GW,0,FL.l,0);
+  gg.addColorStop(0,'rgba(255,255,150,.07)');gg.addColorStop(1,'rgba(255,255,150,.01)');
+  ctx.fillStyle=gg;ctx.fillRect(FL.l-GW,GY,GW,GH);
+  const gg2=ctx.createLinearGradient(FL.r,0,FL.r+GW,0);
+  gg2.addColorStop(0,'rgba(255,255,150,.01)');gg2.addColorStop(1,'rgba(255,255,150,.07)');
+  ctx.fillStyle=gg2;ctx.fillRect(FL.r,GY,GW,GH);
+
+  ctx.strokeStyle='rgba(255,255,255,.92)';ctx.lineWidth=2.5;
+  ctx.beginPath();ctx.moveTo(FL.l,GY);ctx.lineTo(FL.l-GW,GY);ctx.lineTo(FL.l-GW,GY+GH);ctx.lineTo(FL.l,GY+GH);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(FL.r,GY);ctx.lineTo(FL.r+GW,GY);ctx.lineTo(FL.r+GW,GY+GH);ctx.lineTo(FL.r,GY+GH);ctx.stroke();
 
   // Retine
-  ctx.strokeStyle = 'rgba(255,255,255,.09)'; ctx.lineWidth = 0.5;
-  for (let y = FIELD.goalY; y < FIELD.goalY + GOAL_H; y += 12) {
-    ctx.beginPath(); ctx.moveTo(FIELD.left - GOAL_W, y); ctx.lineTo(FIELD.left, y); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(FIELD.right, y); ctx.lineTo(FIELD.right + GOAL_W, y); ctx.stroke();
+  ctx.strokeStyle='rgba(255,255,255,.11)';ctx.lineWidth=.5;
+  for(let y=GY;y<=GY+GH;y+=10){
+    ctx.beginPath();ctx.moveTo(FL.l-GW,y);ctx.lineTo(FL.l,y);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(FL.r,y);ctx.lineTo(FL.r+GW,y);ctx.stroke();
+  }
+  for(let x=0;x<GW;x+=10){
+    ctx.beginPath();ctx.moveTo(FL.l-GW+x,GY);ctx.lineTo(FL.l-GW+x,GY+GH);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(FL.r+x,GY);ctx.lineTo(FL.r+x,GY+GH);ctx.stroke();
   }
 }
 
-function lerpColor(hex1, hex2, t) {
-  const r1 = parseInt(hex1.slice(1,3),16), g1 = parseInt(hex1.slice(3,5),16), b1 = parseInt(hex1.slice(5,7),16);
-  const r2 = parseInt(hex2.slice(1,3),16), g2 = parseInt(hex2.slice(3,5),16), b2 = parseInt(hex2.slice(5,7),16);
-  return `rgb(${Math.round(r1+(r2-r1)*t)},${Math.round(g1+(g2-g1)*t)},${Math.round(b1+(b2-b1)*t)})`;
-}
-
-function drawPlayer(p) {
-  const isCharging = p.kickHeld;
-  const chargeRatio = p.kickCharge / KICK_CHARGE_MAX; // 0..1
-
-  // ── Aura (sempre visibile) ────────────────────────────────────────────────
-  // Raggio aura: cresce con la carica
-  const auraR = p.r + AURA_R_BASE + (isCharging ? chargeRatio * AURA_R_CHARGE : 0);
-
-  // Cerchio esterno: trasparente di base, bianco pieno sotto carica
-  const auraAlpha = isCharging ? 0.15 + chargeRatio * 0.55 : 0.12;
-  ctx.beginPath(); ctx.arc(p.x, p.y, auraR, 0, Math.PI * 2);
-  ctx.strokeStyle = `rgba(255,255,255,${auraAlpha})`;
-  ctx.lineWidth = isCharging ? 2 + chargeRatio * 2.5 : 1.2;
-  ctx.stroke();
-
-  // Fill interno semi-trasparente (sempre)
-  ctx.beginPath(); ctx.arc(p.x, p.y, auraR, 0, Math.PI * 2);
-  ctx.fillStyle = isCharging
-    ? `rgba(255,255,255,${0.04 + chargeRatio * 0.10})`
-    : 'rgba(255,255,255,0.04)';
-  ctx.fill();
-
-  // Arco di carica (solo quando si carica)
-  if (isCharging && chargeRatio > 0) {
+function drawBall(){
+  for(let i=0;i<ball.trail.length;i++){
+    const t=ball.trail[i],a=(i/ball.trail.length)*.16;
+    ctx.globalAlpha=a;ctx.fillStyle='rgba(255,255,255,1)';
+    ctx.beginPath();ctx.arc(t.x,t.y,ball.r*(i/ball.trail.length)*.65,0,Math.PI*2);ctx.fill();
+  }
+  ctx.globalAlpha=1;
+  ctx.fillStyle='rgba(0,0,0,.28)';
+  ctx.beginPath();ctx.ellipse(ball.x+3,ball.y+5,ball.r,ball.r*.44,0,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(ball.x,ball.y,ball.r,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='#1a1a1a';ctx.beginPath();ctx.arc(ball.x,ball.y,ball.r*.36,0,Math.PI*2);ctx.fill();
+  ctx.strokeStyle='#444';ctx.lineWidth=.7;
+  for(let i=0;i<5;i++){
+    const a=i*Math.PI*2/5-Math.PI/2;
     ctx.beginPath();
-    ctx.arc(p.x, p.y, auraR, -Math.PI / 2, -Math.PI / 2 + chargeRatio * Math.PI * 2);
-    ctx.strokeStyle = `rgba(255,255,255,${0.5 + chargeRatio * 0.5})`;
-    ctx.lineWidth = 2.5;
+    ctx.moveTo(ball.x+Math.cos(a)*ball.r*.36,ball.y+Math.sin(a)*ball.r*.36);
+    ctx.lineTo(ball.x+Math.cos(a)*ball.r*.86,ball.y+Math.sin(a)*ball.r*.86);
     ctx.stroke();
   }
+  ctx.fillStyle='rgba(255,255,255,.48)';
+  ctx.beginPath();ctx.arc(ball.x-3,ball.y-3,ball.r*.27,0,Math.PI*2);ctx.fill();
+}
 
-  // ── Ombra ─────────────────────────────────────────────────────────────────
-  ctx.fillStyle = 'rgba(0,0,0,.22)';
-  ctx.beginPath(); ctx.ellipse(p.x + 2, p.y + 4, p.r, p.r * 0.55, 0, 0, Math.PI * 2); ctx.fill();
+function lerpHex(h1,h2,t){
+  const p=n=>parseInt(n,16);
+  const r1=p(h1.slice(1,3)),g1=p(h1.slice(3,5)),b1=p(h1.slice(5,7));
+  const r2=p(h2.slice(1,3)),g2=p(h2.slice(3,5)),b2=p(h2.slice(5,7));
+  return `rgb(${~~(r1+(r2-r1)*t)},${~~(g1+(g2-g1)*t)},${~~(b1+(b2-b1)*t)})`;
+}
 
-  // ── Corpo: schiarisce verso bianco durante la carica ──────────────────────
-  ctx.fillStyle = isCharging ? lerpColor(p.col, '#ffffff', chargeRatio * 0.55) : p.col;
-  ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2); ctx.fill();
+function drawPlayer(p){
+  const cr=p.charge/KICK_CHG_F;
+  const charging=p.held;
 
-  // Riflesso
-  ctx.fillStyle = 'rgba(255,255,255,.22)';
-  ctx.beginPath(); ctx.arc(p.x - 5, p.y - 5, p.r * 0.42, 0, Math.PI * 2); ctx.fill();
+  // Glow — gradiente radiale pulito (niente replace su stringhe)
+  const isRed=p.col==='#ff3333';
+  const gc1=isRed?`rgba(255,80,80,${charging?0.08+cr*.2:0.05})`
+                 :`rgba(80,140,255,${charging?0.08+cr*.2:0.05})`;
+  const glowR=p.r+14+(charging?cr*16:0);
+  const grd=ctx.createRadialGradient(p.x,p.y,p.r*.3,p.x,p.y,glowR);
+  grd.addColorStop(0,gc1);grd.addColorStop(1,'rgba(0,0,0,0)');
+  ctx.fillStyle=grd;
+  ctx.beginPath();ctx.arc(p.x,p.y,glowR,0,Math.PI*2);ctx.fill();
+
+  // Arco carica
+  if(charging&&cr>0.02){
+    ctx.beginPath();
+    ctx.arc(p.x,p.y,p.r+7,-Math.PI/2,-Math.PI/2+cr*Math.PI*2);
+    ctx.strokeStyle=`rgba(255,255,100,${.6+cr*.4})`;
+    ctx.lineWidth=3+cr*2;ctx.lineCap='round';ctx.stroke();ctx.lineCap='butt';
+  }
+
+  // Ombra
+  ctx.fillStyle='rgba(0,0,0,.22)';
+  ctx.beginPath();ctx.ellipse(p.x+2,p.y+5,p.r,p.r*.5,0,0,Math.PI*2);ctx.fill();
+
+  // Corpo con gradiente radiale interno (NO string replace)
+  const hi=isRed?'#ff7777':'#77bbff';
+  const bodyGrd=ctx.createRadialGradient(p.x-4,p.y-4,1,p.x,p.y,p.r);
+  bodyGrd.addColorStop(0,charging?lerpHex(hi,'#ffffff',cr*.7):hi);
+  bodyGrd.addColorStop(1,charging?lerpHex(p.col,'#ffffff',cr*.45):p.col);
+  ctx.fillStyle=bodyGrd;
+  ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,Math.PI*2);ctx.fill();
 
   // Bordo
-  ctx.strokeStyle = isCharging ? `rgba(255,255,255,${0.6 + chargeRatio * 0.4})` : 'rgba(255,255,255,.45)';
-  ctx.lineWidth = isCharging ? 2 + chargeRatio : 1.5;
-  ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2); ctx.stroke();
+  ctx.strokeStyle=charging?`rgba(255,255,120,${.7+cr*.3})`:'rgba(255,255,255,.52)';
+  ctx.lineWidth=charging?2+cr*1.5:1.5;
+  ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,Math.PI*2);ctx.stroke();
 
   // Numero
-  ctx.fillStyle = '#fff'; ctx.font = 'bold 12px Segoe UI';
-  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  ctx.fillText(p.num === 0 ? '1' : '2', p.x, p.y + 1);
+  ctx.fillStyle='#fff';ctx.font='700 12px Inter,sans-serif';
+  ctx.textAlign='center';ctx.textBaseline='middle';
+  ctx.shadowColor='rgba(0,0,0,.6)';ctx.shadowBlur=4;
+  ctx.fillText(p.num===0?'1':'2',p.x,p.y+.5);
+  ctx.shadowBlur=0;
 }
 
-function drawBall() {
-  ctx.fillStyle = 'rgba(0,0,0,.2)';
-  ctx.beginPath(); ctx.ellipse(ball.x + 2, ball.y + 4, ball.r, ball.r * 0.5, 0, 0, Math.PI * 2); ctx.fill();
-  ctx.fillStyle = '#fff';
-  ctx.beginPath(); ctx.arc(ball.x, ball.y, ball.r, 0, Math.PI * 2); ctx.fill();
-  ctx.fillStyle = '#333';
-  ctx.beginPath(); ctx.arc(ball.x, ball.y, ball.r * 0.38, 0, Math.PI * 2); ctx.fill();
-  ctx.strokeStyle = '#555'; ctx.lineWidth = 0.8;
-  for (let i = 0; i < 5; i++) {
-    const a = i * Math.PI * 2 / 5 - Math.PI / 2;
-    ctx.beginPath();
-    ctx.moveTo(ball.x + Math.cos(a) * ball.r * 0.38, ball.y + Math.sin(a) * ball.r * 0.38);
-    ctx.lineTo(ball.x + Math.cos(a) * ball.r * 0.88, ball.y + Math.sin(a) * ball.r * 0.88);
-    ctx.stroke();
-  }
-  ctx.fillStyle = 'rgba(255,255,255,.35)';
-  ctx.beginPath(); ctx.arc(ball.x - 3, ball.y - 3, ball.r * 0.3, 0, Math.PI * 2); ctx.fill();
-}
-
-function draw() {
-  ctx.clearRect(0, 0, W, H);
-  ctx.fillStyle = '#1a3a1a';
-  ctx.fillRect(0, 0, W, H);
+function draw(){
+  ctx.fillStyle='#060a06';ctx.fillRect(0,0,W,H);
   drawField();
-  for (const p of players) drawPlayer(p);
+  drawParticles();
   drawBall();
-
-  if (gameOver) {
-    ctx.fillStyle = 'rgba(0,0,0,.52)';
-    ctx.fillRect(0, 0, W, H);
-    ctx.fillStyle = '#fff'; ctx.font = '500 26px Segoe UI';
-    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText('Partita terminata!', W / 2, H / 2);
+  for(const p of players)drawPlayer(p);
+  // Velo sottile durante cooldown gol
+  if(goalCD>0){
+    const a=Math.min(goalCD/40,1)*.3;
+    ctx.fillStyle=`rgba(0,0,0,${a})`;ctx.fillRect(0,0,W,H);
+  }
+  if(gameOver){
+    ctx.fillStyle='rgba(0,0,0,.58)';ctx.fillRect(0,0,W,H);
+    ctx.fillStyle='#fff';ctx.font='700 28px Inter,sans-serif';
+    ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.shadowColor='rgba(0,0,0,.8)';ctx.shadowBlur=24;
+    ctx.fillText('PARTITA TERMINATA',W/2,H/2);ctx.shadowBlur=0;
   }
 }
 
-function loop() { update(); draw(); requestAnimationFrame(loop); }
-loop();
+// ════════════════════════════════════════════════════════
+// NETWORK
+// ════════════════════════════════════════════════════════
+function serializeState(){
+  return {
+    ts:Date.now(),
+    p0:{x:players[0].x,y:players[0].y,vx:players[0].vx,vy:players[0].vy,c:players[0].charge,h:players[0].held},
+    p1:{x:players[1].x,y:players[1].y,vx:players[1].vx,vy:players[1].vy,c:players[1].charge,h:players[1].held},
+    b:{x:ball.x,y:ball.y,vx:ball.vx,vy:ball.vy},
+    s:score.slice(),tl:timeLeft,go:gameOver,gc:goalCD
+  };
+}
+function broadcastState(){
+  if(channel)channel.send({type:'broadcast',event:'state',payload:serializeState()});
+}
+function sendGuestInput(){
+  if(!channel)return;
+  const inp=inpLocal();
+  channel.send({type:'broadcast',event:'input',payload:{...inp,ts:Date.now()}});
+}
+function applyRemoteState(){
+  if(!remoteState)return;
+  const s=remoteState,L=.32;
+  players[0].x=lerp(players[0].x,s.p0.x,L);players[0].y=lerp(players[0].y,s.p0.y,L);
+  players[0].vx=s.p0.vx;players[0].vy=s.p0.vy;players[0].charge=s.p0.c;players[0].held=s.p0.h;
+  players[1].x=lerp(players[1].x,s.p1.x,L);players[1].y=lerp(players[1].y,s.p1.y,L);
+  players[1].vx=s.p1.vx;players[1].vy=s.p1.vy;players[1].charge=s.p1.c;players[1].held=s.p1.h;
+  ball.x=lerp(ball.x,s.b.x,L);ball.y=lerp(ball.y,s.b.y,L);ball.vx=s.b.vx;ball.vy=s.b.vy;
+  if(s.s[0]!==score[0]||s.s[1]!==score[1]){score=s.s;updateHUD();}
+  if(Math.abs(s.tl-timeLeft)>1){timeLeft=s.tl;updateHUD();}
+  if(s.go&&!gameOver)endGame();
+  goalCD=s.gc;
+}
+
+// ════════════════════════════════════════════════════════
+// GAME LOOP  — delta time reale
+// ════════════════════════════════════════════════════════
+let running=false;
+function loop(ts){
+  if(!running)return;
+  const dt=lastFrameTime?Math.min(ts-lastFrameTime,100):16.67; // cap a 100ms
+  lastFrameTime=ts;
+  update(dt);
+  draw();
+  requestAnimationFrame(loop);
+}
+
+// ════════════════════════════════════════════════════════
+// LOBBY
+// ════════════════════════════════════════════════════════
+function genCode(){
+  const c='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  return Array.from({length:6},()=>c[~~(Math.random()*c.length)]).join('');
+}
+function showLobby(){
+  $('lobby').style.display='flex';$('game').style.display='none';
+  $('touch-controls').style.display='none';running=false;
+}
+function startGame(mode){
+  netMode=mode;
+  $('lobby').style.display='none';$('game').style.display='flex';
+  const badge=$('net-badge');
+  if(mode==='host'){badge.textContent='HOST 🔴';badge.className='badge-host';}
+  else if(mode==='guest'){badge.textContent='GUEST 🔵';badge.className='badge-guest';}
+  else{badge.textContent='LOCALE';badge.className='badge-local';}
+  $('btn-restart').style.display=mode==='guest'?'none':'';
+  // Touch controls
+  detectTouch();
+  if($('touch-controls').style.display!=='none'){
+    // In locale su touch non ha senso — uno schermo, un giocatore
+    // Mostra ugualmente per online/singolo
+  }
+  reset(true);updateHUD();
+  lastFrameTime=0;running=true;requestAnimationFrame(loop);
+}
+
+async function createRoom(){
+  setStatus('Creazione stanza…');
+  const code=genCode();roomCode=code;
+  $('room-code-shown').textContent=code;
+  $('card-wait').style.display='block';$('card-join').style.display='none';setStatus('');
+  channel=sb.channel(`hax2:${code}`,{config:{broadcast:{self:false}}});
+  channel
+    .on('broadcast',{event:'join'},()=>{
+      $('card-wait').style.display='none';
+      startGame('host');
+      channel.send({type:'broadcast',event:'start',payload:{}});
+      setTimeout(()=>broadcastState(),100);
+    })
+    .on('broadcast',{event:'input'},msg=>{
+      const d=msg.payload;
+      remoteInput={up:d.up,dn:d.dn,lt:d.lt,rt:d.rt,kick:d.kick};
+      if(d.ts){pingMs=~~((Date.now()-d.ts)/2);$('ping').textContent=`ping: ${pingMs}ms`;}
+    })
+    .subscribe();
+}
+async function joinRoom(code){
+  code=code.toUpperCase().trim();
+  if(code.length<4){setStatus('Codice non valido');return;}
+  setStatus('Connessione…');roomCode=code;
+  channel=sb.channel(`hax2:${code}`,{config:{broadcast:{self:false}}});
+  channel
+    .on('broadcast',{event:'start'},()=>{setStatus('');startGame('guest');})
+    .on('broadcast',{event:'state'},msg=>{remoteState=msg.payload;})
+    .subscribe(async s=>{
+      if(s==='SUBSCRIBED'){
+        setStatus('Connesso! Avvisando host…');
+        await channel.send({type:'broadcast',event:'join',payload:{ts:Date.now()}});
+        setStatus('In attesa che l\'host avvii la partita…');
+      }
+    });
+}
+function leaveGame(){
+  if(channel){sb.removeChannel(channel);channel=null;}
+  running=false;
+  $('card-wait').style.display='none';$('card-join').style.display='none';
+  $('code-input').value='';setStatus('');showLobby();
+}
+
+// ════════════════════════════════════════════════════════
+// BUTTON HANDLERS
+// ════════════════════════════════════════════════════════
+$('btn-create').onclick=()=>{$('card-join').style.display='none';createRoom();};
+$('btn-join-show').onclick=()=>{$('card-wait').style.display='none';$('card-join').style.display='block';$('code-input').focus();};
+$('btn-join-go').onclick=()=>joinRoom($('code-input').value);
+$('code-input').addEventListener('keydown',e=>{if(e.key==='Enter')$('btn-join-go').click();});
+$('btn-join-cancel').onclick=()=>{$('card-join').style.display='none';setStatus('');};
+$('btn-cancel-wait').onclick=()=>{if(channel){sb.removeChannel(channel);channel=null;}$('card-wait').style.display='none';setStatus('');};
+$('btn-local').onclick=()=>startGame('local');
+$('btn-restart').onclick=()=>{if(netMode!=='guest'){reset(true);updateHUD();}};
+$('btn-leave').onclick=leaveGame;
+
+setInterval(()=>{
+  if(netMode==='host'&&channel)channel.send({type:'broadcast',event:'ping',payload:{ts:Date.now()}});
+},5000);
+
+reset(true);
 </script>
 </body>
 </html>
