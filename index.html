@@ -2,7 +2,7 @@
 <html lang="it">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 <title>HaxBall 2</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap" rel="stylesheet">
@@ -164,7 +164,7 @@ kbd{background:rgba(255,255,255,.1);border-radius:3px;padding:1px 5px;font-size:
 <!-- LOBBY -->
 <div id="lobby">
   <div>
-    <div class="logo">⚽ HAXBALL 232</div>
+    <div class="logo">⚽ HAXBALL 2</div>
     <div class="logo-sub">BROWSER FOOTBALL</div>
   </div>
   <div class="card">
@@ -257,12 +257,18 @@ const SUPABASE_KEY = 'sb_publishable_WzKJ-bi-KddPFEbUw30Avw_RzoIHZ4r';
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 // ════════════════════════════════════════════════════════
-// CANVAS & DIMENSIONI
+// CANVAS & DIMENSIONI — HiDPI / Retina support
 // ════════════════════════════════════════════════════════
 const canvas = document.getElementById('c');
 const ctx    = canvas.getContext('2d');
 const W = 900, H = 520;
-canvas.width = W; canvas.height = H;
+// Usa devicePixelRatio per disegnare a risoluzione nativa (fix pixel visibili)
+const DPR = Math.min(window.devicePixelRatio || 1, 3); // cap a 3x
+canvas.width  = W * DPR;
+canvas.height = H * DPR;
+canvas.style.width  = W + 'px';
+canvas.style.height = H + 'px';
+ctx.scale(DPR, DPR); // tutti i draw usano coordinate logiche W×H
 
 // ════════════════════════════════════════════════════════
 // COSTANTI FISICA  — arcade fluido, leggermente più lento
@@ -572,7 +578,12 @@ function update(dt){
   }
 
   let inp0,inp1;
-  if(netMode==='local'){inp0=inpP0();inp1=inpP1();}
+  if(netMode==='local'){
+    // Se touch attivo, P0 prende il joystick; P1 solo tastiera
+    const isTouch = $('touch-controls').style.display!=='none';
+    inp0 = isTouch ? inpLocal() : inpP0();
+    inp1 = inpP1();
+  }
   else{inp0=inpLocal();inp1=remoteInput;}
 
   applyInput(players[0],inp0);
@@ -775,12 +786,61 @@ function drawPlayer(p){
   ctx.shadowBlur=0;
 }
 
+// Freccia predittiva: mostra direzione e forza del tiro quando il player tocca la palla
+function drawShotArrow(p){
+  if(!p.held && p.charge<=0) return;
+  const d=dist(p,ball);
+  if(d > KICK_DIST) return; // non tocca la palla
+
+  const cr=p.charge/KICK_CHG_F;
+  const force=KICK_MIN+cr*(KICK_MAX-KICK_MIN);
+
+  // Direzione: dalla palla verso l'esterno rispetto al player
+  const dx=ball.x-p.x, dy=ball.y-p.y;
+  const len=Math.hypot(dx,dy)||1;
+  const nx=dx/len, ny=dy/len;
+
+  // Lunghezza freccia proporzionale alla forza (min 30px, max 110px)
+  const arrowLen=30+cr*80;
+  const ax=ball.x+nx*(ball.r+4);
+  const ay=ball.y+ny*(ball.r+4);
+  const bx=ax+nx*arrowLen;
+  const by=ay+ny*arrowLen;
+
+  // Colore: giallo tenue → arancione brillante con la carica
+  const alpha=0.45+cr*0.5;
+  const r=255, g=Math.round(220-cr*120), b=Math.round(60-cr*60);
+  const col=`rgba(${r},${g},${b},${alpha})`;
+
+  ctx.save();
+  ctx.strokeStyle=col;
+  ctx.lineWidth=2+cr*2.5;
+  ctx.lineCap='round';
+  ctx.setLineDash([6,4]);
+  ctx.lineDashOffset= -(Date.now()/40)%10; // animazione scorrimento
+  ctx.beginPath();ctx.moveTo(ax,ay);ctx.lineTo(bx,by);ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Punta freccia
+  const headLen=8+cr*6;
+  const angle=Math.atan2(ny,nx);
+  ctx.fillStyle=col;
+  ctx.beginPath();
+  ctx.moveTo(bx,by);
+  ctx.lineTo(bx-headLen*Math.cos(angle-0.4), by-headLen*Math.sin(angle-0.4));
+  ctx.lineTo(bx-headLen*Math.cos(angle+0.4), by-headLen*Math.sin(angle+0.4));
+  ctx.closePath();ctx.fill();
+  ctx.restore();
+}
+
 function draw(){
   ctx.fillStyle='#060a06';ctx.fillRect(0,0,W,H);
   drawField();
   drawParticles();
   drawBall();
-  for(const p of players)drawPlayer(p);
+  // Frecce predittive (sotto i giocatori)
+  for(const p of players) drawShotArrow(p);
+  for(const p of players) drawPlayer(p);
   // Velo sottile durante cooldown gol
   if(goalCD>0){
     const a=Math.min(goalCD/40,1)*.3;
@@ -833,33 +893,18 @@ function applyRemoteState(){
 // SCALING CANVAS — adatta al viewport (fix mobile)
 // ════════════════════════════════════════════════════════
 function scaleCanvas(){
-  // Calcola lo spazio disponibile togliendo HUD (≈70px) + msgbar (≈24px) + ctrlbar (≈28px)
   const hudH = ($('hud').offsetHeight||60) + ($('msg-bar').offsetHeight||22) + ($('ctrl-bar').offsetHeight||24);
   const availW = window.innerWidth;
   const availH = window.innerHeight - hudH - 8;
-
-  // Scala mantenendo aspect ratio 900×520
-  const scaleX = availW / W;
-  const scaleY = availH / H;
-  const scale  = Math.min(scaleX, scaleY); // su desktop non superare 1:1? no, lascia scalare
-
+  const scale = Math.min(availW / W, availH / H);
   const cssW = Math.floor(W * scale);
   const cssH = Math.floor(H * scale);
-
-  // Applica dimensioni CSS al canvas (le dimensioni interne W×H restano invariate)
   canvas.style.width  = cssW + 'px';
   canvas.style.height = cssH + 'px';
-  canvas.style.transform = '';
-
-  // Forza il wrap a contenere esattamente il canvas
   const wrap = $('wrap');
   wrap.style.width  = cssW + 'px';
   wrap.style.height = cssH + 'px';
   wrap.style.flex   = 'none';
-
-  // Aggiusta anche il kick-arc-canvas (touch)
-  const arcEl = $('kick-arc-canvas');
-  if(arcEl){ arcEl.style.bottom='28px'; arcEl.style.right='24px'; }
 }
 window.addEventListener('resize', scaleCanvas);
 window.addEventListener('orientationchange', ()=>setTimeout(scaleCanvas,120));
