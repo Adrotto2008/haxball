@@ -124,8 +124,11 @@ kbd{background:rgba(255,255,255,.1);border-radius:3px;padding:1px 5px;font-size:
 
 /* ── TOUCH CONTROLS ─────────────────────────────────── */
 #touch-controls{
-  display:none; /* mostrato solo su touch */
-  position:fixed;inset:0;pointer-events:none;z-index:100;
+  display:none;
+  position:fixed;top:0;left:0;
+  width:100%;height:100%;
+  pointer-events:none;z-index:1000;
+  transform-origin:0 0; /* per compensazione zoom via JS */
 }
 /* joystick zona */
 #joy-zone{
@@ -438,12 +441,37 @@ function detectTouch(){
   if(isTouchDevice()){
     $('touch-controls').style.display='block';
     $('ctrl-bar').style.display='none';
+    fixTouchControls();
   } else {
     $('touch-controls').style.display='none';
     $('ctrl-bar').style.display='flex';
   }
 }
 detectTouch();
+
+// ── Mantieni i controlli touch fissi anche durante il pinch-zoom ──────────
+// visualViewport ci dice la scala e l'offset correnti del viewport visuale
+function fixTouchControls(){
+  const tc = $('touch-controls');
+  if(tc.style.display==='none') return;
+  if(window.visualViewport){
+    const vv = window.visualViewport;
+    // Annulla scala: se l'utente ha zoomato 2×, scaliamo i controlli a 1/2
+    const s = 1 / vv.scale;
+    // Offset: il viewport visuale può essere shiftato rispetto al layout viewport
+    const x = -vv.offsetLeft * s;
+    const y = -vv.offsetTop  * s;
+    tc.style.transform = `scale(${s}) translate(${vv.offsetLeft}px, ${vv.offsetTop}px)`;
+    tc.style.width  = (vv.width  * vv.scale) + 'px';
+    tc.style.height = (vv.height * vv.scale) + 'px';
+  }
+}
+if(window.visualViewport){
+  window.visualViewport.addEventListener('resize', fixTouchControls);
+  window.visualViewport.addEventListener('scroll', fixTouchControls);
+}
+// Chiama anche su resize normale
+window.addEventListener('resize', fixTouchControls);
 
 function updateJoyStick(cx,cy){
   const dx=cx-joyOrigin.x, dy=cy-joyOrigin.y;
