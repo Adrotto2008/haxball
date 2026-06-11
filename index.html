@@ -12,19 +12,30 @@ body{
   background:#060a06;min-height:100vh;
   display:flex;flex-direction:column;align-items:center;justify-content:center;
   font-family:'Inter',sans-serif;color:#fff;
-  /* NO touch-action:none qui — blocca il pinch-to-zoom */
 }
 
 /* ── LOBBY ──────────────────────────────────────────── */
-#lobby{display:flex;flex-direction:column;align-items:center;gap:24px;animation:fadeIn .4s ease}
+#lobby{
+  display:flex;flex-direction:column;align-items:center;gap:24px;
+  animation:fadeIn .4s ease;position:relative;padding-bottom:28px;
+}
 @keyframes fadeIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
 .logo{
   font-size:48px;font-weight:900;letter-spacing:-1px;
   background:linear-gradient(135deg,#ff3333 0%,#ff7700 50%,#ffdd00 100%);
   -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
   filter:drop-shadow(0 0 30px rgba(255,80,0,.4));
+  line-height:1.1;
 }
-.logo-sub{font-size:11px;letter-spacing:6px;color:rgba(255,255,255,.3);margin-top:-18px;text-align:center}
+.logo-sub{
+  font-size:11px;letter-spacing:6px;color:rgba(255,255,255,.3);
+  text-align:center;display:block;margin-top:2px;
+}
+#version-badge{
+  position:fixed;bottom:12px;right:16px;
+  font-size:10px;color:rgba(255,255,255,.2);letter-spacing:1px;
+  font-family:'Courier New',monospace;pointer-events:none;z-index:9999;
+}
 .card{
   background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);
   border-radius:16px;padding:24px 28px;min-width:320px;
@@ -63,6 +74,8 @@ input[type=text]::placeholder{font-family:'Inter',sans-serif;letter-spacing:1px;
 .dot:nth-child(2){animation-delay:.2s}.dot:nth-child(3){animation-delay:.4s}
 @keyframes blink{0%,80%,100%{opacity:.2;transform:scale(.7)}40%{opacity:1;transform:scale(1)}}
 #lobby-msg{font-size:12px;color:#ffdd66;min-height:16px;text-align:center}
+/* lista giocatori in sala d'attesa */
+#player-list{font-size:12px;color:rgba(255,255,255,.55);line-height:1.8;min-height:20px}
 
 /* ── GAME ───────────────────────────────────────────── */
 #game{
@@ -94,27 +107,18 @@ input[type=text]::placeholder{font-family:'Inter',sans-serif;letter-spacing:1px;
 .hud-btn-danger{border-color:rgba(255,60,60,.3);color:rgba(255,100,100,.7)}
 .hud-btn-danger:hover{background:rgba(255,60,60,.15);color:#ff8888}
 #net-badge{font-size:9px;font-weight:700;letter-spacing:2px;padding:2px 8px;border-radius:10px;text-transform:uppercase}
-.badge-local{background:rgba(40,180,80,.15);color:#44cc66;border:1px solid rgba(40,180,80,.25)}
+.badge-train{background:rgba(40,180,80,.15);color:#44cc66;border:1px solid rgba(40,180,80,.25)}
 .badge-host{background:rgba(255,60,60,.15);color:#ff6666;border:1px solid rgba(255,60,60,.25)}
 .badge-guest{background:rgba(60,130,255,.15);color:#6699ff;border:1px solid rgba(60,130,255,.25)}
 #ping{font-size:10px;color:rgba(255,255,255,.3)}
 #msg-bar{font-size:13px;font-weight:600;min-height:20px;color:#ffdd44;text-align:center;padding:1px 0 3px;letter-spacing:.3px;flex-shrink:0}
-#wrap{
-  position:relative;line-height:0;
-  display:flex;align-items:center;justify-content:center;
-  flex-shrink:0;
-}
-/* Il canvas viene ridimensionato via JS con width/height CSS */
+#wrap{position:relative;line-height:0;display:flex;align-items:center;justify-content:center;flex-shrink:0}
 canvas{display:block;touch-action:none;}
-/* touch-controls bloccano scroll ma non pinch */
-#touch-controls{touch-action:none;}
 #goal-flash{
   position:absolute;inset:0;pointer-events:none;opacity:0;
   background:radial-gradient(ellipse at center,rgba(255,220,50,.6) 0%,rgba(255,150,0,.2) 40%,transparent 70%);
   transition:opacity .08s;
 }
-
-/* ── CTRL BAR (desktop) ─────────────────────────────── */
 #ctrl-bar{
   display:flex;justify-content:space-between;width:100%;
   padding:4px 16px 2px;font-size:10px;color:rgba(255,255,255,.28);flex-shrink:0;
@@ -124,54 +128,34 @@ kbd{background:rgba(255,255,255,.1);border-radius:3px;padding:1px 5px;font-size:
 
 /* ── TOUCH CONTROLS ─────────────────────────────────── */
 #touch-controls{
-  display:none;
-  position:fixed;top:0;left:0;
-  width:100%;height:100%;
-  pointer-events:none;z-index:1000;
-  transform-origin:0 0; /* per compensazione zoom via JS */
+  display:none;position:fixed;top:0;left:0;
+  width:100%;height:100%;pointer-events:none;z-index:1000;
+  transform-origin:0 0;
 }
-/* joystick zona */
-#joy-zone{
-  position:absolute;left:20px;bottom:24px;
-  width:140px;height:140px;pointer-events:all;
-}
-#joy-base{
-  width:140px;height:140px;border-radius:50%;
-  background:rgba(255,255,255,.08);border:2px solid rgba(255,255,255,.18);
-  position:absolute;top:0;left:0;
-}
-#joy-stick{
-  width:56px;height:56px;border-radius:50%;
-  background:rgba(255,255,255,.28);border:2px solid rgba(255,255,255,.5);
-  position:absolute;top:42px;left:42px;
-  transition:box-shadow .1s;
-  box-shadow:0 0 16px rgba(255,255,255,.1);
-}
-/* kick button */
+#joy-zone{position:absolute;left:20px;bottom:24px;width:140px;height:140px;pointer-events:all}
+#joy-base{width:140px;height:140px;border-radius:50%;background:rgba(255,255,255,.08);border:2px solid rgba(255,255,255,.18);position:absolute;top:0;left:0}
+#joy-stick{width:56px;height:56px;border-radius:50%;background:rgba(255,255,255,.28);border:2px solid rgba(255,255,255,.5);position:absolute;top:42px;left:42px;box-shadow:0 0 16px rgba(255,255,255,.1)}
 #kick-btn{
-  position:absolute;right:24px;bottom:28px;
-  width:100px;height:100px;border-radius:50%;
+  position:absolute;right:24px;bottom:28px;width:100px;height:100px;border-radius:50%;
   background:rgba(255,180,0,.18);border:3px solid rgba(255,200,0,.5);
   pointer-events:all;display:flex;align-items:center;justify-content:center;
   font-size:13px;font-weight:700;color:rgba(255,220,80,.8);letter-spacing:1px;
-  user-select:none;-webkit-user-select:none;
-  transition:background .08s, transform .08s;
+  user-select:none;-webkit-user-select:none;transition:background .08s,transform .08s;
 }
-#kick-btn.pressed{
-  background:rgba(255,200,0,.4);border-color:rgba(255,220,0,.9);
-  transform:scale(.93);box-shadow:0 0 24px rgba(255,200,0,.4);
-}
-/* charge arc overlay inside kick btn */
+#kick-btn.pressed{background:rgba(255,200,0,.4);border-color:rgba(255,220,0,.9);transform:scale(.93);box-shadow:0 0 24px rgba(255,200,0,.4)}
 #kick-arc-canvas{position:absolute;right:24px;bottom:28px;width:100px;height:100px;pointer-events:none}
 </style>
 </head>
 <body>
 
+<!-- VERSION BADGE — sempre visibile -->
+<div id="version-badge">v0.2.0</div>
+
 <!-- LOBBY -->
 <div id="lobby">
-  <div>
+  <div style="text-align:center">
     <div class="logo">⚽ HAXBALL 2</div>
-    <div class="logo-sub">BROWSER FOOTBALL</div>
+    <span class="logo-sub">HUB ONLINE</span>
   </div>
   <div class="card">
     <div class="card-title">🌐 Online</div>
@@ -180,7 +164,7 @@ kbd{background:rgba(255,255,255,.1);border-radius:3px;padding:1px 5px;font-size:
       <button class="btn btn-blue" id="btn-join-show">Entra con codice</button>
     </div>
     <div class="divider">── oppure ──</div>
-    <button class="btn btn-green" id="btn-local">Gioca in locale (stesso PC)</button>
+    <button class="btn btn-green" id="btn-train">🎯 Allenamento (solo)</button>
   </div>
   <div class="card" id="card-join" style="display:none">
     <div class="card-title">Inserisci codice stanza</div>
@@ -191,16 +175,20 @@ kbd{background:rgba(255,255,255,.1);border-radius:3px;padding:1px 5px;font-size:
     </div>
   </div>
   <div class="card" id="card-wait" style="display:none">
-    <div class="card-title">In attesa del secondo giocatore</div>
+    <div class="card-title">Stanza creata — in attesa giocatori</div>
     <div class="code-box">
       <div class="code-big" id="room-code-shown">------</div>
-      <div class="code-hint">Manda questo codice all'avversario</div>
+      <div class="code-hint">Manda questo codice agli avversari — possono entrare in qualsiasi momento</div>
     </div>
+    <div id="player-list"></div>
     <div class="waiting">
       <div class="dot"></div><div class="dot"></div><div class="dot"></div>
-      <span>Aspettando connessione…</span>
+      <span id="wait-status">Aspettando il primo giocatore…</span>
     </div>
-    <button class="btn btn-ghost" id="btn-cancel-wait">Annulla</button>
+    <div class="row">
+      <button class="btn btn-green" id="btn-start-game" style="display:none">▶ Avvia partita</button>
+      <button class="btn btn-ghost" id="btn-cancel-wait">Annulla</button>
+    </div>
   </div>
   <div id="lobby-msg"></div>
 </div>
@@ -218,7 +206,7 @@ kbd{background:rgba(255,255,255,.1);border-radius:3px;padding:1px 5px;font-size:
         <button class="hud-btn" id="btn-restart">↺ Restart</button>
         <button class="hud-btn hud-btn-danger" id="btn-leave">✕ Esci</button>
       </div>
-      <span id="net-badge" class="badge-local">LOCAL</span>
+      <span id="net-badge" class="badge-train">TRAIN</span>
       <span id="ping"></span>
     </div>
     <div class="team-score">
@@ -233,28 +221,25 @@ kbd{background:rgba(255,255,255,.1);border-radius:3px;padding:1px 5px;font-size:
   </div>
   <div id="ctrl-bar">
     <div class="ctrl-side">
-      <b style="color:rgba(255,255,255,.4)">🔴 P1</b>
-      <span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> o Frecce · <kbd>Ctrl</kbd> o <kbd>Spazio</kbd> o <kbd>0</kbd> tiro</span>
-    </div>
-    <div class="ctrl-side" style="text-align:right;align-items:flex-end">
-      <b style="color:rgba(255,255,255,.4)">P2 🔵</b>
-      <span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> o Frecce · <kbd>Ctrl</kbd> o <kbd>Spazio</kbd> o <kbd>0</kbd> tiro</span>
+      <span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> o <kbd>↑←↓→</kbd> muovi · <kbd>Ctrl</kbd> <kbd>Spazio</kbd> <kbd>0</kbd> tiro</span>
     </div>
   </div>
 </div>
 
 <!-- TOUCH CONTROLS -->
 <div id="touch-controls">
-  <div id="joy-zone">
-    <div id="joy-base"></div>
-    <div id="joy-stick"></div>
-  </div>
+  <div id="joy-zone"><div id="joy-base"></div><div id="joy-stick"></div></div>
   <canvas id="kick-arc-canvas" width="100" height="100"></canvas>
   <div id="kick-btn">TIRO</div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script>
+// ════════════════════════════════════════════════════════
+// VERSIONE
+// ════════════════════════════════════════════════════════
+const VERSION = 'v0.2.0';
+
 // ════════════════════════════════════════════════════════
 // SUPABASE
 // ════════════════════════════════════════════════════════
@@ -263,122 +248,166 @@ const SUPABASE_KEY = 'sb_publishable_WzKJ-bi-KddPFEbUw30Avw_RzoIHZ4r';
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 // ════════════════════════════════════════════════════════
-// CANVAS & DIMENSIONI — HiDPI / Retina support
+// CANVAS — HiDPI
 // ════════════════════════════════════════════════════════
 const canvas = document.getElementById('c');
 const ctx    = canvas.getContext('2d');
 const W = 900, H = 520;
-// Usa devicePixelRatio per disegnare a risoluzione nativa (fix pixel visibili)
-const DPR = Math.min(window.devicePixelRatio || 1, 3); // cap a 3x
-canvas.width  = W * DPR;
-canvas.height = H * DPR;
-canvas.style.width  = W + 'px';
-canvas.style.height = H + 'px';
-ctx.scale(DPR, DPR); // tutti i draw usano coordinate logiche W×H
+const DPR = Math.min(window.devicePixelRatio||1, 3);
+canvas.width  = W*DPR; canvas.height = H*DPR;
+canvas.style.width = W+'px'; canvas.style.height = H+'px';
+ctx.scale(DPR,DPR);
 
 // ════════════════════════════════════════════════════════
-// COSTANTI FISICA  — arcade fluido, leggermente più lento
+// COSTANTI FISICA
 // ════════════════════════════════════════════════════════
-const PR = 16, BR = 11;
+const PR=16, BR=11;
+const P_SPEED=2.4, P_ACCEL=0.55, P_FRIC=0.68;
+const B_FRIC=0.985, B_BOUNCE=0.88, B_HIT_R=0.90;
+const KICK_MIN=4.0, KICK_MAX=13.0, KICK_CHG_F=50;
+const KICK_DIST=PR+BR+14;
+const MATCH_TIME=180;
+const FL={l:40,r:W-40,t:40,b:H-40};
+const GH=120,GW=12,GY=H/2-60;
 
-const P_SPEED  = 2.4;   // era 3.2 (ora ~75% — più vicino all'originale)
-const P_ACCEL  = 0.55;  // era 0.9 (risposta rapida ma non istantanea)
-const P_FRIC   = 0.68;  // era 0.60 (si ferma deciso ma non di colpo)
-
-const B_FRIC   = 0.985;
-const B_BOUNCE = 0.88;  // rimbalzo muri molto energico
-const B_HIT_R  = 0.90;  // rimbalzo da giocatore molto energico
-
-const KICK_MIN     = 4.0;
-const KICK_MAX     = 13.0;
-const KICK_CHG_F   = 50;   // frame per max carica
-// distanza max da palla per attivare il tiro (fix bug particelle a distanza)
-const KICK_DIST    = PR + BR + 14;
-
-const MATCH_TIME = 180;
-const FL = {l:40, r:W-40, t:40, b:H-40};
-const GH = 120, GW = 12, GY = H/2 - 60;
+// Colori per team e slot
+const TEAM_COLS=['#ff3333','#3388ff'];
+const TEAM_HI  =['#ff7777','#77bbff'];
 
 // ════════════════════════════════════════════════════════
 // STATO
 // ════════════════════════════════════════════════════════
 let score=[0,0], timeLeft=MATCH_TIME, gameOver=false;
 let goalCD=0, ticker=0;
-let lastFrameTime=0;   // per delta-time reale
-let secondAccum=0;     // accumula ms → decrementa timer ogni 1000ms esatti
-let players, ball, particles=[];
+let lastFrameTime=0, secondAccum=0;
+let players=[], ball, particles=[];
 
 const keys={};
-let touchKick=false;    // input touch kick
-let joyX=0, joyY=0;    // joystick normalizzato -1..1
+let touchKick=false, joyX=0, joyY=0;
 
-let netMode='local', roomCode=null, channel=null, pingMs=0;
-let remoteInput={up:false,dn:false,lt:false,rt:false,kick:false};
+// NET
+let netMode='train'; // 'train' | 'host' | 'guest'
+let myPlayerId=null; // il proprio ID in partita online
+let roomCode=null, channel=null, pingMs=0;
+let remoteInputs={}; // {playerId → {up,dn,lt,rt,kick,ts}}
 let remoteState=null, lastSent=0;
+// Waiting room: giocatori connessi (lato host)
+let waitingPlayers=[]; // [{id, team}]
 
 // ════════════════════════════════════════════════════════
 // HELPERS
 // ════════════════════════════════════════════════════════
-const $     = id => document.getElementById(id);
-const setMsg    = t => $('msg-bar').textContent = t;
-const setStatus = t => $('lobby-msg').textContent = t;
-const lerp  = (a,b,t) => a+(b-a)*t;
-const dist  = (a,b) => Math.hypot(b.x-a.x, b.y-a.y);
+const $       = id=>document.getElementById(id);
+const setMsg  = t=>$('msg-bar').textContent=t;
+const setStatus=t=>$('lobby-msg').textContent=t;
+const lerp    =(a,b,t)=>a+(b-a)*t;
+const dist    =(a,b)=>Math.hypot(b.x-a.x,b.y-a.y);
+function uid(){ return Math.random().toString(36).slice(2,8); }
 
 // ════════════════════════════════════════════════════════
 // PARTICELLE
 // ════════════════════════════════════════════════════════
 function spawnP(x,y,n,col,spd,life){
   for(let i=0;i<n;i++){
-    const a=Math.random()*Math.PI*2, s=spd*(0.4+Math.random()*.6);
+    const a=Math.random()*Math.PI*2,s=spd*(0.4+Math.random()*.6);
     particles.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,life,maxLife:life,col,r:2+Math.random()*3});
   }
 }
 function goalBurst(x,y){
-  spawnP(x,y,60,'#ffdd00',8,50);
-  spawnP(x,y,40,'#ff8800',6,40);
-  spawnP(x,y,25,'#ffffff',10,35);
+  spawnP(x,y,60,'#ffdd00',8,50);spawnP(x,y,40,'#ff8800',6,40);spawnP(x,y,25,'#ffffff',10,35);
 }
 function tickParticles(){
-  particles=particles.filter(p=>{
-    p.x+=p.vx;p.y+=p.vy;p.vx*=0.94;p.vy*=0.94;p.life--;return p.life>0;
-  });
+  particles=particles.filter(p=>{p.x+=p.vx;p.y+=p.vy;p.vx*=0.94;p.vy*=0.94;p.life--;return p.life>0;});
 }
 function drawParticles(){
   for(const p of particles){
-    const a=p.life/p.maxLife;
-    ctx.globalAlpha=a;ctx.fillStyle=p.col;
+    const a=p.life/p.maxLife;ctx.globalAlpha=a;ctx.fillStyle=p.col;
     ctx.beginPath();ctx.arc(p.x,p.y,p.r*a,0,Math.PI*2);ctx.fill();
   }
   ctx.globalAlpha=1;
 }
 
 // ════════════════════════════════════════════════════════
-// INIT
+// SPAWN — distribuisce N giocatori per team sul campo
 // ════════════════════════════════════════════════════════
-function mkPlayer(x,y,col,num){
-  return {x,y,vx:0,vy:0,r:PR,col,num,charge:0,held:false};
+function spawnPositions(teamPlayers, team){
+  // team 0: area sinistra (20-38% campo), team 1: destra (62-80%)
+  const xRatio = team===0 ? 0.22 : 0.78;
+  const n = teamPlayers.length;
+  return teamPlayers.map((p,i)=>{
+    // distribuzione verticale equidistante
+    const yFrac = (i+1)/(n+1);
+    return {x: FL.l+(FL.r-FL.l)*xRatio, y: FL.t+(FL.b-FL.t)*yFrac};
+  });
 }
+
+function mkPlayer(id,team,slotInTeam){
+  const col=TEAM_COLS[team];
+  return {id,team,col,
+    x:W*(team===0?0.22:0.78),y:H/2,
+    vx:0,vy:0,r:PR,charge:0,held:false};
+}
+
+function buildPlayers(roster){
+  // roster: [{id,team}, ...]  già ordinato
+  const byTeam=[[],[]];
+  for(const r of roster) byTeam[r.team].push(r);
+  const result=[];
+  for(const team of [0,1]){
+    const grp=byTeam[team];
+    const n=grp.length;
+    grp.forEach((r,i)=>{
+      const yFrac=(i+1)/(n+1);
+      const p=mkPlayer(r.id,team,i);
+      p.x=FL.l+(FL.r-FL.l)*(team===0?0.22:0.78);
+      p.y=FL.t+(FL.b-FL.t)*yFrac;
+      result.push(p);
+    });
+  }
+  return result;
+}
+
 function mkBall(){
   return {x:W/2,y:H/2,vx:0,vy:0,r:BR,trail:[]};
 }
+
 function reset(full){
-  players=[mkPlayer(W*.22,H/2,'#ff3333',0), mkPlayer(W*.78,H/2,'#3388ff',1)];
   ball=mkBall();
-  remoteInput={up:false,dn:false,lt:false,rt:false,kick:false};
-  remoteState=null; particles=[];
+  remoteInputs={};
+  remoteState=null;
+  particles=[];
+  // Riposiziona giocatori senza ricrearli (mantiene id e team)
+  if(players.length>0){
+    const byTeam=[[],[]];
+    for(const p of players) byTeam[p.team].push(p);
+    for(const team of [0,1]){
+      const grp=byTeam[team],n=grp.length;
+      grp.forEach((p,i)=>{
+        p.x=FL.l+(FL.r-FL.l)*(team===0?0.22:0.78);
+        p.y=FL.t+(FL.b-FL.t)*(i+1)/(n+1);
+        p.vx=0;p.vy=0;p.charge=0;p.held=false;
+      });
+    }
+  }
   if(full){score=[0,0];timeLeft=MATCH_TIME;gameOver=false;ticker=0;secondAccum=0;}
   goalCD=90;
-  if(full) setMsg(
-    netMode==='host'  ?'🔴 Sei il Rosso — WASD/Frecce + Ctrl/Spazio/0':
-    netMode==='guest' ?'🔵 Sei il Blu — WASD/Frecce + Ctrl/Spazio/0':
-    'WASD/Frecce per muoverti · Ctrl, Spazio o 0 per tirare'
-  );
-  else setMsg('');
+  if(full){
+    if(netMode==='train')  setMsg('🎯 Allenamento — WASD/Frecce muovi · Ctrl/Spazio/0 tiro');
+    else if(netMode==='host'){
+      const myP=players.find(p=>p.id===myPlayerId);
+      const col=myP?myP.team===0?'🔴':'🔵':'';
+      setMsg(`${col} Sei il Rosso — WASD/Frecce + Ctrl/Spazio/0`);
+    }
+    else{
+      const myP=players.find(p=>p.id===myPlayerId);
+      const col=myP?myP.team===0?'🔴':'🔵':'';
+      setMsg(`${col} Sei il ${myP?.team===0?'Rosso':'Blu'} — WASD/Frecce + Ctrl/Spazio/0`);
+    }
+  } else setMsg('');
 }
 
 // ════════════════════════════════════════════════════════
-// INPUT TASTIERA
+// INPUT
 // ════════════════════════════════════════════════════════
 document.addEventListener('keydown',e=>{
   keys[e.code]=true;
@@ -386,107 +415,64 @@ document.addEventListener('keydown',e=>{
       'Space','ControlLeft','ControlRight','Digit0','Numpad0'].includes(e.code))
     e.preventDefault();
 });
-document.addEventListener('keyup',e=>{ keys[e.code]=false; });
+document.addEventListener('keyup',e=>{keys[e.code]=false;});
 
 function isKickKey(){
   return !!(keys['ControlLeft']||keys['ControlRight']||keys['Space']
             ||keys['Digit0']||keys['Numpad0']||touchKick);
 }
-
-// Input P0 (locale - WASD+Ctrl/0)
-function inpP0(){
-  return {
-    up: !!keys['KeyW'],    dn: !!keys['KeyS'],
-    lt: !!keys['KeyA'],    rt: !!keys['KeyD'],
-    kick: !!(keys['ControlLeft']||keys['ControlRight']||keys['Digit0']||keys['Numpad0'])
-  };
-}
-// Input P1 (locale - Frecce+Spazio)
-function inpP1(){
-  return {
-    up: !!keys['ArrowUp'],   dn: !!keys['ArrowDown'],
-    lt: !!keys['ArrowLeft'], rt: !!keys['ArrowRight'],
-    kick: !!keys['Space']
-  };
-}
-// Input online/touch - tutti i tasti + joystick
 function inpLocal(){
-  const anyUp  = !!(keys['KeyW']||keys['ArrowUp']   ||(joyY<-0.25));
-  const anyDn  = !!(keys['KeyS']||keys['ArrowDown'] ||(joyY>0.25));
-  const anyLt  = !!(keys['KeyA']||keys['ArrowLeft'] ||(joyX<-0.25));
-  const anyRt  = !!(keys['KeyD']||keys['ArrowRight']||(joyX>0.25));
-  return {up:anyUp, dn:anyDn, lt:anyLt, rt:anyRt, kick:isKickKey()};
+  return {
+    up: !!(keys['KeyW']||keys['ArrowUp']   ||(joyY<-0.25)),
+    dn: !!(keys['KeyS']||keys['ArrowDown'] ||(joyY>0.25)),
+    lt: !!(keys['KeyA']||keys['ArrowLeft'] ||(joyX<-0.25)),
+    rt: !!(keys['KeyD']||keys['ArrowRight']||(joyX>0.25)),
+    kick: isKickKey()
+  };
 }
+const noInp={up:false,dn:false,lt:false,rt:false,kick:false};
 
 // ════════════════════════════════════════════════════════
-// TOUCH — joystick + kick button
+// TOUCH
 // ════════════════════════════════════════════════════════
-const joyZone  = $('joy-zone');
-const joyStick = $('joy-stick');
-const kickBtn  = $('kick-btn');
-const arcCvs   = $('kick-arc-canvas');
-const arcCtx   = arcCvs.getContext('2d');
-let joyTouchId=null, kickTouchId=null;
-let joyOrigin={x:70,y:70}; // centro base joystick
-const JOY_R=60; // raggio max stick
+const joyZone=$('joy-zone'),joyStick=$('joy-stick'),kickBtn=$('kick-btn');
+const arcCvs=$('kick-arc-canvas'),arcCtx=arcCvs.getContext('2d');
+let joyTouchId=null,kickTouchId=null,joyOrigin={x:70,y:70};
+const JOY_R=60;
 
-// Distingue touch vero (telefono/tablet) da laptop con touchscreen
-// Su laptop con touchscreen maxTouchPoints>0 ma vogliamo comunque tastiera
 function isTouchDevice(){
-  return ('ontouchstart' in window && navigator.maxTouchPoints > 0
-          && !window.matchMedia('(pointer:fine)').matches);
+  return('ontouchstart' in window&&navigator.maxTouchPoints>0
+         &&!window.matchMedia('(pointer:fine)').matches);
 }
-
 function detectTouch(){
-  if(isTouchDevice()){
-    $('touch-controls').style.display='block';
-    $('ctrl-bar').style.display='none';
-    fixTouchControls();
-  } else {
-    $('touch-controls').style.display='none';
-    $('ctrl-bar').style.display='flex';
-  }
+  if(isTouchDevice()){$('touch-controls').style.display='block';$('ctrl-bar').style.display='none';fixTouchControls();}
+  else{$('touch-controls').style.display='none';$('ctrl-bar').style.display='flex';}
 }
 detectTouch();
 
-// ── Mantieni i controlli touch fissi anche durante il pinch-zoom ──────────
-// visualViewport ci dice la scala e l'offset correnti del viewport visuale
 function fixTouchControls(){
-  const tc = $('touch-controls');
-  if(tc.style.display==='none') return;
+  const tc=$('touch-controls');if(tc.style.display==='none')return;
   if(window.visualViewport){
-    const vv = window.visualViewport;
-    // Annulla scala: se l'utente ha zoomato 2×, scaliamo i controlli a 1/2
-    const s = 1 / vv.scale;
-    // Offset: il viewport visuale può essere shiftato rispetto al layout viewport
-    const x = -vv.offsetLeft * s;
-    const y = -vv.offsetTop  * s;
-    tc.style.transform = `scale(${s}) translate(${vv.offsetLeft}px, ${vv.offsetTop}px)`;
-    tc.style.width  = (vv.width  * vv.scale) + 'px';
-    tc.style.height = (vv.height * vv.scale) + 'px';
+    const vv=window.visualViewport;
+    const s=1/vv.scale;
+    tc.style.transform=`scale(${s}) translate(${vv.offsetLeft}px,${vv.offsetTop}px)`;
+    tc.style.width=(vv.width*vv.scale)+'px';
+    tc.style.height=(vv.height*vv.scale)+'px';
   }
 }
 if(window.visualViewport){
-  window.visualViewport.addEventListener('resize', fixTouchControls);
-  window.visualViewport.addEventListener('scroll', fixTouchControls);
+  window.visualViewport.addEventListener('resize',fixTouchControls);
+  window.visualViewport.addEventListener('scroll',fixTouchControls);
 }
-// Chiama anche su resize normale
-window.addEventListener('resize', fixTouchControls);
+window.addEventListener('resize',fixTouchControls);
 
 function updateJoyStick(cx,cy){
-  const dx=cx-joyOrigin.x, dy=cy-joyOrigin.y;
-  const d=Math.hypot(dx,dy);
-  const clamped=Math.min(d,JOY_R);
-  const nx=d>1?dx/d:0, ny=d>1?dy/d:0;
-  joyX=nx*(clamped/JOY_R);
-  joyY=ny*(clamped/JOY_R);
-  joyStick.style.left=(70+nx*clamped-28)+'px';
-  joyStick.style.top= (70+ny*clamped-28)+'px';
+  const dx=cx-joyOrigin.x,dy=cy-joyOrigin.y,d=Math.hypot(dx,dy);
+  const cl=Math.min(d,JOY_R),nx=d>1?dx/d:0,ny=d>1?dy/d:0;
+  joyX=nx*(cl/JOY_R);joyY=ny*(cl/JOY_R);
+  joyStick.style.left=(70+nx*cl-28)+'px';joyStick.style.top=(70+ny*cl-28)+'px';
 }
-function resetJoy(){
-  joyX=0;joyY=0;
-  joyStick.style.left='42px';joyStick.style.top='42px';
-}
+function resetJoy(){joyX=0;joyY=0;joyStick.style.left='42px';joyStick.style.top='42px';}
 
 document.addEventListener('touchstart',e=>{
   for(const t of e.changedTouches){
@@ -504,13 +490,9 @@ document.addEventListener('touchstart',e=>{
     }
   }
 },{passive:true});
-
 document.addEventListener('touchmove',e=>{
-  for(const t of e.changedTouches){
-    if(t.identifier===joyTouchId) updateJoyStick(t.clientX,t.clientY);
-  }
+  for(const t of e.changedTouches)if(t.identifier===joyTouchId)updateJoyStick(t.clientX,t.clientY);
 },{passive:true});
-
 document.addEventListener('touchend',e=>{
   for(const t of e.changedTouches){
     if(t.identifier===joyTouchId){joyTouchId=null;resetJoy();}
@@ -518,12 +500,9 @@ document.addEventListener('touchend',e=>{
   }
 },{passive:true});
 
-// Disegna arco carica sul bottone kick
 function drawKickArc(ratio){
-  arcCtx.clearRect(0,0,100,100);
-  if(ratio<=0)return;
-  arcCtx.beginPath();
-  arcCtx.arc(50,50,44,-Math.PI/2,-Math.PI/2+ratio*Math.PI*2);
+  arcCtx.clearRect(0,0,100,100);if(ratio<=0)return;
+  arcCtx.beginPath();arcCtx.arc(50,50,44,-Math.PI/2,-Math.PI/2+ratio*Math.PI*2);
   arcCtx.strokeStyle=`rgba(255,220,80,${0.5+ratio*.5})`;
   arcCtx.lineWidth=5;arcCtx.lineCap='round';arcCtx.stroke();
 }
@@ -532,7 +511,7 @@ function drawKickArc(ratio){
 // FISICA
 // ════════════════════════════════════════════════════════
 function circleCollide(a,b,res){
-  const dx=b.x-a.x, dy=b.y-a.y, d=Math.hypot(dx,dy), md=a.r+b.r;
+  const dx=b.x-a.x,dy=b.y-a.y,d=Math.hypot(dx,dy),md=a.r+b.r;
   if(d<md&&d>0.01){
     const nx=dx/d,ny=dy/d,ov=(md-d)/2;
     a.x-=nx*ov;a.y-=ny*ov;b.x+=nx*ov;b.y+=ny*ov;
@@ -540,49 +519,30 @@ function circleCollide(a,b,res){
     if(rv<0){const imp=rv*(res||1);a.vx+=imp*nx;a.vy+=imp*ny;b.vx-=imp*nx;b.vy-=imp*ny;}
   }
 }
-
 function doKick(p,force){
-  // FIX: tira solo se la palla è abbastanza vicina
-  if(dist(p,ball)>KICK_DIST) return;
-  const dx=ball.x-p.x, dy=ball.y-p.y, d=Math.hypot(dx,dy)||1;
-  ball.vx=(dx/d)*force+p.vx*.3;
-  ball.vy=(dy/d)*force+p.vy*.3;
+  if(dist(p,ball)>KICK_DIST)return;
+  const dx=ball.x-p.x,dy=ball.y-p.y,d=Math.hypot(dx,dy)||1;
+  ball.vx=(dx/d)*force+p.vx*.3;ball.vy=(dy/d)*force+p.vy*.3;
 }
-
 function applyInput(p,inp){
-  const charging=inp.kick;
-  const topSpd=charging?P_SPEED*.42:P_SPEED;  // molto più lento mentre carica
-
+  const charging=inp.kick,topSpd=charging?P_SPEED*.42:P_SPEED;
   if(charging){
     p.charge=Math.min(p.charge+1,KICK_CHG_F);
-    // Brake immediato: se era veloce, rallenta di colpo al primo frame di carica
-    if(!p.held){
-      p.vx*=0.35;
-      p.vy*=0.35;
-    }
+    if(!p.held){p.vx*=0.35;p.vy*=0.35;}
   } else {
     if(p.held&&p.charge>0){
-      const t=p.charge/KICK_CHG_F;
-      const force=KICK_MIN+t*(KICK_MAX-KICK_MIN);
+      const t=p.charge/KICK_CHG_F,force=KICK_MIN+t*(KICK_MAX-KICK_MIN);
       doKick(p,force);
-      // Particelle SOLO se palla vicina
-      if(dist(p,ball)<=KICK_DIST)
-        spawnP(ball.x,ball.y,10,p.col,force*.55,18);
+      if(dist(p,ball)<=KICK_DIST)spawnP(ball.x,ball.y,10,p.col,force*.55,18);
     }
     p.charge=0;
   }
   p.held=charging;
-
-  if(inp.up) p.vy-=P_ACCEL;
-  if(inp.dn) p.vy+=P_ACCEL;
-  if(inp.lt) p.vx-=P_ACCEL;
-  if(inp.rt) p.vx+=P_ACCEL;
-
+  if(inp.up)p.vy-=P_ACCEL;if(inp.dn)p.vy+=P_ACCEL;
+  if(inp.lt)p.vx-=P_ACCEL;if(inp.rt)p.vx+=P_ACCEL;
   const spd=Math.hypot(p.vx,p.vy);
   if(spd>topSpd){p.vx=p.vx/spd*topSpd;p.vy=p.vy/spd*topSpd;}
-  p.x+=p.vx;p.y+=p.vy;
-  p.vx*=P_FRIC;p.vy*=P_FRIC;
-
+  p.x+=p.vx;p.y+=p.vy;p.vx*=P_FRIC;p.vy*=P_FRIC;
   if(p.x<FL.l+p.r){p.x=FL.l+p.r;p.vx*=-.4;}
   if(p.x>FL.r-p.r){p.x=FL.r-p.r;p.vx*=-.4;}
   if(p.y<FL.t+p.r){p.y=FL.t+p.r;p.vy*=-.4;}
@@ -590,61 +550,50 @@ function applyInput(p,inp){
 }
 
 // ════════════════════════════════════════════════════════
-// UPDATE  — usa delta time reale per il timer
+// UPDATE
 // ════════════════════════════════════════════════════════
 function update(dt){
   if(gameOver)return;
   if(goalCD>0){goalCD--;return;}
   ticker++;
-
-  // Timer REALE: accumula millisecondi
   if(timeLeft>0){
     secondAccum+=dt;
-    if(secondAccum>=1000){
-      secondAccum-=1000;
-      timeLeft--;
-      updateHUD();
-      if(timeLeft===0){endGame();return;}
-    }
+    if(secondAccum>=1000){secondAccum-=1000;timeLeft--;updateHUD();if(timeLeft===0){endGame();return;}}
   }
 
   if(netMode==='guest'){
     sendGuestInput();
     applyRemoteState();
     tickParticles();
-    // aggiorna arco kick touch
-    const myP=players[1];
-    if($('touch-controls').style.display!=='none') drawKickArc(myP.charge/KICK_CHG_F);
+    const myP=players.find(p=>p.id===myPlayerId);
+    if(myP&&$('touch-controls').style.display!=='none')drawKickArc(myP.charge/KICK_CHG_F);
     return;
   }
 
-  let inp0,inp1;
-  if(netMode==='local'){
-    // Desktop locale: P0=WASD+Ctrl/0, P1=Frecce+Spazio — SEMPRE separati
-    // Su touch locale: P0 usa joystick+kick, P1 non esiste (single player touch)
-    const isTouch = isTouchDevice();
-    inp0 = isTouch ? inpLocal() : inpP0();
-    inp1 = isTouch ? {up:false,dn:false,lt:false,rt:false,kick:false} : inpP1();
+  // host o train: simula fisica
+  for(const p of players){
+    let inp;
+    if(netMode==='train'||p.id===myPlayerId){
+      inp=inpLocal();
+    } else {
+      inp=remoteInputs[p.id]||noInp;
+    }
+    applyInput(p,inp);
   }
-  else{inp0=inpLocal();inp1=remoteInput;}
 
-  applyInput(players[0],inp0);
-  applyInput(players[1],inp1);
-  circleCollide(players[0],players[1],0.8);
+  // collisioni tra giocatori
+  for(let i=0;i<players.length;i++)
+    for(let j=i+1;j<players.length;j++)
+      circleCollide(players[i],players[j],0.8);
 
   ball.trail.push({x:ball.x,y:ball.y});
   if(ball.trail.length>8)ball.trail.shift();
-
-  ball.x+=ball.vx;ball.y+=ball.vy;
-  ball.vx*=B_FRIC;ball.vy*=B_FRIC;
+  ball.x+=ball.vx;ball.y+=ball.vy;ball.vx*=B_FRIC;ball.vy*=B_FRIC;
   for(const p of players)circleCollide(p,ball,B_HIT_R);
   tickParticles();
 
-  // Arco kick touch (host/local)
-  if($('touch-controls').style.display!=='none'){
-    const myP=netMode==='local'?players[0]:players[0];
-    drawKickArc(myP.charge/KICK_CHG_F);
-  }
+  const myP=players.find(p=>p.id===myPlayerId);
+  if(myP&&$('touch-controls').style.display!=='none')drawKickArc(myP.charge/KICK_CHG_F);
 
   const inGoal=ball.y>GY&&ball.y<GY+GH;
   if(ball.x-ball.r<FL.l){if(inGoal){goal(1);return;}ball.x=FL.l+ball.r;ball.vx*=-B_BOUNCE;}
@@ -653,8 +602,7 @@ function update(dt){
   if(ball.y+ball.r>FL.b){ball.y=FL.b-ball.r;ball.vy*=-B_BOUNCE;}
 
   if(netMode==='host'){
-    const now=Date.now();
-    if(now-lastSent>=50){lastSent=now;broadcastState();}
+    const now=Date.now();if(now-lastSent>=50){lastSent=now;broadcastState();}
   }
 }
 
@@ -663,12 +611,9 @@ function update(dt){
 // ════════════════════════════════════════════════════════
 function goal(team){
   score[team]++;updateHUD();
-  const who=team===0?'🔴 ROSSI':'🔵 BLU';
-  setMsg(`⚽ GOOOL! ${who}! (${score[0]}–${score[1]})`);
-  const gx=team===0?FL.l:FL.r;
-  goalBurst(gx,H/2);
-  const fl=$('goal-flash');fl.style.opacity='1';
-  setTimeout(()=>fl.style.opacity='0',140);
+  setMsg(`⚽ GOOOL! ${team===0?'🔴 ROSSI':'🔵 BLU'}! (${score[0]}–${score[1]})`);
+  goalBurst(team===0?FL.l:FL.r,H/2);
+  const fl=$('goal-flash');fl.style.opacity='1';setTimeout(()=>fl.style.opacity='0',140);
   goalCD=140;reset(false);
   if(netMode==='host')broadcastState();
 }
@@ -694,63 +639,40 @@ function updateHUD(){
 // DISEGNO
 // ════════════════════════════════════════════════════════
 function drawField(){
-  const fw=FL.r-FL.l, fh=FL.b-FL.t;
-  // Sfondo erba con gradiente radiale
+  const fw=FL.r-FL.l,fh=FL.b-FL.t;
   const g=ctx.createRadialGradient(W/2,H/2,40,W/2,H/2,W*.7);
   g.addColorStop(0,'#1d5a1d');g.addColorStop(.5,'#174d17');g.addColorStop(1,'#0d2d0d');
   ctx.fillStyle=g;ctx.fillRect(FL.l,FL.t,fw,fh);
-
-  // Strisce
   const sw=fw/12;ctx.fillStyle='rgba(0,0,0,.065)';
   for(let i=0;i<12;i+=2)ctx.fillRect(FL.l+i*sw,FL.t,sw,fh);
-
-  // Riflettore centrale
   const sg=ctx.createRadialGradient(W/2,H/2,0,W/2,H/2,200);
   sg.addColorStop(0,'rgba(255,255,220,.055)');sg.addColorStop(1,'rgba(0,0,0,0)');
   ctx.fillStyle=sg;ctx.fillRect(FL.l,FL.t,fw,fh);
-
-  // Bordi
   ctx.strokeStyle='rgba(255,255,255,.5)';ctx.lineWidth=2;ctx.strokeRect(FL.l,FL.t,fw,fh);
   ctx.beginPath();ctx.moveTo(W/2,FL.t);ctx.lineTo(W/2,FL.b);
   ctx.strokeStyle='rgba(255,255,255,.38)';ctx.lineWidth=1.5;ctx.stroke();
-
-  // Cerchio
   ctx.beginPath();ctx.arc(W/2,H/2,55,0,Math.PI*2);
   ctx.strokeStyle='rgba(255,255,255,.32)';ctx.lineWidth=1.5;ctx.stroke();
   ctx.fillStyle='rgba(255,255,255,.03)';ctx.fill();
   ctx.fillStyle='rgba(255,255,255,.7)';ctx.beginPath();ctx.arc(W/2,H/2,2.5,0,Math.PI*2);ctx.fill();
-
-  // Aree
   const aW=85,aH=180,aY=(H-aH)/2;
   ctx.strokeStyle='rgba(255,255,255,.22)';ctx.lineWidth=1;
   ctx.strokeRect(FL.l,aY,aW,aH);ctx.strokeRect(FL.r-aW,aY,aW,aH);
   const pW=36,pH=100,pY=(H-pH)/2;
   ctx.strokeRect(FL.l,pY,pW,pH);ctx.strokeRect(FL.r-pW,pY,pW,pH);
-
-  // Porte
   const gg=ctx.createLinearGradient(FL.l-GW,0,FL.l,0);
   gg.addColorStop(0,'rgba(255,255,150,.07)');gg.addColorStop(1,'rgba(255,255,150,.01)');
   ctx.fillStyle=gg;ctx.fillRect(FL.l-GW,GY,GW,GH);
   const gg2=ctx.createLinearGradient(FL.r,0,FL.r+GW,0);
   gg2.addColorStop(0,'rgba(255,255,150,.01)');gg2.addColorStop(1,'rgba(255,255,150,.07)');
   ctx.fillStyle=gg2;ctx.fillRect(FL.r,GY,GW,GH);
-
   ctx.strokeStyle='rgba(255,255,255,.92)';ctx.lineWidth=2.5;
   ctx.beginPath();ctx.moveTo(FL.l,GY);ctx.lineTo(FL.l-GW,GY);ctx.lineTo(FL.l-GW,GY+GH);ctx.lineTo(FL.l,GY+GH);ctx.stroke();
   ctx.beginPath();ctx.moveTo(FL.r,GY);ctx.lineTo(FL.r+GW,GY);ctx.lineTo(FL.r+GW,GY+GH);ctx.lineTo(FL.r,GY+GH);ctx.stroke();
-
-  // Retine
   ctx.strokeStyle='rgba(255,255,255,.11)';ctx.lineWidth=.5;
-  for(let y=GY;y<=GY+GH;y+=10){
-    ctx.beginPath();ctx.moveTo(FL.l-GW,y);ctx.lineTo(FL.l,y);ctx.stroke();
-    ctx.beginPath();ctx.moveTo(FL.r,y);ctx.lineTo(FL.r+GW,y);ctx.stroke();
-  }
-  for(let x=0;x<GW;x+=10){
-    ctx.beginPath();ctx.moveTo(FL.l-GW+x,GY);ctx.lineTo(FL.l-GW+x,GY+GH);ctx.stroke();
-    ctx.beginPath();ctx.moveTo(FL.r+x,GY);ctx.lineTo(FL.r+x,GY+GH);ctx.stroke();
-  }
+  for(let y=GY;y<=GY+GH;y+=10){ctx.beginPath();ctx.moveTo(FL.l-GW,y);ctx.lineTo(FL.l,y);ctx.stroke();ctx.beginPath();ctx.moveTo(FL.r,y);ctx.lineTo(FL.r+GW,y);ctx.stroke();}
+  for(let x=0;x<GW;x+=10){ctx.beginPath();ctx.moveTo(FL.l-GW+x,GY);ctx.lineTo(FL.l-GW+x,GY+GH);ctx.stroke();ctx.beginPath();ctx.moveTo(FL.r+x,GY);ctx.lineTo(FL.r+x,GY+GH);ctx.stroke();}
 }
-
 function drawBall(){
   for(let i=0;i<ball.trail.length;i++){
     const t=ball.trail[i],a=(i/ball.trail.length)*.16;
@@ -758,136 +680,80 @@ function drawBall(){
     ctx.beginPath();ctx.arc(t.x,t.y,ball.r*(i/ball.trail.length)*.65,0,Math.PI*2);ctx.fill();
   }
   ctx.globalAlpha=1;
-  ctx.fillStyle='rgba(0,0,0,.28)';
-  ctx.beginPath();ctx.ellipse(ball.x+3,ball.y+5,ball.r,ball.r*.44,0,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='rgba(0,0,0,.28)';ctx.beginPath();ctx.ellipse(ball.x+3,ball.y+5,ball.r,ball.r*.44,0,0,Math.PI*2);ctx.fill();
   ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(ball.x,ball.y,ball.r,0,Math.PI*2);ctx.fill();
   ctx.fillStyle='#1a1a1a';ctx.beginPath();ctx.arc(ball.x,ball.y,ball.r*.36,0,Math.PI*2);ctx.fill();
   ctx.strokeStyle='#444';ctx.lineWidth=.7;
   for(let i=0;i<5;i++){
     const a=i*Math.PI*2/5-Math.PI/2;
-    ctx.beginPath();
-    ctx.moveTo(ball.x+Math.cos(a)*ball.r*.36,ball.y+Math.sin(a)*ball.r*.36);
-    ctx.lineTo(ball.x+Math.cos(a)*ball.r*.86,ball.y+Math.sin(a)*ball.r*.86);
-    ctx.stroke();
+    ctx.beginPath();ctx.moveTo(ball.x+Math.cos(a)*ball.r*.36,ball.y+Math.sin(a)*ball.r*.36);
+    ctx.lineTo(ball.x+Math.cos(a)*ball.r*.86,ball.y+Math.sin(a)*ball.r*.86);ctx.stroke();
   }
-  ctx.fillStyle='rgba(255,255,255,.48)';
-  ctx.beginPath();ctx.arc(ball.x-3,ball.y-3,ball.r*.27,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='rgba(255,255,255,.48)';ctx.beginPath();ctx.arc(ball.x-3,ball.y-3,ball.r*.27,0,Math.PI*2);ctx.fill();
 }
-
 function lerpHex(h1,h2,t){
   const p=n=>parseInt(n,16);
   const r1=p(h1.slice(1,3)),g1=p(h1.slice(3,5)),b1=p(h1.slice(5,7));
   const r2=p(h2.slice(1,3)),g2=p(h2.slice(3,5)),b2=p(h2.slice(5,7));
   return `rgb(${~~(r1+(r2-r1)*t)},${~~(g1+(g2-g1)*t)},${~~(b1+(b2-b1)*t)})`;
 }
-
 function drawPlayer(p){
-  const cr=p.charge/KICK_CHG_F;
-  const charging=p.held;
-
-  // Glow — gradiente radiale pulito (niente replace su stringhe)
-  const isRed=p.col==='#ff3333';
-  const gc1=isRed?`rgba(255,80,80,${charging?0.08+cr*.2:0.05})`
-                 :`rgba(80,140,255,${charging?0.08+cr*.2:0.05})`;
+  const cr=p.charge/KICK_CHG_F,charging=p.held,isRed=p.team===0;
+  const gc1=isRed?`rgba(255,80,80,${charging?0.08+cr*.2:0.05})`:`rgba(80,140,255,${charging?0.08+cr*.2:0.05})`;
   const glowR=p.r+14+(charging?cr*16:0);
   const grd=ctx.createRadialGradient(p.x,p.y,p.r*.3,p.x,p.y,glowR);
   grd.addColorStop(0,gc1);grd.addColorStop(1,'rgba(0,0,0,0)');
-  ctx.fillStyle=grd;
-  ctx.beginPath();ctx.arc(p.x,p.y,glowR,0,Math.PI*2);ctx.fill();
-
-  // Arco carica
+  ctx.fillStyle=grd;ctx.beginPath();ctx.arc(p.x,p.y,glowR,0,Math.PI*2);ctx.fill();
   if(charging&&cr>0.02){
-    ctx.beginPath();
-    ctx.arc(p.x,p.y,p.r+7,-Math.PI/2,-Math.PI/2+cr*Math.PI*2);
-    ctx.strokeStyle=`rgba(255,255,100,${.6+cr*.4})`;
-    ctx.lineWidth=3+cr*2;ctx.lineCap='round';ctx.stroke();ctx.lineCap='butt';
+    ctx.beginPath();ctx.arc(p.x,p.y,p.r+7,-Math.PI/2,-Math.PI/2+cr*Math.PI*2);
+    ctx.strokeStyle=`rgba(255,255,100,${.6+cr*.4})`;ctx.lineWidth=3+cr*2;ctx.lineCap='round';ctx.stroke();ctx.lineCap='butt';
   }
-
-  // Ombra
-  ctx.fillStyle='rgba(0,0,0,.22)';
-  ctx.beginPath();ctx.ellipse(p.x+2,p.y+5,p.r,p.r*.5,0,0,Math.PI*2);ctx.fill();
-
-  // Corpo con gradiente radiale interno (NO string replace)
-  const hi=isRed?'#ff7777':'#77bbff';
+  ctx.fillStyle='rgba(0,0,0,.22)';ctx.beginPath();ctx.ellipse(p.x+2,p.y+5,p.r,p.r*.5,0,0,Math.PI*2);ctx.fill();
+  const hi=TEAM_HI[p.team];
   const bodyGrd=ctx.createRadialGradient(p.x-4,p.y-4,1,p.x,p.y,p.r);
   bodyGrd.addColorStop(0,charging?lerpHex(hi,'#ffffff',cr*.7):hi);
   bodyGrd.addColorStop(1,charging?lerpHex(p.col,'#ffffff',cr*.45):p.col);
-  ctx.fillStyle=bodyGrd;
-  ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,Math.PI*2);ctx.fill();
-
-  // Bordo
+  ctx.fillStyle=bodyGrd;ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,Math.PI*2);ctx.fill();
   ctx.strokeStyle=charging?`rgba(255,255,120,${.7+cr*.3})`:'rgba(255,255,255,.52)';
-  ctx.lineWidth=charging?2+cr*1.5:1.5;
-  ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,Math.PI*2);ctx.stroke();
-
-  // Numero
-  ctx.fillStyle='#fff';ctx.font='700 12px Inter,sans-serif';
+  ctx.lineWidth=charging?2+cr*1.5:1.5;ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,Math.PI*2);ctx.stroke();
+  // indicatore "sono io" — piccolo cerchio bianco in basso
+  if(p.id===myPlayerId){
+    ctx.fillStyle='rgba(255,255,255,.9)';
+    ctx.beginPath();ctx.arc(p.x,p.y+p.r+4,3,0,Math.PI*2);ctx.fill();
+  }
+  ctx.fillStyle='#fff';ctx.font='700 11px Inter,sans-serif';
   ctx.textAlign='center';ctx.textBaseline='middle';
   ctx.shadowColor='rgba(0,0,0,.6)';ctx.shadowBlur=4;
-  ctx.fillText(p.num===0?'1':'2',p.x,p.y+.5);
-  ctx.shadowBlur=0;
+  // mostra il team number (slot nel team)
+  const label=p.team===0?'R':'B';
+  ctx.fillText(label,p.x,p.y+.5);ctx.shadowBlur=0;
 }
-
-// Freccia predittiva: mostra direzione e forza del tiro quando il player tocca la palla
 function drawShotArrow(p){
-  if(!p.held && p.charge<=0) return;
-  const d=dist(p,ball);
-  if(d > KICK_DIST) return; // non tocca la palla
-
-  const cr=p.charge/KICK_CHG_F;
-  const force=KICK_MIN+cr*(KICK_MAX-KICK_MIN);
-
-  // Direzione: dalla palla verso l'esterno rispetto al player
-  const dx=ball.x-p.x, dy=ball.y-p.y;
-  const len=Math.hypot(dx,dy)||1;
-  const nx=dx/len, ny=dy/len;
-
-  // Lunghezza freccia proporzionale alla forza (min 30px, max 110px)
+  if(!p.held&&p.charge<=0)return;
+  if(dist(p,ball)>KICK_DIST)return;
+  const cr=p.charge/KICK_CHG_F,force=KICK_MIN+cr*(KICK_MAX-KICK_MIN);
+  const dx=ball.x-p.x,dy=ball.y-p.y,len=Math.hypot(dx,dy)||1;
+  const nx=dx/len,ny=dy/len;
   const arrowLen=30+cr*80;
-  const ax=ball.x+nx*(ball.r+4);
-  const ay=ball.y+ny*(ball.r+4);
-  const bx=ax+nx*arrowLen;
-  const by=ay+ny*arrowLen;
-
-  // Colore: giallo tenue → arancione brillante con la carica
+  const ax=ball.x+nx*(ball.r+4),ay=ball.y+ny*(ball.r+4);
+  const bx=ax+nx*arrowLen,by=ay+ny*arrowLen;
   const alpha=0.45+cr*0.5;
-  const r=255, g=Math.round(220-cr*120), b=Math.round(60-cr*60);
-  const col=`rgba(${r},${g},${b},${alpha})`;
-
-  ctx.save();
-  ctx.strokeStyle=col;
-  ctx.lineWidth=2+cr*2.5;
-  ctx.lineCap='round';
-  ctx.setLineDash([6,4]);
-  ctx.lineDashOffset= -(Date.now()/40)%10; // animazione scorrimento
-  ctx.beginPath();ctx.moveTo(ax,ay);ctx.lineTo(bx,by);ctx.stroke();
-  ctx.setLineDash([]);
-
-  // Punta freccia
-  const headLen=8+cr*6;
-  const angle=Math.atan2(ny,nx);
-  ctx.fillStyle=col;
-  ctx.beginPath();
-  ctx.moveTo(bx,by);
-  ctx.lineTo(bx-headLen*Math.cos(angle-0.4), by-headLen*Math.sin(angle-0.4));
-  ctx.lineTo(bx-headLen*Math.cos(angle+0.4), by-headLen*Math.sin(angle+0.4));
-  ctx.closePath();ctx.fill();
-  ctx.restore();
+  const col=`rgba(255,${~~(220-cr*120)},${~~(60-cr*60)},${alpha})`;
+  ctx.save();ctx.strokeStyle=col;ctx.lineWidth=2+cr*2.5;ctx.lineCap='round';
+  ctx.setLineDash([6,4]);ctx.lineDashOffset=-(Date.now()/40)%10;
+  ctx.beginPath();ctx.moveTo(ax,ay);ctx.lineTo(bx,by);ctx.stroke();ctx.setLineDash([]);
+  const headLen=8+cr*6,angle=Math.atan2(ny,nx);
+  ctx.fillStyle=col;ctx.beginPath();ctx.moveTo(bx,by);
+  ctx.lineTo(bx-headLen*Math.cos(angle-0.4),by-headLen*Math.sin(angle-0.4));
+  ctx.lineTo(bx-headLen*Math.cos(angle+0.4),by-headLen*Math.sin(angle+0.4));
+  ctx.closePath();ctx.fill();ctx.restore();
 }
-
 function draw(){
   ctx.fillStyle='#060a06';ctx.fillRect(0,0,W,H);
-  drawField();
-  drawParticles();
-  drawBall();
-  // Frecce predittive (sotto i giocatori)
-  for(const p of players) drawShotArrow(p);
-  for(const p of players) drawPlayer(p);
-  // Velo sottile durante cooldown gol
-  if(goalCD>0){
-    const a=Math.min(goalCD/40,1)*.3;
-    ctx.fillStyle=`rgba(0,0,0,${a})`;ctx.fillRect(0,0,W,H);
-  }
+  drawField();drawParticles();drawBall();
+  for(const p of players)drawShotArrow(p);
+  for(const p of players)drawPlayer(p);
+  if(goalCD>0){const a=Math.min(goalCD/40,1)*.3;ctx.fillStyle=`rgba(0,0,0,${a})`;ctx.fillRect(0,0,W,H);}
   if(gameOver){
     ctx.fillStyle='rgba(0,0,0,.58)';ctx.fillRect(0,0,W,H);
     ctx.fillStyle='#fff';ctx.font='700 28px Inter,sans-serif';
@@ -898,13 +764,12 @@ function draw(){
 }
 
 // ════════════════════════════════════════════════════════
-// NETWORK
+// NETWORK — N giocatori
 // ════════════════════════════════════════════════════════
 function serializeState(){
   return {
     ts:Date.now(),
-    p0:{x:players[0].x,y:players[0].y,vx:players[0].vx,vy:players[0].vy,c:players[0].charge,h:players[0].held},
-    p1:{x:players[1].x,y:players[1].y,vx:players[1].vx,vy:players[1].vy,c:players[1].charge,h:players[1].held},
+    ps:players.map(p=>({id:p.id,team:p.team,x:p.x,y:p.y,vx:p.vx,vy:p.vy,c:p.charge,h:p.held})),
     b:{x:ball.x,y:ball.y,vx:ball.vx,vy:ball.vy},
     s:score.slice(),tl:timeLeft,go:gameOver,gc:goalCD
   };
@@ -913,17 +778,24 @@ function broadcastState(){
   if(channel)channel.send({type:'broadcast',event:'state',payload:serializeState()});
 }
 function sendGuestInput(){
-  if(!channel)return;
+  if(!channel||!myPlayerId)return;
   const inp=inpLocal();
-  channel.send({type:'broadcast',event:'input',payload:{...inp,ts:Date.now()}});
+  channel.send({type:'broadcast',event:'input',payload:{...inp,pid:myPlayerId,ts:Date.now()}});
 }
 function applyRemoteState(){
   if(!remoteState)return;
   const s=remoteState,L=.32;
-  players[0].x=lerp(players[0].x,s.p0.x,L);players[0].y=lerp(players[0].y,s.p0.y,L);
-  players[0].vx=s.p0.vx;players[0].vy=s.p0.vy;players[0].charge=s.p0.c;players[0].held=s.p0.h;
-  players[1].x=lerp(players[1].x,s.p1.x,L);players[1].y=lerp(players[1].y,s.p1.y,L);
-  players[1].vx=s.p1.vx;players[1].vy=s.p1.vy;players[1].charge=s.p1.c;players[1].held=s.p1.h;
+  // Aggiorna posizioni da stato autorevole host
+  for(const sp of s.ps){
+    const p=players.find(x=>x.id===sp.id);
+    if(!p)continue;
+    // Se è il mio player, non sovrascrivere la posizione (prediction locale)
+    if(sp.id===myPlayerId){p.charge=sp.c;p.held=sp.h;}
+    else{
+      p.x=lerp(p.x,sp.x,L);p.y=lerp(p.y,sp.y,L);
+      p.vx=sp.vx;p.vy=sp.vy;p.charge=sp.c;p.held=sp.h;
+    }
+  }
   ball.x=lerp(ball.x,s.b.x,L);ball.y=lerp(ball.y,s.b.y,L);ball.vx=s.b.vx;ball.vy=s.b.vy;
   if(s.s[0]!==score[0]||s.s[1]!==score[1]){score=s.s;updateHUD();}
   if(Math.abs(s.tl-timeLeft)>1){timeLeft=s.tl;updateHUD();}
@@ -932,41 +804,34 @@ function applyRemoteState(){
 }
 
 // ════════════════════════════════════════════════════════
-// SCALING CANVAS — adatta al viewport (fix mobile)
+// SCALING CANVAS
 // ════════════════════════════════════════════════════════
 function scaleCanvas(){
-  const hudH = ($('hud').offsetHeight||60) + ($('msg-bar').offsetHeight||22) + ($('ctrl-bar').offsetHeight||24);
-  const availW = window.innerWidth;
-  const availH = window.innerHeight - hudH - 8;
-  // Desktop: campo leggermente più piccolo (max 85% larghezza o 90% altezza)
-  // Mobile (touch): usa tutto lo spazio disponibile
-  const isTouch = isTouchDevice();
-  const maxW = isTouch ? availW : Math.min(availW * 0.85, availW);
-  const maxH = isTouch ? availH : Math.min(availH * 0.90, availH);
-  const scale = Math.min(maxW / W, maxH / H);
-  const cssW = Math.floor(W * scale);
-  const cssH = Math.floor(H * scale);
-  canvas.style.width  = cssW + 'px';
-  canvas.style.height = cssH + 'px';
-  const wrap = $('wrap');
-  wrap.style.width  = cssW + 'px';
-  wrap.style.height = cssH + 'px';
-  wrap.style.flex   = 'none';
+  const hudH=($('hud').offsetHeight||60)+($('msg-bar').offsetHeight||22)+($('ctrl-bar').offsetHeight||24);
+  const availW=window.innerWidth,availH=window.innerHeight-hudH-8;
+  const isTouch=isTouchDevice();
+  const maxW=isTouch?availW:availW*0.85;
+  const maxH=isTouch?availH:availH*0.90;
+  const scale=Math.min(maxW/W,maxH/H);
+  const cssW=Math.floor(W*scale),cssH=Math.floor(H*scale);
+  canvas.style.width=cssW+'px';canvas.style.height=cssH+'px';
+  const wrap=$('wrap');wrap.style.width=cssW+'px';wrap.style.height=cssH+'px';wrap.style.flex='none';
 }
-window.addEventListener('resize', scaleCanvas);
-window.addEventListener('orientationchange', ()=>setTimeout(scaleCanvas,120));
+window.addEventListener('resize',scaleCanvas);
+window.addEventListener('orientationchange',()=>setTimeout(scaleCanvas,120));
+
+// ════════════════════════════════════════════════════════
+// GAME LOOP
+// ════════════════════════════════════════════════════════
 let running=false;
 function loop(ts){
   if(!running)return;
-  const dt=lastFrameTime?Math.min(ts-lastFrameTime,100):16.67; // cap a 100ms
-  lastFrameTime=ts;
-  update(dt);
-  draw();
-  requestAnimationFrame(loop);
+  const dt=lastFrameTime?Math.min(ts-lastFrameTime,100):16.67;
+  lastFrameTime=ts;update(dt);draw();requestAnimationFrame(loop);
 }
 
 // ════════════════════════════════════════════════════════
-// LOBBY
+// LOBBY & GAME START
 // ════════════════════════════════════════════════════════
 function genCode(){
   const c='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -975,63 +840,109 @@ function genCode(){
 function showLobby(){
   $('lobby').style.display='flex';$('game').style.display='none';
   $('touch-controls').style.display='none';running=false;
+  waitingPlayers=[];
 }
-function startGame(mode){
+function startGame(mode, roster){
+  // roster: [{id,team},...] già definito dall'host
   netMode=mode;
+  players=buildPlayers(roster);
+
   $('lobby').style.display='none';$('game').style.display='flex';
   const badge=$('net-badge');
-  if(mode==='host'){badge.textContent='HOST 🔴';badge.className='badge-host';}
-  else if(mode==='guest'){badge.textContent='GUEST 🔵';badge.className='badge-guest';}
-  else{badge.textContent='LOCALE';badge.className='badge-local';}
+  if(mode==='host'){badge.textContent='HOST';badge.className='badge-host';}
+  else if(mode==='guest'){badge.textContent='GUEST';badge.className='badge-guest';}
+  else{badge.textContent='TRAIN';badge.className='badge-train';}
   $('btn-restart').style.display=mode==='guest'?'none':'';
-  // Touch controls
   detectTouch();
-  if($('touch-controls').style.display!=='none'){
-    // In locale su touch non ha senso — uno schermo, un giocatore
-    // Mostra ugualmente per online/singolo
-  }
   reset(true);updateHUD();
   lastFrameTime=0;running=true;
-  // Scala il canvas dopo che il DOM si è aggiornato
-  requestAnimationFrame(()=>{ scaleCanvas(); requestAnimationFrame(loop); });
+  requestAnimationFrame(()=>{scaleCanvas();requestAnimationFrame(loop);});
 }
 
+// ── Allenamento ─────────────────────────────────────────
+function startTraining(){
+  myPlayerId='train_local';
+  startGame('train',[{id:'train_local',team:0}]);
+}
+
+// ── Crea stanza ─────────────────────────────────────────
 async function createRoom(){
   setStatus('Creazione stanza…');
   const code=genCode();roomCode=code;
+  myPlayerId=uid();
+  waitingPlayers=[{id:myPlayerId,team:0}];
   $('room-code-shown').textContent=code;
   $('card-wait').style.display='block';$('card-join').style.display='none';setStatus('');
+  updateWaitingUI();
+
   channel=sb.channel(`hax2:${code}`,{config:{broadcast:{self:false}}});
   channel
-    .on('broadcast',{event:'join'},()=>{
-      $('card-wait').style.display='none';
-      startGame('host');
-      channel.send({type:'broadcast',event:'start',payload:{}});
-      setTimeout(()=>broadcastState(),100);
+    .on('broadcast',{event:'join'},msg=>{
+      const {pid}=msg.payload;
+      if(waitingPlayers.find(p=>p.id===pid))return; // già presente
+      // assegna team alternando
+      const reds=waitingPlayers.filter(p=>p.team===0).length;
+      const blues=waitingPlayers.filter(p=>p.team===1).length;
+      const team=reds<=blues?0:1;
+      waitingPlayers.push({id:pid,team});
+      updateWaitingUI();
+      // conferma al guest: manda il suo pid, team e lista completa
+      channel.send({type:'broadcast',event:'joined',payload:{pid,team,roster:waitingPlayers}});
     })
     .on('broadcast',{event:'input'},msg=>{
       const d=msg.payload;
-      remoteInput={up:d.up,dn:d.dn,lt:d.lt,rt:d.rt,kick:d.kick};
+      if(d.pid)remoteInputs[d.pid]={up:d.up,dn:d.dn,lt:d.lt,rt:d.rt,kick:d.kick};
       if(d.ts){pingMs=~~((Date.now()-d.ts)/2);$('ping').textContent=`ping: ${pingMs}ms`;}
     })
     .subscribe();
 }
+
+function updateWaitingUI(){
+  const reds=waitingPlayers.filter(p=>p.team===0);
+  const blues=waitingPlayers.filter(p=>p.team===1);
+  $('player-list').innerHTML=
+    `🔴 ${reds.length} giocatore${reds.length!==1?'i':''} · 🔵 ${blues.length} giocatore${blues.length!==1?'i':''}`;
+  $('wait-status').textContent=waitingPlayers.length<2
+    ?'Aspettando almeno un altro giocatore…'
+    :`${waitingPlayers.length} giocatori connessi — puoi avviare!`;
+  $('btn-start-game').style.display=waitingPlayers.length>=2?'block':'none';
+}
+
+function hostStartMatch(){
+  // invia il roster a tutti i guest, poi avvia
+  channel.send({type:'broadcast',event:'start',payload:{roster:waitingPlayers,hostId:myPlayerId}});
+  $('card-wait').style.display='none';
+  startGame('host',waitingPlayers);
+  setTimeout(()=>broadcastState(),120);
+}
+
+// ── Entra in stanza ─────────────────────────────────────
 async function joinRoom(code){
   code=code.toUpperCase().trim();
   if(code.length<4){setStatus('Codice non valido');return;}
   setStatus('Connessione…');roomCode=code;
+  myPlayerId=uid();
+
   channel=sb.channel(`hax2:${code}`,{config:{broadcast:{self:false}}});
   channel
-    .on('broadcast',{event:'start'},()=>{setStatus('');startGame('guest');})
+    .on('broadcast',{event:'joined'},msg=>{
+      // risposta dell'host al mio join — aggiorna lista
+      setStatus(`Connesso! Team ${msg.payload.team===0?'🔴 Rossi':'🔵 Blu'} · ${msg.payload.roster.length} giocatori in sala`);
+    })
+    .on('broadcast',{event:'start'},msg=>{
+      setStatus('');
+      startGame('guest', msg.payload.roster);
+    })
     .on('broadcast',{event:'state'},msg=>{remoteState=msg.payload;})
     .subscribe(async s=>{
       if(s==='SUBSCRIBED'){
         setStatus('Connesso! Avvisando host…');
-        await channel.send({type:'broadcast',event:'join',payload:{ts:Date.now()}});
+        await channel.send({type:'broadcast',event:'join',payload:{pid:myPlayerId,ts:Date.now()}});
         setStatus('In attesa che l\'host avvii la partita…');
       }
     });
 }
+
 function leaveGame(){
   if(channel){sb.removeChannel(channel);channel=null;}
   running=false;
@@ -1047,16 +958,13 @@ $('btn-join-show').onclick=()=>{$('card-wait').style.display='none';$('card-join
 $('btn-join-go').onclick=()=>joinRoom($('code-input').value);
 $('code-input').addEventListener('keydown',e=>{if(e.key==='Enter')$('btn-join-go').click();});
 $('btn-join-cancel').onclick=()=>{$('card-join').style.display='none';setStatus('');};
-$('btn-cancel-wait').onclick=()=>{if(channel){sb.removeChannel(channel);channel=null;}$('card-wait').style.display='none';setStatus('');};
-$('btn-local').onclick=()=>startGame('local');
+$('btn-cancel-wait').onclick=()=>{if(channel){sb.removeChannel(channel);channel=null;}$('card-wait').style.display='none';setStatus('');waitingPlayers=[];};
+$('btn-start-game').onclick=hostStartMatch;
+$('btn-train').onclick=startTraining;
 $('btn-restart').onclick=()=>{if(netMode!=='guest'){reset(true);updateHUD();}};
 $('btn-leave').onclick=leaveGame;
 
-setInterval(()=>{
-  if(netMode==='host'&&channel)channel.send({type:'broadcast',event:'ping',payload:{ts:Date.now()}});
-},5000);
-
-reset(true);
+setInterval(()=>{if(netMode==='host'&&channel)channel.send({type:'broadcast',event:'ping',payload:{ts:Date.now()}});},5000);
 </script>
 </body>
 </html>
