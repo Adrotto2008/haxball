@@ -11,7 +11,8 @@
 body{
   background:#060a06;min-height:100vh;
   display:flex;flex-direction:column;align-items:center;justify-content:center;
-  font-family:'Inter',sans-serif;color:#fff;touch-action:none;
+  font-family:'Inter',sans-serif;color:#fff;
+  /* NO touch-action:none qui — blocca il pinch-to-zoom */
 }
 
 /* ── LOBBY ──────────────────────────────────────────── */
@@ -104,7 +105,9 @@ input[type=text]::placeholder{font-family:'Inter',sans-serif;letter-spacing:1px;
   flex-shrink:0;
 }
 /* Il canvas viene ridimensionato via JS con width/height CSS */
-canvas{display:block;}
+canvas{display:block;touch-action:none;}
+/* touch-controls bloccano scroll ma non pinch */
+#touch-controls{touch-action:none;}
 #goal-flash{
   position:absolute;inset:0;pointer-events:none;opacity:0;
   background:radial-gradient(ellipse at center,rgba(255,220,50,.6) 0%,rgba(255,150,0,.2) 40%,transparent 70%);
@@ -424,10 +427,20 @@ let joyTouchId=null, kickTouchId=null;
 let joyOrigin={x:70,y:70}; // centro base joystick
 const JOY_R=60; // raggio max stick
 
+// Distingue touch vero (telefono/tablet) da laptop con touchscreen
+// Su laptop con touchscreen maxTouchPoints>0 ma vogliamo comunque tastiera
+function isTouchDevice(){
+  return ('ontouchstart' in window && navigator.maxTouchPoints > 0
+          && !window.matchMedia('(pointer:fine)').matches);
+}
+
 function detectTouch(){
-  if('ontouchstart' in window || navigator.maxTouchPoints>0){
+  if(isTouchDevice()){
     $('touch-controls').style.display='block';
     $('ctrl-bar').style.display='none';
+  } else {
+    $('touch-controls').style.display='none';
+    $('ctrl-bar').style.display='flex';
   }
 }
 detectTouch();
@@ -579,10 +592,11 @@ function update(dt){
 
   let inp0,inp1;
   if(netMode==='local'){
-    // Se touch attivo, P0 prende il joystick; P1 solo tastiera
-    const isTouch = $('touch-controls').style.display!=='none';
+    // Desktop locale: P0=WASD+Ctrl/0, P1=Frecce+Spazio — SEMPRE separati
+    // Su touch locale: P0 usa joystick+kick, P1 non esiste (single player touch)
+    const isTouch = isTouchDevice();
     inp0 = isTouch ? inpLocal() : inpP0();
-    inp1 = inpP1();
+    inp1 = isTouch ? {up:false,dn:false,lt:false,rt:false,kick:false} : inpP1();
   }
   else{inp0=inpLocal();inp1=remoteInput;}
 
@@ -896,7 +910,12 @@ function scaleCanvas(){
   const hudH = ($('hud').offsetHeight||60) + ($('msg-bar').offsetHeight||22) + ($('ctrl-bar').offsetHeight||24);
   const availW = window.innerWidth;
   const availH = window.innerHeight - hudH - 8;
-  const scale = Math.min(availW / W, availH / H);
+  // Desktop: campo leggermente più piccolo (max 85% larghezza o 90% altezza)
+  // Mobile (touch): usa tutto lo spazio disponibile
+  const isTouch = isTouchDevice();
+  const maxW = isTouch ? availW : Math.min(availW * 0.85, availW);
+  const maxH = isTouch ? availH : Math.min(availH * 0.90, availH);
+  const scale = Math.min(maxW / W, maxH / H);
   const cssW = Math.floor(W * scale);
   const cssH = Math.floor(H * scale);
   canvas.style.width  = cssW + 'px';
