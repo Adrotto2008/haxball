@@ -65,7 +65,7 @@ input[type=text]::placeholder{font-family:'Inter',sans-serif;letter-spacing:1px;
 
 /* ── GAME ───────────────────────────────────────────── */
 #game{
-  display:none;flex-direction:column;align-items:center;gap:0;
+  display:none;flex-direction:column;align-items:center;justify-content:flex-start;gap:0;
   width:100%;height:100vh;overflow:hidden;
   position:fixed;inset:0;background:#060a06;z-index:10;
 }
@@ -100,11 +100,11 @@ input[type=text]::placeholder{font-family:'Inter',sans-serif;letter-spacing:1px;
 #msg-bar{font-size:13px;font-weight:600;min-height:20px;color:#ffdd44;text-align:center;padding:1px 0 3px;letter-spacing:.3px;flex-shrink:0}
 #wrap{
   position:relative;line-height:0;
-  flex:1;display:flex;align-items:center;justify-content:center;
-  overflow:hidden;width:100%;
+  display:flex;align-items:center;justify-content:center;
+  flex-shrink:0;
 }
-/* Il canvas viene scalato via JS con transform:scale — mantiene dimensioni interne */
-canvas{display:block;transform-origin:center center;}
+/* Il canvas viene ridimensionato via JS con width/height CSS */
+canvas{display:block;}
 #goal-flash{
   position:absolute;inset:0;pointer-events:none;opacity:0;
   background:radial-gradient(ellipse at center,rgba(255,220,50,.6) 0%,rgba(255,150,0,.2) 40%,transparent 70%);
@@ -274,8 +274,8 @@ const P_ACCEL  = 0.55;  // era 0.9 (risposta rapida ma non istantanea)
 const P_FRIC   = 0.68;  // era 0.60 (si ferma deciso ma non di colpo)
 
 const B_FRIC   = 0.985;
-const B_BOUNCE = 0.82;  // era 0.68 — rimbalza molto di più
-const B_HIT_R  = 0.80;
+const B_BOUNCE = 0.88;  // rimbalzo muri molto energico
+const B_HIT_R  = 0.90;  // rimbalzo da giocatore molto energico
 
 const KICK_MIN     = 4.0;
 const KICK_MAX     = 13.0;
@@ -348,8 +348,7 @@ function mkPlayer(x,y,col,num){
   return {x,y,vx:0,vy:0,r:PR,col,num,charge:0,held:false};
 }
 function mkBall(){
-  const a=Math.random()*Math.PI*2;
-  return {x:W/2,y:H/2,vx:Math.cos(a)*1.0,vy:Math.sin(a)*1.0,r:BR,trail:[]};
+  return {x:W/2,y:H/2,vx:0,vy:0,r:BR,trail:[]};
 }
 function reset(full){
   players=[mkPlayer(W*.22,H/2,'#ff3333',0), mkPlayer(W*.78,H/2,'#3388ff',1)];
@@ -509,6 +508,11 @@ function applyInput(p,inp){
 
   if(charging){
     p.charge=Math.min(p.charge+1,KICK_CHG_F);
+    // Brake immediato: se era veloce, rallenta di colpo al primo frame di carica
+    if(!p.held){
+      p.vx*=0.35;
+      p.vy*=0.35;
+    }
   } else {
     if(p.held&&p.charge>0){
       const t=p.charge/KICK_CHG_F;
@@ -829,19 +833,36 @@ function applyRemoteState(){
 // SCALING CANVAS — adatta al viewport (fix mobile)
 // ════════════════════════════════════════════════════════
 function scaleCanvas(){
+  // Calcola lo spazio disponibile togliendo HUD (≈70px) + msgbar (≈24px) + ctrlbar (≈28px)
+  const hudH = ($('hud').offsetHeight||60) + ($('msg-bar').offsetHeight||22) + ($('ctrl-bar').offsetHeight||24);
+  const availW = window.innerWidth;
+  const availH = window.innerHeight - hudH - 8;
+
+  // Scala mantenendo aspect ratio 900×520
+  const scaleX = availW / W;
+  const scaleY = availH / H;
+  const scale  = Math.min(scaleX, scaleY); // su desktop non superare 1:1? no, lascia scalare
+
+  const cssW = Math.floor(W * scale);
+  const cssH = Math.floor(H * scale);
+
+  // Applica dimensioni CSS al canvas (le dimensioni interne W×H restano invariate)
+  canvas.style.width  = cssW + 'px';
+  canvas.style.height = cssH + 'px';
+  canvas.style.transform = '';
+
+  // Forza il wrap a contenere esattamente il canvas
   const wrap = $('wrap');
-  const ww = wrap.clientWidth  || window.innerWidth;
-  const wh = wrap.clientHeight || (window.innerHeight - 120); // sottrai hud+msg
-  // Calcola scala mantenendo aspect ratio 900×520
-  const scaleX = ww / W;
-  const scaleY = wh / H;
-  const scale  = Math.min(scaleX, scaleY, 1); // mai più grande del 100% su desktop
-  canvas.style.transform = `scale(${scale})`;
-  // Ridimensiona il wrap alla dimensione visiva del canvas scalato
-  wrap.style.height = Math.round(H * scale) + 'px';
+  wrap.style.width  = cssW + 'px';
+  wrap.style.height = cssH + 'px';
+  wrap.style.flex   = 'none';
+
+  // Aggiusta anche il kick-arc-canvas (touch)
+  const arcEl = $('kick-arc-canvas');
+  if(arcEl){ arcEl.style.bottom='28px'; arcEl.style.right='24px'; }
 }
 window.addEventListener('resize', scaleCanvas);
-// verrà chiamata anche in startGame
+window.addEventListener('orientationchange', ()=>setTimeout(scaleCanvas,120));
 let running=false;
 function loop(ts){
   if(!running)return;
