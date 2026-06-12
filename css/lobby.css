@@ -12,6 +12,7 @@
   filter:drop-shadow(0 0 28px rgba(255,80,0,.4));line-height:1.1;
 }
 .logo-sub{font-size:10px;letter-spacing:5px;color:rgba(255,255,255,.3);text-align:center;display:block;margin-top:2px}
+.lobby-version{font-size:10px;letter-spacing:2px;color:rgba(255,255,255,.18);text-align:center;margin-top:5px;font-family:'Courier New',monospace}
 .card{
   background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.09);
   border-radius:16px;padding:20px 24px;width:min(340px,92vw);

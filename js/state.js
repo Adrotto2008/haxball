@@ -12,7 +12,7 @@ let players = [], ball, particles = [];
 let netMode = 'train', myPlayerId = null;
 let roomCode = null, channel = null, pingMs = 0;
 let remoteInputs = {}, remoteState = null, lastSent = 0;
-let pmRoster = [], isHost = false, pmSelectedId = null;
+let pmRoster = [], isHost = false, pmSelectedId = null, hostId = null;
 let running = false, escOpen = false;
 let currentView = 8;
 

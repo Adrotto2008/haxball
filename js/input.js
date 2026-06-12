@@ -2,12 +2,20 @@
 const keys = {};
 let touchKick = false, joyX = 0, joyY = 0;
 
+// Blocca zoom su iOS (pinch / double-tap)
+document.addEventListener('gesturestart',  e => e.preventDefault(), {passive:false});
+document.addEventListener('gesturechange', e => e.preventDefault(), {passive:false});
+document.addEventListener('gestureend',    e => e.preventDefault(), {passive:false});
+document.addEventListener('touchmove', e => {
+  if(e.touches.length > 1) e.preventDefault();
+}, {passive:false});
+
 // Tastiera
 document.addEventListener('keydown', e => {
   keys[e.code] = true;
   const stop = ['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space','ControlLeft','ControlRight','Digit0','Numpad0','Escape'];
   if(stop.includes(e.code)) e.preventDefault();
-  if($('game').style.display !== 'none' && $('esc-menu').style.display !== 'flex') {
+  if($('game').style.display !== 'none' && !$('game-menu').classList.contains('open')) {
     const m = e.code.match(/^Digit([1-9])$/);
     if(m) { setView(parseInt(m[1])); return; }
   }

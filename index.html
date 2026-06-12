@@ -2,15 +2,14 @@
 <html lang="it">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>HaxBall 2</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/base.css">
 <link rel="stylesheet" href="css/lobby.css">
-<link rel="stylesheet" href="css/prematch.css">
 <link rel="stylesheet" href="css/game.css">
-<link rel="stylesheet" href="css/esc-menu.css">
+<link rel="stylesheet" href="css/game-menu.css">
 <link rel="stylesheet" href="css/touch.css">
 </head>
 <body>
@@ -20,6 +19,7 @@
   <div style="text-align:center">
     <div class="logo">⚽ HAXBALL 2</div>
     <span class="logo-sub">BROWSER FOOTBALL</span>
+    <div class="lobby-version" id="lobby-version"></div>
   </div>
   <div class="card">
     <div class="card-title">🌐 Online</div>
@@ -56,27 +56,6 @@
   <div id="lobby-msg"></div>
 </div>
 
-<!-- PRE-MATCH ROOM -->
-<div id="prematch">
-  <h2>SALA D'ATTESA</h2>
-  <div class="pm-grid">
-    <div class="pm-col pm-col-red" id="pm-red">
-      <div class="pm-col-title">🔴 Squadra Rossa</div>
-    </div>
-    <div class="pm-col pm-col-spec" id="pm-spec">
-      <div class="pm-col-title">👁 Spettatori</div>
-    </div>
-    <div class="pm-col pm-col-blue" id="pm-blue">
-      <div class="pm-col-title">🔵 Squadra Blu</div>
-    </div>
-  </div>
-  <div id="pm-status">In attesa di giocatori…</div>
-  <div id="pm-actions">
-    <button class="btn btn-green" id="pm-btn-start" style="display:none">▶ Inizia partita</button>
-    <button class="btn btn-ghost" id="pm-btn-leave">← Lascia stanza</button>
-  </div>
-</div>
-
 <!-- GAME -->
 <div id="game">
   <div id="hud">
@@ -92,6 +71,7 @@
       </div>
       <span id="net-badge" class="badge-train">TRAIN</span>
       <span id="ping"></span>
+      <button class="hud-btn hud-menu-touch" id="btn-menu-touch">☰ Menu</button>
     </div>
     <div class="team-score">
       <span class="score-num score-blue" id="sb">0</span>
@@ -108,18 +88,54 @@
   </div>
 </div>
 
-<!-- ESC MENU -->
-<div id="esc-menu">
-  <div class="esc-box">
-    <div class="esc-title">Menu</div>
-    <div id="view-picker"></div>
-    <div style="font-size:10px;color:rgba(255,255,255,.3);margin-top:-4px">Vista campo (0=vicino, 9=lontano)</div>
-    <div style="display:flex;flex-direction:column;gap:8px;width:100%;margin-top:4px">
-      <button class="btn btn-ghost" id="esc-resume">▶ Riprendi</button>
-      <button class="btn btn-ghost" id="esc-prematch" style="display:none">🏠 Sala d'attesa</button>
+<!-- MENU UNIFICATO (pre-partita + in-game) -->
+<div id="game-menu">
+  <div class="gm-box">
+
+    <!-- header -->
+    <div class="gm-header">
+      <div class="gm-title" id="gm-title">Sala d'attesa</div>
+      <button class="gm-close-btn" id="gm-close-btn">✕</button>
+    </div>
+
+    <!-- tab bar -->
+    <div class="gm-tabs" id="gm-tabs">
+      <button class="gm-tab active" data-tab="roster">👥 Giocatori</button>
+      <button class="gm-tab" data-tab="settings">⚙️ Impostazioni</button>
+    </div>
+
+    <!-- TAB: roster -->
+    <div class="gm-panel" id="gm-panel-roster">
+      <div class="pm-grid">
+        <div class="pm-col pm-col-red" id="pm-red">
+          <div class="pm-col-title">🔴 Rossi</div>
+        </div>
+        <div class="pm-col pm-col-spec" id="pm-spec">
+          <div class="pm-col-title">👁 Spec</div>
+        </div>
+        <div class="pm-col pm-col-blue" id="pm-blue">
+          <div class="pm-col-title">🔵 Blu</div>
+        </div>
+      </div>
+      <div id="pm-status">In attesa…</div>
+      <div id="pm-admin-hint" class="pm-admin-hint" style="display:none">Sei admin — tocca un giocatore, poi una colonna per spostarlo</div>
+    </div>
+
+    <!-- TAB: impostazioni (zoom + azioni) -->
+    <div class="gm-panel" id="gm-panel-settings" style="display:none">
+      <div class="gm-section-label">Vista campo</div>
+      <div id="view-picker"></div>
+      <div class="gm-vp-hint">0 = più vicino · 9 = più lontano</div>
+    </div>
+
+    <!-- footer azioni -->
+    <div class="gm-footer">
+      <button class="btn btn-green" id="pm-btn-start" style="display:none">▶ Inizia partita</button>
+      <button class="btn btn-ghost" id="esc-resume" style="display:none">▶ Riprendi</button>
       <button class="btn btn-ghost" id="esc-restart" style="display:none">↺ Restart</button>
       <button class="btn btn-ghost hud-btn-danger" id="esc-leave">✕ Esci</button>
     </div>
+
   </div>
 </div>
 

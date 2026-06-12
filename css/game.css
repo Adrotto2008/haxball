@@ -28,6 +28,14 @@
 .badge-host{background:rgba(255,60,60,.15);color:#ff6666;border:1px solid rgba(255,60,60,.25)}
 .badge-guest{background:rgba(60,130,255,.15);color:#6699ff;border:1px solid rgba(60,130,255,.25)}
 #ping{font-size:9px;color:rgba(255,255,255,.28)}
+/* Tasto menu visibile solo su touch */
+.hud-menu-touch{
+  display:none;font-size:16px;padding:4px 10px;line-height:1;
+  background:rgba(255,255,255,.09);border:1px solid rgba(255,255,255,.15);
+}
+@media (pointer:coarse) {
+  .hud-menu-touch{display:block}
+}
 #msg-bar{font-size:12px;font-weight:600;min-height:18px;color:#ffdd44;text-align:center;padding:1px 0 2px;letter-spacing:.2px;flex-shrink:0}
 #wrap{
   flex:1;display:flex;align-items:center;justify-content:center;

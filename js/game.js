@@ -1,20 +1,7 @@
 // ── GAME — update loop, gol, fine partita, build/reset ──
 
 // ── ESC MENU ───────────────────────────────────────────
-function toggleEscMenu(forceOpen) {
-  escOpen = forceOpen!==undefined ? forceOpen : !escOpen;
-  $('esc-menu').style.display = escOpen ? 'flex' : 'none';
-  if(escOpen) {
-    buildViewPicker();
-    $('esc-prematch').style.display = (netMode==='host'||netMode==='guest') ? '' : 'none';
-    $('esc-restart').style.display = netMode!=='guest' ? '' : 'none';
-  }
-}
-$('esc-resume').onclick = () => toggleEscMenu(false);
-$('esc-restart').onclick = () => { toggleEscMenu(false); if(netMode!=='guest'){reset(true);updateHUD();} };
-$('esc-prematch').onclick = () => { toggleEscMenu(false); backToPrematch(); };
-$('esc-leave').onclick = () => { toggleEscMenu(false); leaveGame(); };
-$('esc-menu').addEventListener('click', e => { if(e.target===$('esc-menu')) toggleEscMenu(false); });
+// toggleEscMenu è definita in prematch.js (menu unificato)
 
 // ── UPDATE ─────────────────────────────────────────────
 function update(dt) {
@@ -120,7 +107,8 @@ function loop(ts) {
 // ── START GAME ─────────────────────────────────────────
 function startGame(mode, roster) {
   netMode=mode; players=buildPlayers(roster);
-  $('prematch').style.display='none'; $('lobby').style.display='none'; $('game').style.display='flex';
+  $('game-menu').classList.remove('open');
+  $('lobby').style.display='none'; $('game').style.display='flex';
   const badge=$('net-badge');
   if(mode==='host') { badge.textContent='HOST'; badge.className='badge-host'; }
   else if(mode==='guest') { badge.textContent='GUEST'; badge.className='badge-guest'; }
@@ -130,4 +118,4 @@ function startGame(mode, roster) {
   reset(true); updateHUD(); applyView();
   lastFrameTime=0; running=true; requestAnimationFrame(loop);
 }
-function startTraining() { myPlayerId='local'; netMode='train'; isHost=true; startGame('train',[{id:'local',team:0}]); }
+function startTraining() { myPlayerId='local'; hostId='local'; netMode='train'; isHost=true; startGame('train',[{id:'local',team:0}]); }
