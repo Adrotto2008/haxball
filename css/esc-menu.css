@@ -1,0 +1,19 @@
+/* ── ESC MENU ─────────────────────────────────────────── */
+#esc-menu{
+  position:fixed;inset:0;display:none;align-items:center;justify-content:center;
+  background:rgba(0,0,0,.72);z-index:200;animation:fadeIn .15s ease;
+}
+.esc-box{
+  background:#0e1a0e;border:1px solid rgba(255,255,255,.12);
+  border-radius:18px;padding:28px 32px;width:min(320px,88vw);
+  display:flex;flex-direction:column;gap:12px;align-items:center;
+}
+.esc-title{font-size:14px;font-weight:700;letter-spacing:2px;opacity:.6;text-transform:uppercase}
+#view-picker{display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin:4px 0}
+.vp-btn{
+  width:36px;height:36px;border-radius:8px;border:1.5px solid rgba(255,255,255,.15);
+  background:rgba(255,255,255,.07);color:rgba(255,255,255,.6);font-size:13px;font-weight:700;
+  cursor:pointer;transition:all .1s;display:flex;align-items:center;justify-content:center;
+}
+.vp-btn:hover{background:rgba(255,255,255,.16);color:#fff}
+.vp-btn.active{background:rgba(80,200,100,.22);border-color:rgba(80,200,100,.55);color:#8df0a0}

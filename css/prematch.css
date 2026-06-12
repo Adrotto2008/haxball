@@ -1,0 +1,31 @@
+/* ── PRE-MATCH ROOM ───────────────────────────────────── */
+#prematch{
+  position:fixed;inset:0;display:none;flex-direction:column;
+  align-items:center;justify-content:center;gap:16px;z-index:50;
+  background:#060a06;animation:fadeIn .3s ease;
+}
+#prematch h2{font-size:18px;font-weight:700;letter-spacing:2px;opacity:.7}
+.pm-grid{
+  display:flex;gap:12px;width:min(720px,96vw);
+}
+.pm-col{
+  flex:1;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.09);
+  border-radius:14px;padding:14px 12px;min-height:200px;
+  display:flex;flex-direction:column;gap:8px;
+}
+.pm-col-title{font-size:10px;font-weight:700;letter-spacing:3px;text-transform:uppercase;text-align:center;padding-bottom:6px;border-bottom:1px solid rgba(255,255,255,.07)}
+.pm-col-red   .pm-col-title{color:#ff6666}
+.pm-col-spec  .pm-col-title{color:rgba(255,255,255,.4)}
+.pm-col-blue  .pm-col-title{color:#6699ff}
+.pm-player{
+  background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);
+  border-radius:8px;padding:8px 10px;font-size:12px;font-weight:600;
+  display:flex;align-items:center;gap:7px;cursor:pointer;transition:all .12s;
+  touch-action:manipulation;
+}
+.pm-player:hover{background:rgba(255,255,255,.14)}
+.pm-player.me{border-color:rgba(255,220,80,.4);background:rgba(255,200,50,.07)}
+.pm-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.pm-you{font-size:9px;opacity:.5;margin-left:auto}
+#pm-status{font-size:12px;color:rgba(255,255,255,.35);text-align:center}
+#pm-actions{display:flex;gap:10px;width:min(360px,90vw)}
