@@ -38,7 +38,7 @@ function update(dt) {
   if(ball.x+ball.r>FL.r) { if(inGoal){goal(0);return;} ball.x=FL.r-ball.r; ball.vx*=-B_BOUNCE; }
   if(ball.y-ball.r<FL.t) { ball.y=FL.t+ball.r; ball.vy*=-B_BOUNCE; }
   if(ball.y+ball.r>FL.b) { ball.y=FL.b-ball.r; ball.vy*=-B_BOUNCE; }
-  if(netMode==='host') { const now=Date.now(); if(now-lastSent>=50){lastSent=now;broadcastState();} }
+  if(netMode==='host') { const now=Date.now(); if(now-lastSent>=33){lastSent=now;broadcastState();} }
 }
 
 // ── GOL / FINE ─────────────────────────────────────────
@@ -118,4 +118,8 @@ function startGame(mode, roster) {
   reset(true); updateHUD(); applyView();
   lastFrameTime=0; running=true; requestAnimationFrame(loop);
 }
-function startTraining() { myPlayerId='local'; hostId='local'; netMode='train'; isHost=true; startGame('train',[{id:'local',team:0}]); }
+function startTraining() {
+  myNickname = (typeof getNick==='function') ? getNick() : 'Giocatore';
+  myPlayerId='local'; hostId='local'; netMode='train'; isHost=true;
+  startGame('train',[{id:'local',team:0,name:myNickname}]);
+}

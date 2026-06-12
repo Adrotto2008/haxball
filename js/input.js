@@ -20,6 +20,9 @@ document.addEventListener('keydown', e => {
     if(m) { setView(parseInt(m[1])); return; }
   }
   if(e.code === 'Escape' && $('game').style.display !== 'none') { toggleEscMenu(); return; }
+  if(e.code === 'KeyT' && $('game').style.display !== 'none' && !$('game-menu').classList.contains('open')) {
+    e.preventDefault(); toggleChat(); return;
+  }
 });
 document.addEventListener('keyup', e => { keys[e.code] = false; });
 
@@ -27,6 +30,7 @@ function isKick() {
   return !!(keys['ControlLeft']||keys['ControlRight']||keys['Space']||keys['Digit0']||keys['Numpad0']||touchKick);
 }
 function inpLocal() {
+  if(chatOpen) return noInp; // nessun movimento mentre si chatta
   return {
     up: !!(keys['KeyW']||keys['ArrowUp']||joyY<-0.22),
     dn: !!(keys['KeyS']||keys['ArrowDown']||joyY>0.22),

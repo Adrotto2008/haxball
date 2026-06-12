@@ -34,3 +34,16 @@ input[type=text]::placeholder{font-family:'Inter',sans-serif;letter-spacing:1px;
 .dot{width:5px;height:5px;border-radius:50%;background:#5599ff;animation:blink 1.2s infinite}
 .dot:nth-child(2){animation-delay:.2s}.dot:nth-child(3){animation-delay:.4s}
 #lobby-msg{font-size:12px;color:#ffdd66;min-height:16px;text-align:center}
+
+/* card nickname compatta */
+#lobby .card:first-of-type {
+  padding:14px 20px;
+}
+#nickname-input{
+  background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.14);
+  border-radius:9px;padding:10px 13px;color:#fff;width:100%;outline:none;
+  font-family:'Inter',sans-serif;font-size:14px;font-weight:600;
+  letter-spacing:.3px;transition:border-color .15s;
+}
+#nickname-input:focus{border-color:rgba(80,200,100,.45)}
+#nickname-input::placeholder{color:rgba(255,255,255,.2);font-weight:400}

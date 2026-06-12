@@ -17,10 +17,17 @@
 <!-- LOBBY -->
 <div id="lobby">
   <div style="text-align:center">
-    <div class="logo"> HAXBALL 2</div>
+    <div class="logo">⚽ HAXBALL 2</div>
     <span class="logo-sub">BROWSER FOOTBALL</span>
     <div class="lobby-version" id="lobby-version"></div>
   </div>
+
+  <!-- nickname -->
+  <div class="card">
+    <div class="card-title">👤 Il tuo nome</div>
+    <input type="text" id="nickname-input" maxlength="16" placeholder="Nickname…" autocomplete="off" spellcheck="false">
+  </div>
+
   <div class="card">
     <div class="card-title">🌐 Online</div>
     <div class="row">
@@ -30,6 +37,7 @@
     <div class="divider">── oppure ──</div>
     <button class="btn btn-green" id="btn-train">🎯 Allenamento (solo)</button>
   </div>
+
   <div class="card" id="card-join" style="display:none">
     <div class="card-title">Inserisci codice stanza</div>
     <input type="text" id="code-input" maxlength="6" placeholder="es. AB12CD">
@@ -38,6 +46,7 @@
       <button class="btn btn-ghost btn-sm" id="btn-join-cancel">Annulla</button>
     </div>
   </div>
+
   <div class="card" id="card-wait" style="display:none">
     <div class="card-title">Stanza creata</div>
     <div class="code-box">
@@ -58,47 +67,68 @@
 
 <!-- GAME -->
 <div id="game">
+  <!-- HUD: unica riga compatta -->
   <div id="hud">
-    <div class="team-score">
-      <span class="team-name">ROSSI</span>
+    <div class="hud-team">
       <span class="score-num score-red" id="sr">0</span>
+      <span class="team-name">ROSSI</span>
     </div>
-    <div class="hud-center">
+    <div class="hud-mid">
       <div id="timer">3:00</div>
-      <div class="hud-btns">
-        <button class="hud-btn" id="btn-restart">↺</button>
-        <button class="hud-btn hud-btn-danger" id="btn-leave">✕</button>
-      </div>
       <span id="net-badge" class="badge-train">TRAIN</span>
       <span id="ping"></span>
-      <button class="hud-btn hud-menu-touch" id="btn-menu-touch">☰ Menu</button>
     </div>
-    <div class="team-score">
-      <span class="score-num score-blue" id="sb">0</span>
+    <div class="hud-actions">
+      <button class="hud-btn" id="btn-restart">↺</button>
+      <button class="hud-btn" id="btn-chat-toggle" title="Chat (T)">💬</button>
+      <button class="hud-btn hud-btn-menu" id="btn-menu-touch">☰</button>
+      <button class="hud-btn hud-btn-danger" id="btn-leave">✕</button>
+    </div>
+    <div class="hud-team hud-team-right">
       <span class="team-name">BLU</span>
+      <span class="score-num score-blue" id="sb">0</span>
     </div>
   </div>
+
   <div id="msg-bar"></div>
   <div id="wrap">
     <canvas id="c"></canvas>
     <div id="goal-flash"></div>
   </div>
   <div id="ctrl-bar">
-    <span><kbd>W/A/S/D</kbd> o <kbd>↑←↓→</kbd> muovi · <kbd>0</kbd><kbd>Ctrl</kbd><kbd>Spazio</kbd> tiro · <kbd>ESC</kbd> menu · <kbd>1-9</kbd> vista</span>
+    <span><kbd>WASD</kbd>/<kbd>↑←↓→</kbd> muovi · <kbd>0/Ctrl/Spazio</kbd> tiro · <kbd>ESC</kbd> menu · <kbd>T</kbd> chat</span>
   </div>
 </div>
 
-<!-- MENU UNIFICATO (pre-partita + in-game) -->
+<!-- CHAT OVERLAY -->
+<div id="chat-overlay">
+  <div id="chat-box">
+    <div id="chat-header">
+      <span>💬 Chat</span>
+      <button id="chat-close-btn">✕</button>
+    </div>
+    <div id="chat-log"></div>
+    <div id="chat-input-row">
+      <input type="text" id="chat-input" maxlength="120" placeholder="Scrivi un messaggio…" autocomplete="off">
+      <button id="chat-send-btn">↵</button>
+    </div>
+  </div>
+</div>
+<div id="chat-toast"></div>
+
+<!-- CONTEXT MENU ADMIN -->
+<div id="ctx-menu">
+  <div class="ctx-item" id="ctx-transfer">👑 Passa admin</div>
+  <div class="ctx-item ctx-danger" id="ctx-kick">🚫 Kick</div>
+</div>
+
+<!-- MENU UNIFICATO -->
 <div id="game-menu">
   <div class="gm-box">
-
-    <!-- header -->
     <div class="gm-header">
       <div class="gm-title" id="gm-title">Sala d'attesa</div>
       <button class="gm-close-btn" id="gm-close-btn">✕</button>
     </div>
-
-    <!-- tab bar -->
     <div class="gm-tabs" id="gm-tabs">
       <button class="gm-tab active" data-tab="roster">👥 Giocatori</button>
       <button class="gm-tab" data-tab="settings">⚙️ Impostazioni</button>
@@ -107,35 +137,30 @@
     <!-- TAB: roster -->
     <div class="gm-panel" id="gm-panel-roster">
       <div class="pm-grid">
-        <div class="pm-col pm-col-red" id="pm-red">
-          <div class="pm-col-title">🔴 Rossi</div>
-        </div>
-        <div class="pm-col pm-col-spec" id="pm-spec">
-          <div class="pm-col-title">👁 Spec</div>
-        </div>
-        <div class="pm-col pm-col-blue" id="pm-blue">
-          <div class="pm-col-title">🔵 Blu</div>
-        </div>
+        <div class="pm-col pm-col-red" id="pm-red"><div class="pm-col-title">🔴 Rossi</div></div>
+        <div class="pm-col pm-col-spec" id="pm-spec"><div class="pm-col-title">👁 Spec</div></div>
+        <div class="pm-col pm-col-blue" id="pm-blue"><div class="pm-col-title">🔵 Blu</div></div>
       </div>
       <div id="pm-status">In attesa…</div>
-      <div id="pm-admin-hint" class="pm-admin-hint" style="display:none">Sei admin — tocca un giocatore, poi una colonna per spostarlo</div>
+      <div id="pm-admin-hint" class="pm-admin-hint" style="display:none">
+        Sei admin 👑 — tocca un giocatore poi una colonna per spostarlo · tasto destro per opzioni
+      </div>
     </div>
 
-    <!-- TAB: impostazioni (zoom + azioni) -->
+    <!-- TAB: impostazioni -->
     <div class="gm-panel" id="gm-panel-settings" style="display:none">
       <div class="gm-section-label">Vista campo</div>
       <div id="view-picker"></div>
       <div class="gm-vp-hint">0 = più vicino · 9 = più lontano</div>
     </div>
 
-    <!-- footer azioni -->
+    <!-- footer -->
     <div class="gm-footer">
       <button class="btn btn-green" id="pm-btn-start" style="display:none">▶ Inizia partita</button>
       <button class="btn btn-ghost" id="esc-resume" style="display:none">▶ Riprendi</button>
       <button class="btn btn-ghost" id="esc-restart" style="display:none">↺ Restart</button>
       <button class="btn btn-ghost hud-btn-danger" id="esc-leave">✕ Esci</button>
     </div>
-
   </div>
 </div>
 
