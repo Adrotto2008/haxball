@@ -164,19 +164,19 @@ $('ctx-kick').addEventListener('click', () => { if(ctxTargetPid) adminKick(ctxTa
 // ── AVVIO PARTITA ──────────────────────────────────────
 function hostStartMatch() {
   if(!pmRoster.filter(r=>r.team===0||r.team===1).length) return;
-  channel.send({type:'broadcast',event:'start',payload:{roster:pmRoster,hostId:myPlayerId}});
-  closeMenu(); startGame('host',pmRoster); setTimeout(()=>broadcastState(),120);
+  wsSend({ type:'start', payload:{} });
+  // startGame verrà chiamato quando arriverà msg 'start' dal server
 }
 function backToPrematch() {
   running=false; $('game').style.display='none';
   if(isTouchDev()) $('touch-layer').style.display='none';
-  if(channel) channel.send({type:'broadcast',event:'back_prematch',payload:{}});
+  wsSend({ type:'back_prematch', payload:{} });
   showPrematch();
 }
 
 $('pm-btn-start').onclick = hostStartMatch;
 $('esc-resume').onclick   = () => closeMenu();
-$('esc-restart').onclick  = () => { closeMenu(); if(netMode!=='guest'){reset(true);updateHUD();} };
+$('esc-restart').onclick  = () => { closeMenu(); if(isHost) wsSend({type:'restart',payload:{}}); else if(netMode==='train'){reset(true);updateHUD();} };
 $('esc-leave').onclick    = () => { closeMenu(); leaveGame(); };
 
 // ── CHAT + COMANDI ─────────────────────────────────────
