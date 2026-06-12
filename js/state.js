@@ -14,7 +14,10 @@ let roomCode = null, channel = null, pingMs = 0;
 let remoteInputs = {}, remoteState = null, lastSent = 0;
 let pmRoster = [], isHost = false, pmSelectedId = null, hostId = null;
 let myNickname = 'Giocatore';
+let mySkin = ''; // lettera/emoji da mostrare nel cerchio
+let playerSkins = {}; // pid → skin string
 let chatOpen = false, chatMessages = [];
+let afkPlayers = new Set(); // pid dei giocatori AFK
 let running = false, escOpen = false;
 let currentView = 8;
 

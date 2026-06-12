@@ -100,34 +100,55 @@ function lerpHex(h1, h2, t) {
 }
 
 function drawPlayer(p) {
+  // spettatori: non disegnare il corpo (solo in partita)
+  if(p.team === -1) return;
+  // AFK: cerchio grigio semitrasparente
+  const isAfk = afkPlayers.has(p.id);
   const cr=p.charge/KICK_CHG_F, charging=p.held;
-  const ga = charging ? 0.07+cr*.18 : 0.04;
-  const grc = p.team===0 ? `rgba(255,80,80,${ga})` : `rgba(80,140,255,${ga})`;
-  const glowR = p.r+14+(charging?cr*16:0);
+  const ga = isAfk ? 0.06 : (charging ? 0.07+cr*.18 : 0.04);
+  const grc = isAfk ? `rgba(150,150,150,${ga})` : (p.team===0 ? `rgba(255,80,80,${ga})` : `rgba(80,140,255,${ga})`);
+  const glowR = p.r+14+(charging&&!isAfk?cr*16:0);
   const grd = ctx.createRadialGradient(p.x,p.y,p.r*.3,p.x,p.y,glowR);
   grd.addColorStop(0,grc); grd.addColorStop(1,'rgba(0,0,0,0)');
   ctx.fillStyle=grd; ctx.beginPath(); ctx.arc(p.x,p.y,glowR,0,Math.PI*2); ctx.fill();
   ctx.beginPath(); ctx.arc(p.x,p.y,p.r+6,0,Math.PI*2);
-  ctx.strokeStyle = charging ? `rgba(255,255,100,${0.35+cr*.65})` : 'rgba(255,255,255,0.12)';
-  ctx.lineWidth = charging ? 2+cr*2 : 1.2; ctx.stroke();
-  if(charging && cr>0.02) {
+  ctx.strokeStyle = isAfk ? 'rgba(180,180,180,0.2)' : (charging ? `rgba(255,255,100,${0.35+cr*.65})` : 'rgba(255,255,255,0.12)');
+  ctx.lineWidth = charging&&!isAfk ? 2+cr*2 : 1.2; ctx.stroke();
+  if(charging && cr>0.02 && !isAfk) {
     ctx.beginPath(); ctx.arc(p.x,p.y,p.r+6,-Math.PI/2,-Math.PI/2+cr*Math.PI*2);
     ctx.strokeStyle=`rgba(255,255,80,${.55+cr*.45})`;
     ctx.lineWidth=3+cr*2; ctx.lineCap='round'; ctx.stroke(); ctx.lineCap='butt';
   }
   ctx.fillStyle='rgba(0,0,0,.22)'; ctx.beginPath(); ctx.ellipse(p.x+2,p.y+5,p.r,p.r*.5,0,0,Math.PI*2); ctx.fill();
-  const hi = TEAM_HI[p.team];
-  const bg = ctx.createRadialGradient(p.x-4,p.y-4,1,p.x,p.y,p.r);
-  bg.addColorStop(0, charging ? lerpHex(hi,'#ffffff',cr*.7) : hi);
-  bg.addColorStop(1, charging ? lerpHex(TEAM_COLS[p.team],'#ffffff',cr*.45) : TEAM_COLS[p.team]);
-  ctx.fillStyle=bg; ctx.beginPath(); ctx.arc(p.x,p.y,p.r,0,Math.PI*2); ctx.fill();
-  ctx.strokeStyle = charging ? `rgba(255,255,100,${.7+cr*.3})` : 'rgba(255,255,255,.5)';
-  ctx.lineWidth = charging ? 2+cr*1.5 : 1.5; ctx.beginPath(); ctx.arc(p.x,p.y,p.r,0,Math.PI*2); ctx.stroke();
+  if(isAfk) {
+    // corpo grigio
+    ctx.globalAlpha = 0.45;
+    ctx.fillStyle = '#555';
+    ctx.beginPath(); ctx.arc(p.x,p.y,p.r,0,Math.PI*2); ctx.fill();
+    ctx.strokeStyle = 'rgba(200,200,200,.3)'; ctx.lineWidth=1.5;
+    ctx.beginPath(); ctx.arc(p.x,p.y,p.r,0,Math.PI*2); ctx.stroke();
+    ctx.globalAlpha = 1;
+  } else {
+    const hi = TEAM_HI[p.team];
+    const bg = ctx.createRadialGradient(p.x-4,p.y-4,1,p.x,p.y,p.r);
+    bg.addColorStop(0, charging ? lerpHex(hi,'#ffffff',cr*.7) : hi);
+    bg.addColorStop(1, charging ? lerpHex(TEAM_COLS[p.team],'#ffffff',cr*.45) : TEAM_COLS[p.team]);
+    ctx.fillStyle=bg; ctx.beginPath(); ctx.arc(p.x,p.y,p.r,0,Math.PI*2); ctx.fill();
+    ctx.strokeStyle = charging ? `rgba(255,255,100,${.7+cr*.3})` : 'rgba(255,255,255,.5)';
+    ctx.lineWidth = charging ? 2+cr*1.5 : 1.5; ctx.beginPath(); ctx.arc(p.x,p.y,p.r,0,Math.PI*2); ctx.stroke();
+  }
   if(p.id === myPlayerId) { ctx.fillStyle='rgba(255,255,255,.9)'; ctx.beginPath(); ctx.arc(p.x,p.y+p.r+5,2.5,0,Math.PI*2); ctx.fill(); }
-  ctx.fillStyle='#fff'; ctx.font='700 11px Inter,sans-serif';
+  // testo nel cerchio: skin personalizzata > 👻 se AFK > R/B
+  const skinEntry = playerSkins[p.id];
+  const label = isAfk ? '👻' : (skinEntry || (p.team===0?'R':'B'));
+  const fontSize = isAfk ? 14 : (skinEntry && skinEntry.length > 1 ? 13 : 11);
+  ctx.globalAlpha = isAfk ? 0.6 : 1;
+  ctx.fillStyle = isAfk ? '#aaa' : '#fff';
+  ctx.font = `700 ${fontSize}px Inter,sans-serif`;
   ctx.textAlign='center'; ctx.textBaseline='middle';
   ctx.shadowColor='rgba(0,0,0,.6)'; ctx.shadowBlur=4;
-  ctx.fillText(p.team===0?'R':'B',p.x,p.y+.5); ctx.shadowBlur=0;
+  ctx.fillText(label,p.x,p.y+.5); ctx.shadowBlur=0;
+  ctx.globalAlpha=1;
 }
 
 function draw() {

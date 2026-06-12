@@ -20,16 +20,19 @@ function update(dt) {
     return;
   }
   for(const p of players) {
+    if(p.team === -1) continue; // spettatori: nessuna fisica
     const inp = (netMode==='train'||p.id===myPlayerId) ? inpLocal() : (remoteInputs[p.id]||noInp);
     applyInput(p, inp);
   }
   for(let i=0;i<players.length;i++)
-    for(let j=i+1;j<players.length;j++)
+    for(let j=i+1;j<players.length;j++) {
+      if(players[i].team===-1||players[j].team===-1) continue;
       circleCollide(players[i],players[j],0.8);
+    }
   ball.trail.push({x:ball.x,y:ball.y});
   if(ball.trail.length>8) ball.trail.shift();
   ball.x+=ball.vx; ball.y+=ball.vy; ball.vx*=B_FRIC; ball.vy*=B_FRIC;
-  for(const p of players) circleCollide(p,ball,B_HIT_R);
+  for(const p of players) { if(p.team===-1) continue; circleCollide(p,ball,B_HIT_R); }
   tickParticles();
   const myP = players.find(p=>p.id===myPlayerId);
   if(myP && isTouchDev()) drawKickArc(myP.charge/KICK_CHG_F);
@@ -64,16 +67,26 @@ function updateHUD() {
 
 // ── BUILD PLAYERS / BALL / RESET ────────────────────────
 function buildPlayers(roster) {
-  const byTeam = [[],[]];
-  for(const r of roster) if(r.team===0||r.team===1) byTeam[r.team].push(r);
   const result = [];
+  // raggruppa per team (inclusi spettatori team=-1 che vengono parcheggiati)
+  const byTeam = [[],[]];
+  for(const r of roster) {
+    if(r.team===0||r.team===1) byTeam[r.team].push(r);
+  }
   for(const team of [0,1]) {
     const grp=byTeam[team], n=grp.length;
     grp.forEach((r,i) => {
-      result.push({id:r.id,team,col:TEAM_COLS[team],
+      result.push({id:r.id, team, col:TEAM_COLS[team],
         x:FL.l+(FL.r-FL.l)*(team===0?.22:.78), y:FL.t+(FL.b-FL.t)*(i+1)/(n+1),
-        vx:0,vy:0,r:PR,charge:0,held:false});
+        vx:0,vy:0, r:PR, charge:0, held:false});
     });
+  }
+  // spettatori: aggiunti ma parcheggiati fuori campo
+  for(const r of roster) {
+    if(r.team===-1) {
+      result.push({id:r.id, team:-1, col:'#555',
+        x:-9999, y:-9999, vx:0,vy:0, r:PR, charge:0, held:false});
+    }
   }
   return result;
 }
@@ -107,6 +120,8 @@ function loop(ts) {
 // ── START GAME ─────────────────────────────────────────
 function startGame(mode, roster) {
   netMode=mode; players=buildPlayers(roster);
+  // applica skin propria salvata
+  if(mySkin && myPlayerId) playerSkins[myPlayerId] = mySkin;
   $('game-menu').classList.remove('open');
   $('lobby').style.display='none'; $('game').style.display='flex';
   const badge=$('net-badge');

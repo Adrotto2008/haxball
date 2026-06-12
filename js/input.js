@@ -20,7 +20,7 @@ document.addEventListener('keydown', e => {
     if(m) { setView(parseInt(m[1])); return; }
   }
   if(e.code === 'Escape' && $('game').style.display !== 'none') { toggleEscMenu(); return; }
-  if(e.code === 'KeyT' && $('game').style.display !== 'none' && !$('game-menu').classList.contains('open')) {
+  if(e.code === 'Backslash' && $('game').style.display !== 'none' && !$('game-menu').classList.contains('open')) {
     e.preventDefault(); toggleChat(); return;
   }
 });
