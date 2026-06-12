@@ -1,6 +1,7 @@
 // ── NETWORK — Server (Render), broadcast, sync ──────────
-// NB: 'sb'/'channel' restano l'abstraction esistente per il canale realtime,
-// ora instradato tramite il server su Render invece di Supabase peer broadcast.
+const SUPABASE_URL = 'https://qtmqdeluofnwhtftjnkc.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_WzKJ-bi-KddPFEbUw30Avw_RzoIHZ4r';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 // ── STATE (alta frequenza, ~30Hz, host -> guest) ────────
 // Formato compatto ad array per minimizzare i byte JSON:
