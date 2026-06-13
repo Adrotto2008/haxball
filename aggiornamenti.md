@@ -4,7 +4,116 @@ Questo file tiene traccia delle modifiche e delle nuove funzionalità introdotte
 
 ---
 
-## v1.3.0 — Versione attuale
+## v1.6.0 — Fix rubber-banding + dead reckoning corretto
+
+### 🔧 Fix
+- **Rimosso il rubber-banding sul giocatore locale** (`js/network.js` → `applyRemoteState`): il giocatore locale ora viene escluso dalla correzione server-state. Prima veniva tirato indietro verso la posizione server (in ritardo del ping), causando il "tu laggi mentre gli altri sono fluidi".
+- **Dead reckoning solo sui remoti** (`js/network.js` → `tickRemotePhysics`): la palla non veniva più mossa due volte (rimossa la duplicazione del movimento in `tickRemotePhysics`). Solo i giocatori remoti vengono predetti tra un pacchetto e l'altro.
+
+---
+
+## v1.5.0 — Ottimizzazione fluidità: dead reckoning + lerp adattivo
+
+### ✨ Novità
+- **Dead reckoning** (`js/network.js` → `tickRemotePhysics`): i giocatori remoti vengono mossi ogni frame con la loro ultima velocità nota, rendendoli fluidi a 60fps tra i pacchetti server (invece di saltare ogni 33ms).
+- **Lerp adattivo** (`js/network.js` → `applyRemoteState`): il fattore di interpolazione ora dipende dalla distanza tra posizione locale e server. Distanza piccola → lerp leggero (quasi invisibile); distanza grande → convergenza rapida. Snap diretto sopra 80px (respawn/gol).
+- **Broadcast server a 60Hz** (`server.js`): da 30Hz a 60Hz per minimizzare il drift tra predizione client e stato reale.
+- Dead reckoning agganciato al loop `update` solo in modalità `guest` (`js/game.js`).
+
+---
+
+## v1.4.0 — Ottimizzazione pacchetti di rete
+
+### ✨ Novità / Modifiche
+- **Input bitmask** (`js/network.js`, `server.js`): i 5 booleani di input (up/dn/lt/rt/kick) ora viaggiano come un singolo intero bitmask `b`. Rimossi `pid` e `ts` dal payload (il server conosce già il pid dalla connessione WS).
+- **Input inviato solo sui cambi** (`js/network.js` → `sendGuestInput`): se il bitmask non cambia rispetto al frame precedente, nessun messaggio viene inviato. Da 60 msg/s a pochi al secondo in idle.
+- **Ping separato ogni 2s** (`js/network.js`, `server.js`): il timestamp per il calcolo del ping è stato spostato in un messaggio `ping`/`pong` dedicato inviato ogni 2 secondi, non più agganciato ad ogni frame di input.
+- **State compatto** (`server.js` → `serializeState`): rimossi `ts`, `afk`, `skins`, `score`, `timeLeft`, `gameOver` dallo state. I player ora sono array posizionali `[x,y,vx,vy,charge,held]` senza `id`/`team` ripetuti. Posizioni arrotondate a interi, velocità a 2 decimali. Dimensione: ~70-90 byte contro i ~350-450 byte precedenti.
+- **Evento `meta`** (`server.js`, `js/network.js`): score/timer/gameOver ora viaggiano in un messaggio separato inviato solo quando cambiano (≈1 volta/s per il timer, raramente per score/gameOver).
+- **`team_change` minimale** (`server.js`, `js/network.js`): il server manda solo `{pid, team}` invece del roster completo. Il client aggiorna localmente la singola entry.
+- **`host_change`** (`server.js`, `js/network.js`): nuovo evento dedicato al cambio host, invia solo `{hostId}` invece di tutto il roster.
+- **Rimosso `ts` dalla chat** (`server.js`, `js/network.js`): non veniva usato dal renderer.
+- **Fix `movePlayerToTeam`** (`js/prematch.js`): usava `channel.send` di Supabase (codice morto). Ora usa correttamente `wsSend`.
+
+---
+
+## v1.3.0 — Stato iniziale documentato
+
+> ⚠️ Nota: questa è la prima fotografia "completa" del progetto registrata in questo changelog. Da qui in avanti, ogni nuova versione dovrà elencare solo le **differenze** rispetto a quella precedente. Di seguito è descritto lo stato attuale di tutte le funzionalità presenti nel codice, con indicazione di dove si trovano.
+
+### 🌐 Multiplayer online (Supabase Realtime)
+- Creazione stanza con codice a 6 caratteri e gestione canali broadcast (`js/lobby.js`, `js/network.js`)
+- Ingresso in una stanza tramite codice (`js/lobby.js`)
+- Sincronizzazione stato partita host → guest (posizioni, palla, punteggio, timer) (`js/network.js`, funzione `serializeState`/`applyRemoteState`)
+- Invio input dei giocatori guest verso l'host (`sendGuestInput`, `js/network.js`)
+- Calcolo e visualizzazione del ping (`js/lobby.js`, badge `#ping` in `index.html`)
+
+### 🛋️ Sala d'attesa / Pre-match
+- Schermata "stanza creata" con codice da condividere e stato giocatori connessi (`index.html` → `#card-wait`, `js/lobby.js`)
+- Menu unificato pre-partita / in-partita con roster a 3 colonne (Rossi / Spettatori / Blu) (`js/prematch.js`, `css/game-menu.css`)
+- L'host (👑) può spostare i giocatori tra le squadre toccando giocatore + colonna (`movePlayerToTeam`, `onPmPlayerTap` in `js/prematch.js`)
+- Menu contestuale admin: trasferisci ruolo host / kick giocatore (tasto destro o pressione prolungata su mobile) (`js/prematch.js`, `js/network.js` → `adminKick`, `adminTransfer`)
+- Avvio partita da parte dell'host con broadcast a tutti i partecipanti (`hostStartMatch`, `js/prematch.js`)
+- Possibilità di tornare alla sala d'attesa dopo una partita (`backToPrematch`)
+
+### 🎮 Modalità di gioco
+- **Allenamento (solo)**: modalità single-player senza rete (`startTraining`, `js/game.js`)
+- **Host / Guest**: partite online 1 contro 1 o più (in base ai giocatori in roster)
+- Reset partita (gol singolo / restart completo) con relativo broadcast (`reset`, `goal`, `js/game.js`)
+- Fine partita con messaggio vittoria/pareggio (`endGame`, `js/game.js`)
+
+### ⚽ Motore fisico
+- Movimento giocatori con accelerazione, attrito e rimbalzo sui bordi campo (`applyInput`, `js/physics.js`)
+- Collisioni cerchio-cerchio tra giocatori e tra giocatore/palla (`circleCollide`, `js/physics.js`)
+- Sistema di "carica tiro": tenendo premuto il tasto calcio si accumula potenza, mostrata con una freccia direzionale animata (`doKick`, `drawShotArrow` in `js/draw.js`)
+- Fisica della palla con attrito, rimbalzo e rilevamento goal (`update`, `js/game.js`)
+- Effetti particellari su tiri ed esultanze gol (`spawnP`, `goalBurst`, `js/particles.js`)
+
+### 🖥️ Interfaccia e HUD
+- HUD compatto con punteggio, timer, badge modalità rete (TRAIN/HOST/GUEST) e ping (`css/game.css`, `index.html` → `#hud`)
+- Barra messaggi di gioco (gol, fine partita, ecc.) (`#msg-bar`)
+- Effetto "flash" dorato sullo schermo al momento del gol (`#goal-flash`)
+- Selettore vista/zoom campo con 10 livelli (0-9), richiamabile da tastiera (tasti numerici) o dal menu impostazioni (`js/views.js`, `css/game-menu.css`)
+- Indicatore "vista" a comparsa temporanea in alto a destra (`#view-badge`)
+
+### 💬 Chat in-game
+- Overlay chat apribile/chiudibile con tasto dedicato (`toggleChat`, `js/prematch.js`)
+- Invio messaggi e visualizzazione in tempo reale (`sendChatMsg`, `pushChatMsg`, `renderChat` in `js/network.js`)
+- Notifica "toast" quando arriva un messaggio con chat chiusa (`showChatToast`, `js/network.js`)
+- Sanificazione HTML dei messaggi (`escHtml`, `js/network.js`)
+
+### 📱 Controlli touch (mobile)
+- Joystick virtuale per il movimento (`#joy-area`, `js/input.js`)
+- Tasto/area "TIRO" con indicatore ad arco della carica del tiro (`#kick-area`, `drawKickArc`, `js/input.js`)
+- Rilevamento automatico dispositivi touch e posizionamento layer controlli (`isTouchDev`, `positionTouchLayer`)
+- Blocco pinch-zoom e gesture indesiderate su iOS (`js/input.js`, `css/base.css`)
+
+### 🏠 Lobby iniziale
+- Inserimento nickname con salvataggio automatico in `localStorage` (`js/lobby.js`)
+- Generazione codice stanza alfanumerico univoco (`genCode`, `js/lobby.js`)
+- Tre percorsi: crea stanza, entra con codice, allenamento in solitaria
+- Indicatore versione mostrato in basso nella lobby (`$('lobby-version')`)
+
+### ⚙️ Configurazione
+- Tutte le costanti di gioco centralizzate in `js/config.js`
+- Numero di versione corrente: **1.3.0** (`js/config.js`)
+
+---
+
+## Come aggiornare questo file
+
+Per ogni nuova versione, aggiungere in cima una sezione con questo formato:
+
+```
+## vX.Y.Z — Titolo breve della release
+
+### ✨ Novità
+- Descrizione modifica (file coinvolti)
+
+### 🔧 Modifiche / Fix
+- Descrizione modifica (file coinvolti)
+```
+
 
 > ⚠️ Nota: questa è la prima fotografia "completa" del progetto registrata in questo changelog. Da qui in avanti, ogni nuova versione dovrà elencare solo le **differenze** rispetto a quella precedente. Di seguito è descritto lo stato attuale di tutte le funzionalità presenti nel codice, con indicazione di dove si trovano.
 

@@ -157,21 +157,20 @@ function applyRemoteState() {
   if (!s || !s.p) return;
   for (let i = 0; i < s.p.length && i < players.length; i++) {
     const sp = s.p[i], p = players[i];
+    // Il giocatore locale NON viene corretto dal server state:
+    // la client prediction lo gestisce già. Correggerlo causerebbe
+    // rubber-banding ("tu laggi" mentre gli altri sembrano fluidi).
+    if (p.id === myPlayerId) continue;
     const dx = sp[0] - p.x, dy = sp[1] - p.y;
     const dist = Math.hypot(dx, dy);
-    // Se il giocatore è lontano (teletrasporto/respawn) snap diretto;
-    // altrimenti lerp aggressivo proporzionale alla distanza
     if (dist > 80) {
       p.x = sp[0]; p.y = sp[1];
     } else {
-      // L più alto = converge più veloce, usa ~0.85 invece di 0.55
       const L = Math.min(0.85, 0.5 + dist * 0.01);
       p.x += dx * L; p.y += dy * L;
     }
-    // Le velocità vengono usate per il dead reckoning tra i pacchetti
     p.vx = sp[2]; p.vy = sp[3]; p.charge = sp[4]; p.held = !!sp[5];
   }
-  // mismatch lunghezza: resync pendente
   if (s.p.length !== players.length) return;
   if (s.b) {
     const b = s.b;
@@ -188,23 +187,21 @@ function applyRemoteState() {
   if (s.gc !== undefined) goalCD = s.gc;
 }
 
-// Dead reckoning: tra un pacchetto e l'altro, muovi i remoti con la loro velocità
-// così appaiono fluidi anche tra i 33ms di gap tra state
+// Dead reckoning: tra un pacchetto e l'altro, muovi SOLO i remoti con la loro velocità
+// Il giocatore locale è già mosso da applyInput (client prediction), non va toccato.
+// La palla NON viene mossa qui: è già inclusa nel server state e il lerp in applyRemoteState
+// la gestisce. Muoverla anche qui causerebbe doppio movimento.
 function tickRemotePhysics() {
   for (const p of players) {
-    if (p.id === myPlayerId) continue; // il locale si muove con applyInput
-    if (p.team === -1) continue;
+    if (p.id === myPlayerId) continue; // locale: già mosso da applyInput
+    if (p.team === -1) continue;       // spettatori: parcheggiati fuori campo
     p.x += p.vx; p.y += p.vy;
     p.vx *= P_FRIC; p.vy *= P_FRIC;
-    // clamp ai bordi per evitare che vadano fuori schermo
     if (p.x < FL.l + p.r) p.x = FL.l + p.r;
     if (p.x > FL.r - p.r) p.x = FL.r - p.r;
     if (p.y < FL.t + p.r) p.y = FL.t + p.r;
     if (p.y > FL.b - p.r) p.y = FL.b - p.r;
   }
-  // dead reckoning palla
-  ball.x += ball.vx; ball.y += ball.vy;
-  ball.vx *= B_FRIC; ball.vy *= B_FRIC;
 }
 
 // ── SEND INPUT (chiamato ogni frame dal loop guest) ──────
