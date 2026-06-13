@@ -4,6 +4,16 @@ Questo file tiene traccia delle modifiche e delle nuove funzionalità introdotte
 
 ---
 
+## v1.8.0 — Fluidità palla + velocità player
+
+### ✨ Novità
+- **Player più veloci**: `P_SPEED` da 1.65 a 2.0, `KICK_MAX` da 12 a 14 (`js/config.js`, `server.js`). Non impatta il lag: la fisica è server-side, i pacchetti sono gli stessi.
+
+### 🔧 Fix
+- **Palla fluida sui tiri veloci** (`js/network.js` → `applyRemoteState`): rimosso il lerp limitante sulla palla. Ora se la velocità della palla è >4 o la distanza >60px viene fatto snap diretto alla posizione server; il dead reckoning la tiene già al posto giusto tra i pacchetti, quindi lo snap è impercettibile. Sotto soglia lerp 0.95 (quasi snap).
+
+---
+
 ## v1.7.0 — Rimozione client prediction, server completamente autoritativo
 
 ### 🔧 Fix

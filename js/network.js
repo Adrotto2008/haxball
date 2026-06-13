@@ -172,13 +172,17 @@ function applyRemoteState() {
   if (s.p.length !== players.length) return;
   if (s.b) {
     const b = s.b;
+    const bspd = Math.hypot(b[2], b[3]); // velocità reale dal server
     const bdx = b[0] - ball.x, bdy = b[1] - ball.y;
     const bdist = Math.hypot(bdx, bdy);
-    if (bdist > 120) {
+    // Se la palla è veloce o lontana: snap diretto.
+    // Il dead reckoning la tiene già al posto giusto tra i pacchetti;
+    // il lerp su tiri veloci introduce ritardo percepibile.
+    if (bdist > 60 || bspd > 4) {
       ball.x = b[0]; ball.y = b[1];
-    } else if (bdist > 1) {
-      const L = Math.min(0.9, 0.6 + bdist * 0.012);
-      ball.x += bdx * L; ball.y += bdy * L;
+    } else if (bdist > 0.5) {
+      ball.x += bdx * 0.95;
+      ball.y += bdy * 0.95;
     }
     ball.vx = b[2]; ball.vy = b[3];
   }
