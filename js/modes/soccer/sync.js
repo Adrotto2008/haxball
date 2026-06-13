@@ -1,5 +1,5 @@
 // ── SOCCER SYNC — applica lo state autoritativo del server
-//   e fa dead reckoning tra un pacchetto e l'altro ────────
+//   e fa dead reckoning / prediction tra un pacchetto e l'altro ──
 
 // ── APPLY REMOTE STATE (client) ──────────────────────
 // I players arrivano come array posizionale parallelo a room.players
@@ -9,16 +9,33 @@ function applyRemoteState() {
   if (!s || !s.p) return;
   for (let i = 0; i < s.p.length && i < players.length; i++) {
     const sp = s.p[i], p = players[i];
+    const isMe = (p.id === myPlayerId);
     const dx = sp[0] - p.x, dy = sp[1] - p.y;
     const dist = Math.hypot(dx, dy);
-    // Snap se troppo lontano (respawn/gol), altrimenti lerp aggressivo
+
+    if (isMe) {
+      // Il proprio giocatore è già simulato localmente in tickRemotePhysics
+      // (stessa fisica del server). Qui correggiamo solo la deriva residua,
+      // SENZA toccare vx/vy: la fisica locale resta autorevole frame-by-frame.
+      if (dist > 80) {
+        // scarto enorme (respawn/gol/teleport): snap immediato
+        p.x = sp[0]; p.y = sp[1]; p.vx = sp[2]; p.vy = sp[3];
+      } else if (dist > 3) {
+        // piccola correzione morbida, non percepibile
+        const L = 0.12;
+        p.x += dx * L; p.y += dy * L;
+      }
+      p.charge = sp[4]; p.held = !!sp[5];
+      continue;
+    }
+
+    // Giocatori remoti: nessuna prediction, lerp aggressivo + snap su grosso scarto
     if (dist > 80) {
       p.x = sp[0]; p.y = sp[1];
     } else if (dist > 1) {
       const L = Math.min(0.9, 0.6 + dist * 0.012);
       p.x += dx * L; p.y += dy * L;
     }
-    // Aggiorna velocità per dead reckoning (tutti, incluso locale)
     p.vx = sp[2]; p.vy = sp[3]; p.charge = sp[4]; p.held = !!sp[5];
   }
   if (s.p.length !== players.length) return;
@@ -28,9 +45,6 @@ function applyRemoteState() {
     const bdist = Math.hypot(bdx, bdy);
     const dvx = b[2] - ball.vx, dvy = b[3] - ball.vy;
     const velJump = Math.hypot(dvx, dvy);
-    // Snap solo se la velocità è cambiata di colpo (bounce/kick appena avvenuto)
-    // oppure la palla è troppo lontana. Durante il volo libero il dead reckoning
-    // la segue già fedelmente: lerp leggero basta per correggere la deriva minima.
     if (velJump > 1.5 || bdist > 40) {
       ball.x = b[0]; ball.y = b[1];
     } else if (bdist > 0.3) {
@@ -42,17 +56,25 @@ function applyRemoteState() {
   if (s.gc !== undefined) goalCD = s.gc;
 }
 
-// Dead reckoning: muovi tutti i player e la palla con l'ultima velocità nota.
-// Il server corregge la posizione reale ad ogni pacchetto (60Hz);
-// questo riempie i ~16ms di gap visivamente senza prediction separata.
+// Tick fisico locale a 60Hz (chiamato da game.js):
+// - il proprio player viene PREDETTO con applyInput (stessa fisica del server)
+//   → risponde all'input senza aspettare il roundtrip col server
+// - gli altri player e la palla fanno dead reckoning con l'ultima velocità nota
+//   per riempire i gap tra un pacchetto e l'altro
 function tickRemotePhysics() {
   for (const p of players) {
     if (p.team === -1) continue;
+
+    if (p.id === myPlayerId) {
+      // Prediction: simula localmente con l'input corrente,
+      // identica fisica del server (vedi physics.js / server.js).
+      applyInput(p, inpLocal());
+      continue;
+    }
+
     p.x += p.vx; p.y += p.vy;
-    // NON applichiamo P_FRIC ai remoti: lato server stanno ricevendo input
-    // continuo e non stanno davvero decelerando. Applicare frizione qui
-    // causa undershoot costante (player sembra sempre un passo indietro).
-    // La frizione reale arriva col prossimo state dal server.
+    // NON applichiamo P_FRIC ai remoti: il server invia vx/vy "vivi"
+    // (post-input), la frizione reale arriva col prossimo state.
     if (p.x < FL.l + p.r) p.x = FL.l + p.r;
     if (p.x > FL.r - p.r) p.x = FL.r - p.r;
     if (p.y < FL.t + p.r) p.y = FL.t + p.r;
