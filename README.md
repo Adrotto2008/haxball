@@ -33,37 +33,49 @@ Apri `index.html` in un browser (desktop o mobile) e scegli una delle modalità 
 
 ## 📁 Struttura del progetto
 
+L'architettura separa il **core** (riusabile da qualunque modalità: rete, chat,
+menu, lobby, input, viste, particelle) dalla **modalità di gioco**, che vive sotto
+`js/modes/`. Aggiungere una nuova modalità (basket, hockey, …) significa creare
+`js/modes/<nome>/` sul modello di `soccer/`, senza toccare i file core.
+
 ```
 index.html              Pagina principale, markup di lobby, gioco, menu e chat
 
 css/
-├─ base.css              Stili condivisi (bottoni, layout base)
+├─ base.css              Stili condivisi (bottoni, layout base, animazioni)
 ├─ lobby.css             Schermata iniziale (lobby)
-├─ game.css              HUD, campo di gioco, chat, menu contestuale
-├─ game-menu.css         Menu unificato pre-match / in-game
-├─ esc-menu.css          Stili del menu ESC (vista campo)
-├─ prematch.css          Sala d'attesa pre-partita
+├─ hud.css               HUD: campo, punteggio, timer, badge rete, msg-bar
+├─ chat.css              Overlay chat, log, input, toast
+├─ menu.css              Menu unificato pre-match/in-game, roster, menu contestuale admin
 └─ touch.css             Controlli touch (joystick, tasto tiro)
 
-js/
-├─ config.js             Costanti globali (dimensioni campo, fisica, versione, livelli zoom)
-├─ state.js              Variabili di stato globali e helper condivisi
+js/                      ── CORE (mode-agnostico) ──
+├─ config.js             Costanti davvero globali (W/H, DPR, versione, livelli zoom)
+├─ helpers.js            Utility generiche ($, setMsg, lerp, uid, isTouchDev, escHtml)
+├─ state.js              Variabili condivise (rete, roster, chat, UI) + init canvas
 ├─ input.js              Gestione input tastiera e touch
-├─ physics.js            Movimento, collisioni e calcio della palla
 ├─ particles.js          Sistema di effetti particellari
-├─ draw.js               Rendering del campo, palla, giocatori e freccia di tiro
 ├─ views.js              Gestione dei livelli di zoom/vista
-├─ network.js            Comunicazione Supabase, chat e azioni admin
-├─ prematch.js           Menu pre-match/in-game, roster, chat UI
-├─ game.js               Ciclo di gioco, gol, fine partita, reset
-└─ lobby.js              Lobby iniziale: creazione/ingresso stanza, bottoni, init
+├─ network-core.js       Client WebSocket + router dei messaggi del server
+├─ chat.js               Chat: logica invio/ricezione + UI + comandi
+├─ admin.js              Azioni host (kick/transfer/team), menu contestuale, AFK, skin
+├─ menu.js               Apri/chiudi menu, tab, esc menu, avvio/ritorno partita
+├─ roster.js             Render roster e assegnazione squadre
+├─ lobby.js              Lobby iniziale: creazione/ingresso stanza, bottoni, init
+│
+└─ modes/soccer/         ── MODALITÀ: CALCIO ──
+   ├─ config.js          Costanti del calcio (raggi, fisica, porte, squadre, durata)
+   ├─ physics.js         Movimento, collisioni e calcio della palla
+   ├─ draw.js            Rendering del campo, palla, giocatori e freccia di tiro
+   ├─ sync.js            Applica lo state autoritativo del server + dead reckoning
+   └─ game.js            Stato partita, ciclo di gioco, gol, fine, reset, start
 ```
 
 ## 🛠️ Tecnologie utilizzate
 
 - HTML5 Canvas per il rendering del gioco
 - JavaScript vanilla (nessun framework)
-- [Supabase](https://supabase.com/) Realtime per la sincronizzazione multiplayer
+- Server WebSocket autoritativo (Node.js, `server.js`) per la sincronizzazione multiplayer
 - Font [Inter](https://fonts.google.com/specimen/Inter) da Google Fonts
 
 ## 📝 Changelog

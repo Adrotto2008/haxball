@@ -1,7 +1,10 @@
-// ── GAME — update loop, gol, fine partita, build/reset ──
+// ── SOCCER GAME — stato partita, update loop, gol, fine,
+//   build/reset, start ───────────────────────────────────
 
-// ── ESC MENU ───────────────────────────────────────────
-// toggleEscMenu è definita in prematch.js (menu unificato)
+// ── STATO PARTITA (variabili specifiche del calcio) ────
+let score = [0,0], timeLeft = MATCH_TIME, gameOver = false;
+let goalCD = 0, ticker = 0, lastFrameTime = 0, secondAccum = 0;
+let players = [], ball;
 
 // ── UPDATE ─────────────────────────────────────────────
 // Timestep fisso per il dead reckoning: indipendente da monitor hz

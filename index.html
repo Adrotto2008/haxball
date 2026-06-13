@@ -8,8 +8,9 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/base.css">
 <link rel="stylesheet" href="css/lobby.css">
-<link rel="stylesheet" href="css/game.css">
-<link rel="stylesheet" href="css/game-menu.css">
+<link rel="stylesheet" href="css/hud.css">
+<link rel="stylesheet" href="css/chat.css">
+<link rel="stylesheet" href="css/menu.css">
 <link rel="stylesheet" href="css/touch.css">
 </head>
 <body>
@@ -181,16 +182,27 @@
 
 <div id="view-badge"></div>
 
+<!-- core (mode-agnostici) -->
 <script src="js/config.js"></script>
+<script src="js/helpers.js"></script>
 <script src="js/state.js"></script>
 <script src="js/input.js"></script>
-<script src="js/physics.js"></script>
 <script src="js/particles.js"></script>
-<script src="js/draw.js"></script>
 <script src="js/views.js"></script>
-<script src="js/network.js"></script>
-<script src="js/prematch.js"></script>
-<script src="js/game.js"></script>
+<script src="js/network-core.js"></script>
+<script src="js/chat.js"></script>
+<script src="js/admin.js"></script>
+<script src="js/menu.js"></script>
+<script src="js/roster.js"></script>
+
+<!-- modalità: calcio -->
+<script src="js/modes/soccer/config.js"></script>
+<script src="js/modes/soccer/physics.js"></script>
+<script src="js/modes/soccer/draw.js"></script>
+<script src="js/modes/soccer/sync.js"></script>
+<script src="js/modes/soccer/game.js"></script>
+
+<!-- lobby (per ultima: usa startTraining/showPrematch già definiti) -->
 <script src="js/lobby.js"></script>
 </body>
 </html>
