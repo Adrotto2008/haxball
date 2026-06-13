@@ -4,6 +4,25 @@ Questo file tiene traccia delle modifiche e delle nuove funzionalità introdotte
 
 ---
 
+## v2.2.0 — Nero schermo fix, fine partita, crea stanza, lista stanze, AFK fix
+
+### 🔧 Fix critici
+- **Nero schermo permanente** (`js/modes/soccer/game.js`): il problema era che `visibilitychange` non basta — il browser non solo throttla rAF in background ma a volte lo stoppa del tutto. La soluzione corretta è disaccoppiare update e render: ora `draw()` viene chiamata **sempre** ad ogni frame, mentre `update()` (fisica/input) viene saltata quando la scheda non è visibile. Questo evita il canvas nero al ritorno e anche l'accumulo di `dt` gigante.
+- **AFK** (`js/admin.js`): quando esci dall'AFK torni spettatore (`team=-1`), non più alla squadra precedente. Il player fisico resta parcheggiato a `x=-9999`, l'host può spostarlo dal menu. Il messaggio in chat è broadcastato a tutti dal server.
+- **`stopLoop` / `startLoop`** (`js/modes/soccer/game.js`): introdotte funzioni esplicite che gestiscono `_rafId` con `cancelAnimationFrame` per evitare loop doppi.
+
+### ✨ Novità
+- **Fine partita → torna al menu P** (`js/modes/soccer/game.js`): quando la partita finisce, dopo 3 secondi tutti i client tornano automaticamente al menu pre-partita. L'host può avviare una nuova partita senza ricaricare.
+- **Crea stanza con nome e password** (`js/lobby.js`, `server.js`, `index.html`): il flow di creazione ora mostra una card con campo nome stanza e campo password opzionale. Il server memorizza nome e password per ogni room.
+- **Lista stanze pubblica** (`js/lobby.js`, `server.js`, `css/lobby.css`): nuovo bottone "🏠 Lista stanze" apre una card con tutte le stanze attive (nome, codice, numero giocatori, lucchetto se con password, etichetta "in corso"). Cliccando "Entra" viene richiesta la password se necessaria. La lista usa una connessione WS temporanea con messaggio `list_rooms` — nessun polling, nessuna richiesta HTTP extra, chiude subito dopo la risposta.
+- **Verifica password** (`server.js`): il server rifiuta i `join` con password errata inviando `{type:'error', msg:'Password errata'}`.
+
+### 📦 Rete
+- La lista stanze usa una connessione WS separata che si chiude dopo il primo messaggio: zero overhead sulle connessioni di gioco esistenti.
+- `list_rooms` risponde con un solo pacchetto contenente tutte le stanze: nessun polling, la lista è sempre fresca al click.
+
+---
+
 ## v2.1.0 — Fix allenamento, join in-game, codice stanza, tasti
 
 ### 🔧 Fix

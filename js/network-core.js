@@ -29,15 +29,13 @@ function handleServerMsg(msg) {
     case 'created':
       hostId = myPlayerId; isHost = true;
       pmRoster = [{ id: myPlayerId, name: myNickname, team: 0, skin: mySkin, afk: false }];
-      $('card-wait').style.display = 'none';
+      $('card-create').style.display = 'none';
       $('card-join').style.display = 'none';
-      // mostra il codice nel menu prematch
       wsRoom = msg.code;
       showPrematch();
-      // mostra codice nel header del menu
-      const codeEl = $('gm-room-code');
-      codeEl.textContent = `🏠 Codice stanza: ${msg.code}`;
-      codeEl.style.display = '';
+      { const codeEl = $('gm-room-code');
+        codeEl.textContent = `🏠 ${msg.roomName || msg.code}  ·  ${msg.code}${msg.hasPassword ? '  🔒' : ''}`;
+        codeEl.style.display = ''; }
       break;
 
     case 'joined':
@@ -76,8 +74,6 @@ function handleServerMsg(msg) {
       isHost   = (msg.hostId === myPlayerId);
       closeMenu();
       if (msg.lateJoin) {
-        // entrato a partita in corso: ricostruisce solo i player locali
-        // senza resettare palla/score/timer (arriveranno dal server state)
         players = buildPlayers(msg.roster);
         if(mySkin && myPlayerId) playerSkins[myPlayerId] = mySkin;
         $('game-menu').classList.remove('open');
@@ -86,7 +82,7 @@ function handleServerMsg(msg) {
         $('btn-restart').style.display = 'none';
         if(isTouchDev()) positionTouchLayer(); else hideTouchLayer();
         applyView();
-        if(!running) { lastFrameTime=0; running=true; requestAnimationFrame(loop); }
+        startLoop();
         sysMsg('👋 Sei entrato come spettatore. L\'host può spostarti in una squadra.');
       } else {
         startGame('guest', pmRoster);
@@ -127,11 +123,7 @@ function handleServerMsg(msg) {
 
     case 'game_over':
       score = msg.score; updateHUD();
-      gameOver = true;
-      const res = score[0]>score[1] ? `🏆 Vincono i ROSSI! (${score[0]}–${score[1]})` :
-                  score[1]>score[0] ? `🏆 Vincono i BLU! (${score[0]}–${score[1]})` :
-                  `🤝 Pareggio! (${score[0]}–${score[1]})`;
-      setMsg(res + ' — Restart per rigiocare');
+      handleGameOver(); // torna al menu P dopo 3s
       break;
 
     case 'chat':

@@ -63,11 +63,13 @@ function applyInput(p, inp, ball) {
 
 // ── ROOM ────────────────────────────────────────────────
 function mkBall() { return { x: W / 2, y: H / 2, vx: 0, vy: 0, r: BR, trail: [] }; }
-function mkRoom(code) {
+function mkRoom(code, name, password) {
   return {
     code,
-    clients: new Map(),   // ws → {pid, name, team, skin, afk}
-    players: [],          // oggetti fisici
+    name: name || `Stanza ${code}`,
+    password: password || '',
+    clients: new Map(),
+    players: [],
     ball: mkBall(),
     score: [0, 0],
     timeLeft: MATCH_TIME,
@@ -75,18 +77,18 @@ function mkRoom(code) {
     goalCD: 0,
     started: false,
     hostPid: null,
-    roster: [],           // [{id,name,team,skin,afk}]
-    inputs: {},           // pid → {up,dn,lt,rt,kick}
+    roster: [],
+    inputs: {},
     afkSet: new Set(),
     skins: {},
-    ticker: null,         // setInterval handle
+    ticker: null,
     secondAccum: 0,
     lastBcast: 0
   };
 }
 const rooms = new Map();
-function getOrCreate(code) {
-  if (!rooms.has(code)) rooms.set(code, mkRoom(code));
+function getOrCreate(code, name, password) {
+  if (!rooms.has(code)) rooms.set(code, mkRoom(code, name, password));
   return rooms.get(code);
 }
 function cleanRoom(room) {
@@ -278,22 +280,42 @@ wss.on('connection', ws => {
     let msg; try { msg = JSON.parse(raw); } catch { return; }
     const { type, payload } = msg;
 
+    // lista stanze pubblica — risposta immediata, nessuna room associata
+    if (type === 'list_rooms') {
+      const list = [];
+      for (const [, r] of rooms) {
+        list.push({
+          code: r.code,
+          name: r.name,
+          players: r.clients.size,
+          hasPassword: !!r.password,
+          started: r.started
+        });
+      }
+      send(ws, { type: 'rooms_list', rooms: list });
+      return;
+    }
+
     if (type === 'create') {
-      const { pid, name, code } = payload;
+      const { pid, name, code, roomName, password } = payload;
       myPid = pid;
-      myRoom = getOrCreate(code);
+      myRoom = getOrCreate(code, roomName, password);
       myRoom.hostPid = pid;
       myRoom.clients.set(ws, { pid, name, team: 0, skin: payload.skin || '', afk: false });
       syncRoster(myRoom);
-      send(ws, { type: 'created', code, hostId: pid });
+      send(ws, { type: 'created', code, hostId: pid, roomName: myRoom.name, hasPassword: !!myRoom.password });
       return;
     }
 
     if (type === 'join') {
-      const { pid, name, code } = payload;
+      const { pid, name, code, password } = payload;
       myPid = pid;
       myRoom = rooms.get(code);
       if (!myRoom) { send(ws, { type: 'error', msg: 'Stanza non trovata' }); return; }
+      // verifica password
+      if (myRoom.password && myRoom.password !== (password || '')) {
+        send(ws, { type: 'error', msg: 'Password errata' }); return;
+      }
       // auto-team bilanciato, ma se la partita è già iniziata entra come spettatore
       let team;
       if (myRoom.started) {

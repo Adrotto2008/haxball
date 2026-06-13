@@ -7,7 +7,6 @@ let goalCD = 0, ticker = 0, lastFrameTime = 0, secondAccum = 0;
 let players = [], ball;
 
 // ── UPDATE ─────────────────────────────────────────────
-// Timestep fisso per il dead reckoning: indipendente da monitor hz
 const PHYS_TICK = 1000 / 60;
 let physAccum = 0;
 
@@ -16,27 +15,21 @@ function update(dt) {
   if(goalCD>0) { goalCD--; return; }
 
   if(netMode === 'train') {
-    // ── ALLENAMENTO: fisica completa client-side ──────────
     const p = players[0];
     if(p) {
       applyInput(p, inpLocal());
-      // collisione player-palla (usa la ball globale, come physics.js si aspetta)
       circleCollide(p, ball, B_HIT_R);
     }
-    // fisica palla
     ball.x += ball.vx; ball.y += ball.vy;
     ball.vx *= B_FRIC; ball.vy *= B_FRIC;
-    // bordi palla
     const inGoal = ball.y > GY && ball.y < GY + GH;
     if(ball.x - BR < FL.l) { if(inGoal){ score[1]++; updateHUD(); setMsg(`⚽ BLU! (${score[0]}–${score[1]})`); goalBurst(FL.l,H/2); goalCD=90; resetLocal(false); } else { ball.x=FL.l+BR; ball.vx*=-B_BOUNCE; } }
     if(ball.x + BR > FL.r) { if(inGoal){ score[0]++; updateHUD(); setMsg(`⚽ ROSSO! (${score[0]}–${score[1]})`); goalBurst(FL.r,H/2); goalCD=90; resetLocal(false); } else { ball.x=FL.r-BR; ball.vx*=-B_BOUNCE; } }
     if(ball.y - BR < FL.t){ ball.y=FL.t+BR; ball.vy*=-B_BOUNCE; }
     if(ball.y + BR > FL.b){ ball.y=FL.b-BR; ball.vy*=-B_BOUNCE; }
-    // timer
     if(timeLeft>0){ secondAccum+=dt; if(secondAccum>=1000){secondAccum-=1000;timeLeft--;updateHUD();} }
-    if(timeLeft<=0 && !gameOver){ gameOver=true; setMsg('Fine allenamento — Restart per rigiocare'); }
+    if(timeLeft<=0 && !gameOver){ gameOver=true; handleGameOverLocal(); }
   } else {
-    // ── GUEST: dead reckoning server-autoritativo ─────────
     sendGuestInput();
     physAccum = Math.min(physAccum + dt, PHYS_TICK * 4);
     while(physAccum >= PHYS_TICK) { tickRemotePhysics(); physAccum -= PHYS_TICK; }
@@ -54,15 +47,33 @@ function goal(team) {
   setMsg(`⚽ GOOOL! ${team===0?'🔴 ROSSI':'🔵 BLU'}! (${score[0]}–${score[1]})`);
   goalBurst(team===0?FL.l:FL.r, H/2);
   const gf=$('goal-flash'); gf.style.opacity='1'; setTimeout(()=>gf.style.opacity='0',140);
-  goalCD=140; reset(false); if(netMode==='host') broadcastState();
+  goalCD=140;
 }
-function endGame() {
-  gameOver=true;
+
+function handleGameOverLocal() {
+  // solo training: torna al prematch dopo 3 secondi
   const msg = score[0]>score[1] ? `🏆 Vincono i ROSSI! (${score[0]}–${score[1]})` :
               score[1]>score[0] ? `🏆 Vincono i BLU! (${score[0]}–${score[1]})` :
               `🤝 Pareggio! (${score[0]}–${score[1]})`;
-  setMsg(msg+' — Restart per rigiocare'); if(netMode==='host') broadcastState();
+  setMsg(msg);
+  setTimeout(() => { resetLocal(true); updateHUD(); }, 3000);
 }
+
+function handleGameOver() {
+  // multiplayer: torna al menu P dopo 3 secondi
+  gameOver = true;
+  const msg = score[0]>score[1] ? `🏆 Vincono i ROSSI! (${score[0]}–${score[1]})` :
+              score[1]>score[0] ? `🏆 Vincono i BLU! (${score[0]}–${score[1]})` :
+              `🤝 Pareggio! (${score[0]}–${score[1]})`;
+  setMsg(msg);
+  setTimeout(() => {
+    running = false;
+    $('game').style.display = 'none';
+    if(isTouchDev()) $('touch-layer').style.display = 'none';
+    showPrematch();
+  }, 3000);
+}
+
 function updateHUD() {
   $('sr').textContent=score[0]; $('sb').textContent=score[1];
   const m=Math.floor(timeLeft/60), s=timeLeft%60;
@@ -76,6 +87,7 @@ function resetLocal(full) {
   goalCD = 90;
   const p = players[0];
   if(p) { p.x=FL.l+(FL.r-FL.l)*0.25; p.y=H/2; p.vx=0; p.vy=0; p.charge=0; p.held=false; }
+  setMsg('🎯 Allenamento — WASD/Frecce · 0/Ctrl/Spazio tiro');
 }
 
 // ── BUILD PLAYERS / BALL / RESET ────────────────────────
@@ -117,28 +129,35 @@ function reset(full) {
   }
   if(full) { score=[0,0]; timeLeft=MATCH_TIME; gameOver=false; ticker=0; secondAccum=0; }
   goalCD=90;
-  if(full) setMsg(netMode==='train' ? '🎯 Allenamento — WASD/Frecce · 0/Ctrl/Spazio tiro' : '');
+  if(full) setMsg('');
   else setMsg('');
 }
 
 // ── LOOP ───────────────────────────────────────────────
+// Il loop di RENDER gira sempre (anche in background) per evitare il nero.
+// L'UPDATE (fisica/input) si ferma quando la scheda non è visibile.
+let _rafId = null;
 function loop(ts) {
   if(!running) return;
-  const dt = lastFrameTime ? Math.min(ts-lastFrameTime, 100) : 16.67;
+  const visible = document.visibilityState === 'visible';
+  const dt = (lastFrameTime && visible) ? Math.min(ts - lastFrameTime, 100) : 16.67;
   lastFrameTime = ts;
-  update(dt); draw();
-  requestAnimationFrame(loop);
+  if(visible) update(dt); // aggiorna solo se visibile (evita accumulo di dt)
+  draw();                  // disegna sempre: evita il nero al ritorno scheda
+  _rafId = requestAnimationFrame(loop);
 }
 
-// Quando la scheda torna visibile, resetta lastFrameTime e rilancia il loop.
-// Il browser throttla/stoppa rAF sulle schede in background;
-// senza questo il canvas rimane nero al ritorno dalla scheda.
-document.addEventListener('visibilitychange', () => {
-  if(document.visibilityState === 'visible' && running) {
-    lastFrameTime = 0; // evita un dt enorme al primo frame
-    requestAnimationFrame(loop);
-  }
-});
+function stopLoop() {
+  running = false;
+  if(_rafId) { cancelAnimationFrame(_rafId); _rafId = null; }
+}
+
+function startLoop() {
+  if(running) return;
+  lastFrameTime = 0;
+  running = true;
+  _rafId = requestAnimationFrame(loop);
+}
 
 // ── START GAME ─────────────────────────────────────────
 function startGame(mode, roster) {
@@ -153,7 +172,7 @@ function startGame(mode, roster) {
   $('btn-restart').style.display = (!isHost && mode!=='train') ? 'none' : '';
   if(isTouchDev()) positionTouchLayer(); else hideTouchLayer();
   reset(true); updateHUD(); applyView();
-  lastFrameTime=0; running=true; requestAnimationFrame(loop);
+  startLoop();
 }
 function startTraining() {
   myNickname = (typeof getNick==='function') ? getNick() : 'Giocatore';
