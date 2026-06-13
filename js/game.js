@@ -11,7 +11,16 @@ function update(dt) {
   // Dead reckoning: tutti i player (incluso locale) vengono mossi
   // con la loro ultima velocità nota tra un pacchetto e l'altro.
   // Il server è autoritativo: applyRemoteState corregge ogni ~16ms.
-  if(netMode === 'guest') tickRemotePhysics();
+  if(netMode==='guest') {
+    const myP = players.find(p=>p.id===myPlayerId);
+    if(myP) applyInput(myP, inpLocal());
+    sendGuestInput();
+    predictRemote(dt);     // avanza palla + remoti a passo fisso (indipendente dagli fps)
+    applyRemoteState();    // micro-correzioni continue, snap solo su salti reali
+    tickParticles();
+    if(myP && isTouchDev()) drawKickArc(myP.charge/KICK_CHG_F);
+    return;
+  }
   tickParticles();
   const myP = players.find(p=>p.id===myPlayerId);
   if(myP && isTouchDev()) drawKickArc(myP.charge/KICK_CHG_F);
