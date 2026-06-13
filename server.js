@@ -359,15 +359,18 @@ wss.on('connection', ws => {
     if (type === 'afk') {
       const c = myRoom.clients.get(ws); if (!c) return;
       c.afk = payload.afk;
+      const name = c.name || myPid.slice(0,6);
       if (payload.afk) {
         myRoom.afkSet.add(myPid);
         const p = myRoom.players.find(x => x.id === myPid);
         if (p) { p.team = -1; p.x = -9999; p.y = -9999; p.vx = 0; p.vy = 0; }
+        bcast(myRoom, { type: 'chat', pid: 'system', name: 'Sistema', text: `👻 ${name} è diventato fantasma` }, ws);
       } else {
         myRoom.afkSet.delete(myPid);
-        const c2 = myRoom.clients.get(ws);
-        const p  = myRoom.players.find(x => x.id === myPid);
-        if (p && c2) { p.team = c2.team >= 0 ? c2.team : 0; p.x = p.team===0?W*0.25:W*0.75; p.y=H/2; }
+        // rimane spettatore (team=-1): l'host lo può spostare
+        const p = myRoom.players.find(x => x.id === myPid);
+        if (p) { p.team = -1; } // resta parcheggiato fuori campo
+        bcast(myRoom, { type: 'chat', pid: 'system', name: 'Sistema', text: `👤 ${name} non è più AFK (spettatore)` }, ws);
       }
       syncRoster(myRoom);
       bcastAll(myRoom, { type: 'afk', pid: myPid, afk: payload.afk });

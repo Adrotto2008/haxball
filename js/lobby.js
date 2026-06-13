@@ -12,6 +12,9 @@ function showLobby() {
   $('game-menu').classList.remove('open');
   $('chat-overlay').classList.remove('open');
   $('touch-layer').style.display = 'none';
+  // nascondi codice stanza
+  const codeEl = $('gm-room-code');
+  if (codeEl) { codeEl.textContent = ''; codeEl.style.display = 'none'; }
   running = false; isHost = false; pmRoster = []; hostId = null;
   chatMessages = []; chatOpen = false; afkPlayers = new Set(); playerSkins = {};
 }

@@ -1,5 +1,5 @@
 // ── CONFIG — costanti globali ──────────────────────────
-const VERSION = '2.0.0';
+const VERSION = '2.1.0';
 const W = 1020, H = 600;
 const DPR = Math.min(window.devicePixelRatio||1, 2);
 

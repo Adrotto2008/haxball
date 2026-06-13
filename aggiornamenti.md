@@ -4,6 +4,17 @@ Questo file tiene traccia delle modifiche e delle nuove funzionalità introdotte
 
 ---
 
+## v2.1.0 — Fix allenamento, join in-game, codice stanza, tasti
+
+### 🔧 Fix
+- **Allenamento: palla funzionante** (`js/game.js`): aggiunta la chiamata `circleCollide(p, ball, B_HIT_R)` dopo `applyInput` in modalità train. Prima la palla non veniva spinta perché `physics.js` usa `ball` globale (non un parametro) e la collisione non veniva mai eseguita. Aggiunti anche i `goalBurst` sui gol.
+- **Join in-game: no palla fantasma** (`js/network.js`): il messaggio `start` con `lateJoin:true` non chiama più `startGame` (che resettava palla/score/timer). Invece ricostruisce solo i player locali e avvia il loop se non era già attivo. L'host ora vede il nuovo arrivato grazie al `pm_update` che aggiorna anche `players[]` in-game.
+- **Codice stanza nel menu** (`js/network.js`, `index.html`, `css/game-menu.css`): il codice compare nell'header del menu prematch/in-game in giallo evidenziato, non più in chat. Viene nascosto quando si torna alla lobby.
+- **ESC chiude chat, non apre menu** (`js/input.js`): ESC ora chiude la chat se è aperta, o chiude il menu se è aperto. Non apre più nulla.
+- **P apre il menu di gioco** (`js/input.js`): il tasto menu è stato spostato da ESC a P. Aggiornato anche il testo hint nella barra controlli.
+
+---
+
 ## v2.0.0 — Allenamento client-side, join in-game, UX lobby e fix vari
 
 ### ✨ Novità

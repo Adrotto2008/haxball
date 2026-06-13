@@ -27,12 +27,15 @@ function handleServerMsg(msg) {
     case 'created':
       hostId = myPlayerId; isHost = true;
       pmRoster = [{ id: myPlayerId, name: myNickname, team: 0, skin: mySkin, afk: false }];
-      // vai subito in prematch, mostra il codice nel menu
       $('card-wait').style.display = 'none';
       $('card-join').style.display = 'none';
+      // mostra il codice nel menu prematch
+      wsRoom = msg.code;
       showPrematch();
-      // mostra il codice stanza nella prematch (riuso #room-code-shown se esiste, altrimenti chat)
-      sysMsg(`🏠 Stanza creata! Codice: ${msg.code} — condividilo con gli amici`);
+      // mostra codice nel header del menu
+      const codeEl = $('gm-room-code');
+      codeEl.textContent = `🏠 Codice stanza: ${msg.code}`;
+      codeEl.style.display = '';
       break;
 
     case 'joined':
@@ -48,6 +51,19 @@ function handleServerMsg(msg) {
     case 'pm_update':
       pmRoster = msg.roster;
       if (msg.hostId) { hostId = msg.hostId; isHost = (msg.hostId === myPlayerId); }
+      // se siamo in-game, sincronizza i player fisici con il nuovo roster
+      // (serve quando qualcuno entra/esce durante la partita)
+      if ($('game').style.display !== 'none' && netMode !== 'train') {
+        // aggiungi player mancanti
+        for (const r of msg.roster) {
+          if (!players.find(p => p.id === r.id)) {
+            const col = r.team === 0 ? TEAM_COLS[0] : r.team === 1 ? TEAM_COLS[1] : '#555';
+            players.push({ id: r.id, team: r.team, col, x: -9999, y: -9999, vx: 0, vy: 0, r: PR, charge: 0, held: false });
+          }
+        }
+        // rimuovi player non più nel roster
+        players = players.filter(p => msg.roster.find(r => r.id === p.id));
+      }
       updateWaitingCard();
       if ($('game-menu').classList.contains('open')) renderPmRoster();
       break;
@@ -57,10 +73,21 @@ function handleServerMsg(msg) {
       hostId   = msg.hostId;
       isHost   = (msg.hostId === myPlayerId);
       closeMenu();
-      startGame('guest', pmRoster);
       if (msg.lateJoin) {
-        // entrato a partita in corso: mostra messaggio e apri chat
+        // entrato a partita in corso: ricostruisce solo i player locali
+        // senza resettare palla/score/timer (arriveranno dal server state)
+        players = buildPlayers(msg.roster);
+        if(mySkin && myPlayerId) playerSkins[myPlayerId] = mySkin;
+        $('game-menu').classList.remove('open');
+        $('lobby').style.display='none'; $('game').style.display='flex';
+        const badge2 = $('net-badge'); badge2.textContent='GUEST'; badge2.className='badge-guest';
+        $('btn-restart').style.display = 'none';
+        if(isTouchDev()) positionTouchLayer(); else hideTouchLayer();
+        applyView();
+        if(!running) { lastFrameTime=0; running=true; requestAnimationFrame(loop); }
         sysMsg('👋 Sei entrato come spettatore. L\'host può spostarti in una squadra.');
+      } else {
+        startGame('guest', pmRoster);
       }
       break;
 
@@ -292,26 +319,29 @@ function adminMoveTeamIngame(pid, team) {
 function toggleAfk() {
   const isAfk = afkPlayers.has(myPlayerId);
   const newAfk = !isAfk;
+  const myName = pmRoster.find(r => r.id === myPlayerId)?.name || myNickname;
+
   if (newAfk) {
+    // diventa fantasma: parcheggiato fuori campo
     afkPlayers.add(myPlayerId);
     const r = pmRoster.find(x => x.id === myPlayerId);
-    if (r) { r._prevTeam = r.team; r.team = -1; }
-    // nasconde il player locale dalla visuale
+    if (r) r.team = -1;
     const p = players.find(x => x.id === myPlayerId);
     if (p) { p.team = -1; p.x = -9999; p.y = -9999; p.vx = 0; p.vy = 0; }
+    pushChatMsg({ pid:'system', name:'Sistema', text: `👻 ${myName} è diventato fantasma` }, false);
   } else {
+    // torna visibile ma rimane spettatore (team=-1)
+    // l'host può spostarlo in una squadra dal menu
     afkPlayers.delete(myPlayerId);
     const r = pmRoster.find(x => x.id === myPlayerId);
-    const prevTeam = r?._prevTeam ?? 0;
-    if (r) r.team = prevTeam;
-    // riporta il player in campo (il server manderà la posizione reale al prossimo state)
+    if (r) r.team = -1;
     const p = players.find(x => x.id === myPlayerId);
-    if (p) { p.team = prevTeam; p.vx = 0; p.vy = 0; }
+    if (p) { p.team = -1; }
+    pushChatMsg({ pid:'system', name:'Sistema', text: `👤 ${myName} non è più AFK (spettatore)` }, false);
   }
+
   wsSend({ type: 'afk', payload: { afk: newAfk } });
   if ($('game-menu').classList.contains('open')) renderPmRoster();
-  const txt = newAfk ? '👻 Sei ora AFK (spettatore)' : '✅ Sei tornato in gioco';
-  pushChatMsg({ pid:'system', name:'Sistema', text:txt }, true);
 }
 
 // ── SKIN ─────────────────────────────────────────────────

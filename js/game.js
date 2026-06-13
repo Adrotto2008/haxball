@@ -15,14 +15,18 @@ function update(dt) {
   if(netMode === 'train') {
     // ── ALLENAMENTO: fisica completa client-side ──────────
     const p = players[0];
-    if(p) applyInput(p, inpLocal(), ball);
+    if(p) {
+      applyInput(p, inpLocal());
+      // collisione player-palla (usa la ball globale, come physics.js si aspetta)
+      circleCollide(p, ball, B_HIT_R);
+    }
     // fisica palla
     ball.x += ball.vx; ball.y += ball.vy;
     ball.vx *= B_FRIC; ball.vy *= B_FRIC;
     // bordi palla
     const inGoal = ball.y > GY && ball.y < GY + GH;
-    if(ball.x - BR < FL.l) { if(inGoal){ score[1]++; updateHUD(); setMsg(`⚽ BLU! (${score[0]}–${score[1]})`); goalCD=90; resetLocal(false); } else { ball.x=FL.l+BR; ball.vx*=-B_BOUNCE; } }
-    if(ball.x + BR > FL.r) { if(inGoal){ score[0]++; updateHUD(); setMsg(`⚽ ROSSO! (${score[0]}–${score[1]})`); goalCD=90; resetLocal(false); } else { ball.x=FL.r-BR; ball.vx*=-B_BOUNCE; } }
+    if(ball.x - BR < FL.l) { if(inGoal){ score[1]++; updateHUD(); setMsg(`⚽ BLU! (${score[0]}–${score[1]})`); goalBurst(FL.l,H/2); goalCD=90; resetLocal(false); } else { ball.x=FL.l+BR; ball.vx*=-B_BOUNCE; } }
+    if(ball.x + BR > FL.r) { if(inGoal){ score[0]++; updateHUD(); setMsg(`⚽ ROSSO! (${score[0]}–${score[1]})`); goalBurst(FL.r,H/2); goalCD=90; resetLocal(false); } else { ball.x=FL.r-BR; ball.vx*=-B_BOUNCE; } }
     if(ball.y - BR < FL.t){ ball.y=FL.t+BR; ball.vy*=-B_BOUNCE; }
     if(ball.y + BR > FL.b){ ball.y=FL.b-BR; ball.vy*=-B_BOUNCE; }
     // timer
@@ -74,7 +78,6 @@ function resetLocal(full) {
 // ── BUILD PLAYERS / BALL / RESET ────────────────────────
 function buildPlayers(roster) {
   const result = [];
-  // raggruppa per team (inclusi spettatori team=-1 che vengono parcheggiati)
   const byTeam = [[],[]];
   for(const r of roster) {
     if(r.team===0||r.team===1) byTeam[r.team].push(r);
@@ -87,7 +90,6 @@ function buildPlayers(roster) {
         vx:0,vy:0, r:PR, charge:0, held:false});
     });
   }
-  // spettatori: aggiunti ma parcheggiati fuori campo
   for(const r of roster) {
     if(r.team===-1) {
       result.push({id:r.id, team:-1, col:'#555',
@@ -119,9 +121,21 @@ function reset(full) {
 // ── LOOP ───────────────────────────────────────────────
 function loop(ts) {
   if(!running) return;
-  const dt = lastFrameTime ? Math.min(ts-lastFrameTime,100) : 16.67;
-  lastFrameTime=ts; update(dt); draw(); requestAnimationFrame(loop);
+  const dt = lastFrameTime ? Math.min(ts-lastFrameTime, 100) : 16.67;
+  lastFrameTime = ts;
+  update(dt); draw();
+  requestAnimationFrame(loop);
 }
+
+// Quando la scheda torna visibile, resetta lastFrameTime e rilancia il loop.
+// Il browser throttla/stoppa rAF sulle schede in background;
+// senza questo il canvas rimane nero al ritorno dalla scheda.
+document.addEventListener('visibilitychange', () => {
+  if(document.visibilityState === 'visible' && running) {
+    lastFrameTime = 0; // evita un dt enorme al primo frame
+    requestAnimationFrame(loop);
+  }
+});
 
 // ── START GAME ─────────────────────────────────────────
 function startGame(mode, roster) {
@@ -133,7 +147,6 @@ function startGame(mode, roster) {
   if(mode==='train')       { badge.textContent='TRAIN'; badge.className='badge-train'; }
   else if(isHost)          { badge.textContent='HOST';  badge.className='badge-host';  }
   else                     { badge.textContent='GUEST'; badge.className='badge-guest'; }
-  // restart visibile solo a host e in training
   $('btn-restart').style.display = (!isHost && mode!=='train') ? 'none' : '';
   if(isTouchDev()) positionTouchLayer(); else hideTouchLayer();
   reset(true); updateHUD(); applyView();

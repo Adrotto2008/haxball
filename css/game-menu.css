@@ -22,6 +22,11 @@
   font-size:13px;font-weight:700;letter-spacing:2px;
   text-transform:uppercase;color:rgba(255,255,255,.55);
 }
+.gm-room-code{
+  font-size:15px;font-weight:800;letter-spacing:3px;
+  color:#ffe066;margin-top:4px;text-transform:uppercase;
+  text-shadow:0 0 12px rgba(255,220,0,.4);
+}
 .gm-close-btn{
   background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);
   color:rgba(255,255,255,.5);border-radius:8px;width:30px;height:30px;

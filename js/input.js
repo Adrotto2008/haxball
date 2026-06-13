@@ -13,15 +13,32 @@ document.addEventListener('touchmove', e => {
 // Tastiera
 document.addEventListener('keydown', e => {
   keys[e.code] = true;
-  const stop = ['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space','ControlLeft','ControlRight','Digit0','Numpad0','Escape'];
+  const inGame = $('game').style.display !== 'none';
+  const menuOpen = $('game-menu').classList.contains('open');
+
+  // Escape: chiude chat se aperta, altrimenti chiude menu se aperto
+  if(e.code === 'Escape') {
+    e.preventDefault();
+    if(chatOpen) { toggleChat(false); return; }
+    if(inGame && menuOpen) { closeMenu(); return; }
+    return;
+  }
+
+  // P: apre/chiude menu di gioco (al posto di ESC)
+  if(e.code === 'KeyP' && inGame && !chatOpen) {
+    e.preventDefault(); toggleEscMenu(); return;
+  }
+
+  const stop = ['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space','ControlLeft','ControlRight','Digit0','Numpad0'];
   if(stop.includes(e.code)) e.preventDefault();
-  if($('game').style.display !== 'none' && !$('game-menu').classList.contains('open')) {
+
+  if(inGame && !menuOpen) {
     const m = e.code.match(/^Digit([1-9])$/);
     if(m) { setView(parseInt(m[1])); return; }
   }
-  if(e.code === 'Escape' && $('game').style.display !== 'none') { toggleEscMenu(); return; }
-  // Backslash o Enter aprono la chat (Enter solo se il gioco è attivo e la chat è chiusa)
-  if($('game').style.display !== 'none' && !$('game-menu').classList.contains('open')) {
+
+  // Backslash o Enter aprono la chat
+  if(inGame && !menuOpen) {
     if(e.code === 'Backslash') { e.preventDefault(); toggleChat(); return; }
     if(e.code === 'Enter' && !chatOpen) { e.preventDefault(); toggleChat(true); return; }
   }
