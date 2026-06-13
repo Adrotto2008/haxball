@@ -13,18 +13,23 @@ document.addEventListener('touchmove', e => {
 // Tastiera
 document.addEventListener('keydown', e => {
   keys[e.code] = true;
-  const inGame = $('game').style.display !== 'none';
+  const inGame   = $('game').style.display !== 'none';
+  const inLobby  = $('lobby').style.display !== 'none';
   const menuOpen = $('game-menu').classList.contains('open');
 
-  // Escape: chiude chat se aperta, altrimenti chiude menu se aperto
+  // In lobby: nessun shortcut di gioco (P, Invio, Backslash)
+  // per evitare aperture accidentali mentre si scrive
+  if(inLobby) return;
+
+  // Escape: chiude chat se aperta, poi chiude menu se aperto
   if(e.code === 'Escape') {
     e.preventDefault();
     if(chatOpen) { toggleChat(false); return; }
-    if(inGame && menuOpen) { closeMenu(); return; }
+    if(menuOpen) { closeMenu(); return; }
     return;
   }
 
-  // P: apre/chiude menu di gioco (al posto di ESC)
+  // P: apre/chiude menu di gioco
   if(e.code === 'KeyP' && inGame && !chatOpen) {
     e.preventDefault(); toggleEscMenu(); return;
   }
@@ -37,7 +42,7 @@ document.addEventListener('keydown', e => {
     if(m) { setView(parseInt(m[1])); return; }
   }
 
-  // Backslash o Enter aprono la chat
+  // Backslash o Enter aprono la chat (solo in-game, menu chiuso)
   if(inGame && !menuOpen) {
     if(e.code === 'Backslash') { e.preventDefault(); toggleChat(); return; }
     if(e.code === 'Enter' && !chatOpen) { e.preventDefault(); toggleChat(true); return; }

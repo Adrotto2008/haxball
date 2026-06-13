@@ -1,4 +1,4 @@
-// ── STATE — variabili condivise + init canvas ───────────
+// ── STATO — variabili condivise + init canvas ───────────
 // Le variabili della partita di calcio (score/ball/players/timeLeft/…)
 // stanno in js/modes/soccer/game.js, non qui.
 const canvas = document.getElementById('c');
@@ -26,3 +26,10 @@ let chatOpen = false, chatMessages = [];
 let particles = [];
 let running = false, escOpen = false;
 let currentView = 8;
+
+// ── IMPOSTAZIONE: prediction locale ───────────────────
+// Se abilitata: il tuo player viene predetto con applyInput
+// (risponde all'input immediatamente) e corretto dal server.
+// Migliora la fluidità su reti buone, peggiora su reti instabili.
+// Ogni giocatore può cambiarla nelle impostazioni.
+let useLocalPrediction = JSON.parse(localStorage.getItem('hax_prediction') ?? 'true');

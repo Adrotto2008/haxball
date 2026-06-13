@@ -14,6 +14,9 @@ function openMenu(context) {
   $('esc-leave').textContent       = menuContext === 'prematch' ? '← Lascia stanza' : '✕ Esci';
   $('pm-admin-hint').style.display = isHost ? '' : 'none';
   $('gm-close-btn').style.display  = menuContext === 'ingame' ? '' : 'none';
+  // sincronizza il toggle con il valore corrente
+  const chk = $('toggle-prediction');
+  if (chk) chk.checked = useLocalPrediction;
   switchTab('roster');
   $('game-menu').classList.add('open');
   escOpen = (menuContext === 'ingame');
@@ -25,7 +28,10 @@ function closeMenu() {
   hideCtxMenu();
 }
 
-$('game-menu').addEventListener('click', e => { if(e.target === $('game-menu')) closeMenu(); });
+$('game-menu').addEventListener('click', e => {
+  // chiude solo se sei in-game e clicchi fuori dalla box
+  if(e.target === $('game-menu') && $('game').style.display !== 'none') closeMenu();
+});
 $('gm-close-btn').addEventListener('click', closeMenu);
 $('gm-tabs').addEventListener('click', e => { const t=e.target.closest('.gm-tab'); if(t) switchTab(t.dataset.tab); });
 
@@ -45,9 +51,22 @@ function toggleEscMenu(forceOpen) {
 }
 function showPrematch() {
   $('lobby').style.display  = 'none';
-  $('game').style.display   = 'none';
+  // mostra il canvas in background (evita il nero per i late joiner)
+  // ma nasconde HUD, ctrl-bar e touch
+  $('game').style.display   = 'flex';
+  $('hud').style.visibility       = 'hidden';
+  $('msg-bar').style.visibility   = 'hidden';
+  $('ctrl-bar').style.visibility  = 'hidden';
   if(isTouchDev()) $('touch-layer').style.display = 'none';
+  // avvia il loop di render se non era attivo
+  if (!running) { lastFrameTime = 0; running = true; requestAnimationFrame(loop); }
   openMenu('prematch');
+}
+
+function hidePrematch() {
+  $('hud').style.visibility       = '';
+  $('msg-bar').style.visibility   = '';
+  $('ctrl-bar').style.visibility  = '';
 }
 
 // ── AVVIO / RITORNO PARTITA ────────────────────────────
@@ -67,3 +86,9 @@ $('pm-btn-start').onclick = hostStartMatch;
 $('esc-resume').onclick   = () => closeMenu();
 $('esc-restart').onclick  = () => { closeMenu(); if(netMode==='train'){ resetLocal(true); updateHUD(); } else if(isHost) wsSend({type:'restart',payload:{}}); };
 $('esc-leave').onclick    = () => { closeMenu(); leaveGame(); };
+
+// toggle prediction locale
+document.getElementById('toggle-prediction').addEventListener('change', e => {
+  useLocalPrediction = e.target.checked;
+  localStorage.setItem('hax_prediction', JSON.stringify(useLocalPrediction));
+});

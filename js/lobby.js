@@ -15,6 +15,7 @@ function showLobby() {
   $('card-create').style.display = 'none';
   $('card-join').style.display   = 'none';
   $('card-rooms').style.display  = 'none';
+  hidePrematch(); // ripristina HUD/ctrl-bar se erano nascosti
   const codeEl = $('gm-room-code');
   if (codeEl) { codeEl.textContent = ''; codeEl.style.display = 'none'; }
   stopLoop();

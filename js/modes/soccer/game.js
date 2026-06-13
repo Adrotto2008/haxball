@@ -165,6 +165,7 @@ function startGame(mode, roster) {
   if(mySkin && myPlayerId) playerSkins[myPlayerId] = mySkin;
   $('game-menu').classList.remove('open');
   $('lobby').style.display='none'; $('game').style.display='flex';
+  hidePrematch(); // ripristina HUD/ctrl-bar nascosti da showPrematch
   const badge = $('net-badge');
   if(mode==='train')       { badge.textContent='TRAIN'; badge.className='badge-train'; }
   else if(isHost)          { badge.textContent='HOST';  badge.className='badge-host';  }

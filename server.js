@@ -384,14 +384,15 @@ wss.on('connection', ws => {
       const name = c.name || myPid.slice(0,6);
       if (payload.afk) {
         myRoom.afkSet.add(myPid);
+        // forza il player fuori campo E team=-1 immediatamente
         const p = myRoom.players.find(x => x.id === myPid);
         if (p) { p.team = -1; p.x = -9999; p.y = -9999; p.vx = 0; p.vy = 0; }
+        c.team = -1; // aggiorna anche il client record
         bcast(myRoom, { type: 'chat', pid: 'system', name: 'Sistema', text: `👻 ${name} è diventato fantasma` }, ws);
       } else {
         myRoom.afkSet.delete(myPid);
-        // rimane spettatore (team=-1): l'host lo può spostare
-        const p = myRoom.players.find(x => x.id === myPid);
-        if (p) { p.team = -1; } // resta parcheggiato fuori campo
+        // rimane spettatore (team=-1): resta a -9999 finché l'host non lo sposta
+        // NON aggiornare c.team: il client rimane in team=-1
         bcast(myRoom, { type: 'chat', pid: 'system', name: 'Sistema', text: `👤 ${name} non è più AFK (spettatore)` }, ws);
       }
       syncRoster(myRoom);
@@ -458,9 +459,11 @@ wss.on('connection', ws => {
 
   ws.on('close', () => {
     if (!myRoom) return;
+    const c = myRoom.clients.get(ws);
+    const leftName = c?.name || myPid?.slice(0,6) || '?';
     myRoom.clients.delete(ws);
     delete myRoom.inputs[myPid];
-    delete _lastMeta[myRoom.code]; // resetta cache meta alla disconnessione
+    delete _lastMeta[myRoom.code];
     myRoom.afkSet.delete(myPid);
     myRoom.players = myRoom.players.filter(p => p.id !== myPid);
     if (myPid === myRoom.hostPid) {
@@ -469,7 +472,7 @@ wss.on('connection', ws => {
     }
     if (myRoom.clients.size === 0) { cleanRoom(myRoom); return; }
     syncRoster(myRoom);
-    bcastAll(myRoom, { type: 'player_left', pid: myPid });
+    bcastAll(myRoom, { type: 'player_left', pid: myPid, name: leftName });
   });
 
   ws.on('error', () => ws.close());

@@ -51,20 +51,18 @@ function handleServerMsg(msg) {
     case 'pm_update':
       pmRoster = msg.roster;
       if (msg.hostId) { hostId = msg.hostId; isHost = (msg.hostId === myPlayerId); }
-      // se siamo in-game, sincronizza i player fisici con il nuovo roster
-      // (serve quando qualcuno entra/esce durante la partita)
+      // sincronizza player fisici se in-game
       if ($('game').style.display !== 'none' && netMode !== 'train') {
-        // aggiungi player mancanti
         for (const r of msg.roster) {
           if (!players.find(p => p.id === r.id)) {
             const col = r.team === 0 ? TEAM_COLS[0] : r.team === 1 ? TEAM_COLS[1] : '#555';
             players.push({ id: r.id, team: r.team, col, x: -9999, y: -9999, vx: 0, vy: 0, r: PR, charge: 0, held: false });
           }
         }
-        // rimuovi player non più nel roster
         players = players.filter(p => msg.roster.find(r => r.id === p.id));
       }
       updateWaitingCard();
+      // aggiorna sempre il roster se il menu è aperto (prematch o in-game)
       if ($('game-menu').classList.contains('open')) renderPmRoster();
       break;
 
@@ -160,7 +158,7 @@ function handleServerMsg(msg) {
       pmRoster = pmRoster.filter(r => r.id !== msg.pid);
       players  = players.filter(p => p.id !== msg.pid);
       if ($('game-menu').classList.contains('open')) renderPmRoster();
-      pushChatMsg({ pid:'system', name:'Sistema', text:`${msg.pid} ha lasciato la stanza`, ts:Date.now() }, false);
+      pushChatMsg({ pid:'system', name:'Sistema', text:`${msg.name || msg.pid} ha lasciato la stanza` }, false);
       break;
 
     case 'kicked':

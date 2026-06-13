@@ -4,6 +4,22 @@ Questo file tiene traccia delle modifiche e delle nuove funzionalità introdotte
 
 ---
 
+## v2.3.0 — Fix multipli: nero, AFK, lobby realtime, prediction toggle, tasti
+
+### 🔧 Fix
+- **Nero schermo definitivo** (`js/menu.js`): `showPrematch` ora porta `game` a `display:flex` ma nasconde HUD/ctrl-bar con `visibility:hidden`. Il canvas è sempre nel DOM e il loop di render gira. `hidePrematch()` ripristina la visibilità quando si avvia la partita o si torna alla lobby. Il click sul backdrop in prematch non chiude più il menu (solo in-game).
+- **Nero late-joiner** (`js/menu.js`, `js/modes/soccer/game.js`): stesso fix: il canvas è visibile anche in prematch, quindi il late-joiner non vede nero al primo pacchetto.
+- **AFK lampeggio/colore sbagliato** (`server.js`): quando vai AFK, il server ora aggiorna subito anche `c.team = -1` nel record del client. Così `syncRoster` manda il team corretto e il client non disegna più il player con il colore della squadra precedente.
+- **Host vede roster in tempo reale** (`js/network-core.js`): `pm_update` chiama sempre `renderPmRoster()` se il menu è aperto, non solo in-game. Ora l'host vede le persone entrare in prematch senza aggiornare.
+- **Nome nella chat disconnessione** (`server.js`, `js/network-core.js`): `player_left` ora include `name` (preso dal record client prima della rimozione). Il client mostra il nome invece dell'ID.
+- **Tasti P/Invio disabilitati in lobby** (`js/input.js`): aggiunto early-return se `inLobby` è true. Nessun shortcut di gioco si attiva mentre scrivi il codice o il nickname.
+- **Click backdrop menu in prematch** (`js/menu.js`): `closeMenu` sul click esterno scatta solo se `game` è visibile come schermata di gioco vera, non in prematch.
+
+### ✨ Novità
+- **Toggle prediction locale** (`js/state.js`, `js/modes/soccer/sync.js`, `js/menu.js`, `index.html`, `css/menu.css`): nuova impostazione nelle Impostazioni del menu. Abilitata: il tuo player risponde all'input subito (prediction + correzione server). Disabilitata: server completamente autoritativo (dead reckoning puro). Preferenza salvata in `localStorage`. Default: ON.
+
+---
+
 ## v2.2.0 — Nero schermo fix, fine partita, crea stanza, lista stanze, AFK fix
 
 ### 🔧 Fix critici

@@ -134,3 +134,30 @@
 .ctx-item:hover{background:rgba(255,255,255,.1);color:#fff}
 .ctx-danger{color:rgba(255,100,100,.8)}
 .ctx-danger:hover{background:rgba(255,60,60,.15);color:#ff8888}
+
+/* ── TOGGLE IMPOSTAZIONI ────────────────────────────── */
+.gm-toggle-row{
+  display:flex;align-items:center;justify-content:space-between;
+  gap:12px;padding:10px 0;cursor:pointer;
+  border-bottom:1px solid rgba(255,255,255,.06);
+}
+.gm-toggle-label{
+  font-size:13px;font-weight:600;color:rgba(255,255,255,.8);
+  display:flex;flex-direction:column;gap:3px;
+}
+.gm-toggle-sub{
+  font-size:11px;font-weight:400;color:rgba(255,255,255,.35);line-height:1.4;
+}
+.gm-checkbox{
+  appearance:none;-webkit-appearance:none;
+  width:38px;height:22px;border-radius:11px;
+  background:rgba(255,255,255,.12);border:1.5px solid rgba(255,255,255,.18);
+  position:relative;cursor:pointer;transition:background .2s,border-color .2s;flex-shrink:0;
+}
+.gm-checkbox::after{
+  content:'';position:absolute;top:3px;left:3px;
+  width:14px;height:14px;border-radius:50%;
+  background:#fff;transition:left .2s;
+}
+.gm-checkbox:checked{background:#3da84a;border-color:#3da84a;}
+.gm-checkbox:checked::after{left:19px;}
