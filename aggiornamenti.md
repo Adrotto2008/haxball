@@ -4,6 +4,15 @@ Questo file tiene traccia delle modifiche e delle nuove funzionalità introdotte
 
 ---
 
+## v1.9.0 — Timestep fisso, palla fluida, frizione corretta
+
+### 🔧 Fix
+- **Timestep fisso per dead reckoning** (`js/game.js`): introdotto accumulatore `physAccum` con tick fissi da 16.67ms. Su monitor a 120/144Hz il dead reckoning girava 2x più veloce del server (causando avanzamento eccessivo + snap all'indietro ad ogni pacchetto). Ora: a 60Hz → 1 tick/frame; a 120Hz → alterna 0/1 tick; a 30fps → 2 tick. Comportamento identico su qualsiasi refresh rate.
+- **Palla fluida sui tiri** (`js/network.js` → `applyRemoteState`): rimosso snap basato su velocità alta (`bspd > 4`). Ora snap solo su salto di velocità (`velJump > 1.5`, indica bounce/kick appena avvenuto) o distanza > 40px. Durante il volo libero lerp leggero 0.35 per correggere la deriva minima del dead reckoning. Prima lo snap continuo su ogni pacchetto causava micro-jitter visibile.
+- **Frizione rimossa dai player nel dead reckoning** (`js/network.js` → `tickRemotePhysics`): i player remoti non decelerano più nel gap tra pacchetti. Lato server stanno ricevendo input continuo e non frenano davvero; applicare `P_FRIC` localmente causava undershoot costante. La frizione reale arriva con il prossimo state. La palla mantiene `B_FRIC` (rallenta da sola come sul server).
+
+---
+
 ## v1.8.0 — Fluidità palla + velocità player
 
 ### ✨ Novità

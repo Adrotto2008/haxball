@@ -4,22 +4,24 @@
 // toggleEscMenu è definita in prematch.js (menu unificato)
 
 // ── UPDATE ─────────────────────────────────────────────
+// Timestep fisso per il dead reckoning: indipendente da monitor hz
+const PHYS_TICK = 1000 / 60;
+let physAccum = 0;
+
 function update(dt) {
   if(gameOver || escOpen) return;
   if(goalCD>0) { goalCD--; return; }
   sendGuestInput();
-  // Dead reckoning: tutti i player (incluso locale) vengono mossi
-  // con la loro ultima velocità nota tra un pacchetto e l'altro.
-  // Il server è autoritativo: applyRemoteState corregge ogni ~16ms.
-  if(netMode==='guest') {
-    const myP = players.find(p=>p.id===myPlayerId);
-    if(myP) applyInput(myP, inpLocal());
-    sendGuestInput();
-    predictRemote(dt);     // avanza palla + remoti a passo fisso (indipendente dagli fps)
-    applyRemoteState();    // micro-correzioni continue, snap solo su salti reali
-    tickParticles();
-    if(myP && isTouchDev()) drawKickArc(myP.charge/KICK_CHG_F);
-    return;
+  if(netMode === 'guest') {
+    // Accumula dt e avanza di tick fissi da 16.67ms.
+    // A 60Hz → 1 tick/frame. A 120/144Hz → alterna 0/1 tick.
+    // Senza questo, su 120Hz il dead reckoning gira 2x veloce
+    // → entità avanzano troppo → snap all'indietro ad ogni pacchetto.
+    physAccum = Math.min(physAccum + dt, PHYS_TICK * 4);
+    while(physAccum >= PHYS_TICK) {
+      tickRemotePhysics();
+      physAccum -= PHYS_TICK;
+    }
   }
   tickParticles();
   const myP = players.find(p=>p.id===myPlayerId);
