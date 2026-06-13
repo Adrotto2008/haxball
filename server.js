@@ -163,19 +163,31 @@ function resetPositions(room, full) {
 }
 
 // ── SERIALIZE STATE ──────────────────────────────────────
+// Formato compatto: players come array posizionale [x,y,vx,vy,charge,held]
+// id/team omessi (il client li conosce già dall'ordine deterministico del roster)
+// afk e skins esclusi: già sincronizzati via eventi dedicati
+// score/timeLeft/gameOver inviati solo quando cambiano (vedi broadcastMeta)
 function serializeState(room) {
   return {
     type: 'state',
-    ts: Date.now(),
-    ps: room.players.map(p => ({ id: p.id, team: p.team, x: p.x, y: p.y, vx: p.vx, vy: p.vy, c: p.charge, h: p.held })),
-    b: { x: room.ball.x, y: room.ball.y, vx: room.ball.vx, vy: room.ball.vy },
-    s: room.score.slice(),
-    tl: room.timeLeft,
-    go: room.gameOver,
-    gc: room.goalCD,
-    afk: [...room.afkSet],
-    skins: room.skins
+    p: room.players.map(p => [
+      Math.round(p.x), Math.round(p.y),
+      Math.round(p.vx * 100) / 100, Math.round(p.vy * 100) / 100,
+      p.charge, p.held ? 1 : 0
+    ]),
+    b: [Math.round(room.ball.x), Math.round(room.ball.y),
+        Math.round(room.ball.vx * 100) / 100, Math.round(room.ball.vy * 100) / 100],
+    gc: room.goalCD
   };
+}
+
+// Invia score/timer/gameOver solo quando cambiano
+let _lastMeta = {};
+function broadcastMeta(room) {
+  const key = `${room.score[0]},${room.score[1]},${room.timeLeft},${room.gameOver?1:0}`;
+  if (_lastMeta[room.code] === key) return;
+  _lastMeta[room.code] = key;
+  bcastAll(room, { type: 'meta', s: room.score.slice(), t: room.timeLeft, g: room.gameOver ? 1 : 0 });
 }
 
 // ── GOL ──────────────────────────────────────────────────
@@ -236,6 +248,7 @@ function tick(room) {
   if (now - room.lastBcast >= BCAST_MS) {
     room.lastBcast = now;
     bcastAll(room, serializeState(room));
+    broadcastMeta(room);
   }
 }
 
@@ -293,9 +306,17 @@ wss.on('connection', ws => {
     if (!myRoom || !myPid) return;
 
     if (type === 'input') {
-      myRoom.inputs[myPid] = payload;
-      // usa il ts per calcolare ping
-      if (payload.ts) send(ws, { type: 'pong', ts: payload.ts });
+      // payload: bitmask b (up=1,dn=2,lt=4,rt=8,kick=16), inviato solo sui cambi
+      const b = payload.b || 0;
+      myRoom.inputs[myPid] = {
+        up: !!(b & 1), dn: !!(b & 2), lt: !!(b & 4), rt: !!(b & 8), kick: !!(b & 16)
+      };
+      return;
+    }
+
+    if (type === 'ping') {
+      // client manda ts ogni 2s; server risponde con pong
+      send(ws, { type: 'pong', ts: payload.ts });
       return;
     }
 
@@ -314,7 +335,8 @@ wss.on('connection', ws => {
     }
 
     if (type === 'chat') {
-      bcastAll(myRoom, { type: 'chat', pid: myPid, name: payload.name, text: payload.text, ts: Date.now() });
+      // ts rimosso: non usato dal renderer
+      bcastAll(myRoom, { type: 'chat', pid: myPid, name: payload.name, text: payload.text });
       return;
     }
 
@@ -357,8 +379,12 @@ wss.on('connection', ws => {
           else { p.x = team===0 ? W*0.25 : W*0.75; p.y = H/2 + (Math.random()-.5)*80; p.vx=0; p.vy=0; }
         }
       }
-      syncRoster(myRoom);
-      bcastAll(myRoom, { type: 'team_change', pid, team, roster: buildRoster(myRoom) });
+      // aggiorna roster locale ma NON fare syncRoster (evita pm_update ridondante)
+      // il client aggiorna localmente con team_change {pid, team}
+      const roster = buildRoster(myRoom);
+      myRoom.roster = roster;
+      // manda solo il delta: pid + nuovo team (+ roster completo per chi entra in prematch)
+      bcastAll(myRoom, { type: 'team_change', pid, team });
       return;
     }
 
@@ -375,7 +401,8 @@ wss.on('connection', ws => {
     if (type === 'transfer') {
       if (myPid !== myRoom.hostPid) return;
       myRoom.hostPid = payload.pid;
-      bcastAll(myRoom, { type: 'pm_update', roster: buildRoster(myRoom), hostId: myRoom.hostPid });
+      // solo il nuovo hostId cambia: roster invariato
+      bcastAll(myRoom, { type: 'host_change', hostId: myRoom.hostPid });
       return;
     }
 
@@ -392,10 +419,9 @@ wss.on('connection', ws => {
     if (!myRoom) return;
     myRoom.clients.delete(ws);
     delete myRoom.inputs[myPid];
+    delete _lastMeta[myRoom.code]; // resetta cache meta alla disconnessione
     myRoom.afkSet.delete(myPid);
-    // rimuovi player in-game
     myRoom.players = myRoom.players.filter(p => p.id !== myPid);
-    // se era l'host, passa il ruolo al prossimo
     if (myPid === myRoom.hostPid) {
       const next = [...myRoom.clients.values()][0];
       if (next) myRoom.hostPid = next.pid;

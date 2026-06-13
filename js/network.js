@@ -1,76 +1,209 @@
-// ── NETWORK — Supabase, broadcast, sync ─────────────────
-const SUPABASE_URL = 'https://qtmqdeluofnwhtftjnkc.supabase.co';
-const SUPABASE_KEY = 'sb_publishable_WzKJ-bi-KddPFEbUw30Avw_RzoIHZ4r';
-const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+// ── NETWORK — WebSocket client (server autoritativo) ────
+// Il server gira su Render; la fisica è tutta server-side.
+// Tutti i client sono "guest": mandano input, ricevono state.
 
-// ── STATE (host -> guest), ~30Hz ────────────────────────
-// players[] ha ordine deterministico (stesso roster su host e guest),
-// quindi sincronizziamo per indice: niente id/team ripetuti ogni frame.
-// Numeri arrotondati per ridurre la dimensione del JSON.
-function serializeState() {
-  return {
-    p: players.map(p => [
-      Math.round(p.x), Math.round(p.y),
-      Math.round(p.vx*100)/100, Math.round(p.vy*100)/100,
-      p.charge, p.held?1:0
-    ]),
-    b: [Math.round(ball.x), Math.round(ball.y), Math.round(ball.vx*100)/100, Math.round(ball.vy*100)/100],
-    c: goalCD
-  };
+const WS_URL = 'wss://haxball-9dkw.onrender.com';
+
+let ws = null;
+let wsRoom = null; // codice stanza corrente
+
+// ── CONNESSIONE ─────────────────────────────────────────
+function wsConnect(onOpen) {
+  if (ws && ws.readyState <= 1) ws.close();
+  ws = new WebSocket(WS_URL);
+  ws.onopen = () => { console.log('[WS] connesso'); if (onOpen) onOpen(); };
+  ws.onmessage = e => { try { handleServerMsg(JSON.parse(e.data)); } catch(err){ console.error('[WS] parse error', err); } };
+  ws.onerror   = e => console.error('[WS] errore', e);
+  ws.onclose   = () => { console.log('[WS] chiuso'); handleWsClose(); };
+}
+function wsSend(obj) {
+  if (ws && ws.readyState === 1) ws.send(JSON.stringify(obj));
 }
 
-// score/timer/gameOver cambiano raramente: pacchetto "meta" separato,
-// inviato solo quando uno di questi valori cambia davvero.
-let lastMetaSent = null;
-function broadcastState() {
-  if(!channel) return;
-  channel.send({type:'broadcast', event:'state', payload:serializeState()});
-  const m = [score[0], score[1], timeLeft, gameOver?1:0];
-  if(!lastMetaSent || m[0]!==lastMetaSent[0] || m[1]!==lastMetaSent[1] || m[2]!==lastMetaSent[2] || m[3]!==lastMetaSent[3]) {
-    lastMetaSent = m;
-    channel.send({type:'broadcast', event:'meta', payload:{s:[m[0],m[1]], t:m[2], g:m[3]}});
+// ── GESTIONE MESSAGGI DAL SERVER ────────────────────────
+function handleServerMsg(msg) {
+  switch (msg.type) {
+
+    case 'created':
+      // host confermato
+      hostId = myPlayerId; isHost = true;
+      $('room-code-shown').textContent = msg.code;
+      $('card-wait').style.display = 'block';
+      $('card-join').style.display = 'none';
+      setStatus('');
+      updateWaitingCard();
+      break;
+
+    case 'joined':
+      // guest: entra nella sala
+      pmRoster = msg.roster;
+      hostId   = msg.hostId;
+      setStatus('');
+      $('card-join').style.display  = 'none';
+      $('lobby').style.display      = 'none';
+      showPrematch();
+      break;
+
+    case 'pm_update':
+      pmRoster = msg.roster;
+      if (msg.hostId) { hostId = msg.hostId; isHost = (msg.hostId === myPlayerId); }
+      updateWaitingCard();
+      if ($('game-menu').classList.contains('open')) renderPmRoster();
+      break;
+
+    case 'start':
+      pmRoster = msg.roster;
+      hostId   = msg.hostId;
+      isHost   = (msg.hostId === myPlayerId);
+      closeMenu();
+      // tutti sono guest (fisica server-side)
+      startGame('guest', pmRoster);
+      break;
+
+    case 'restarted':
+      reset(true); updateHUD();
+      break;
+
+    case 'state':
+      remoteState = msg;
+      applyRemoteState();
+      break;
+
+    case 'meta':
+      // score/timer/gameOver arrivano solo quando cambiano
+      score = msg.s; timeLeft = msg.t; updateHUD();
+      if (msg.g && !gameOver) { gameOver = true; }
+      break;
+
+    case 'pong':
+      if (msg.ts) {
+        pingMs = ~~((Date.now() - msg.ts) / 2);
+        $('ping').textContent = `ping:${pingMs}ms`;
+      }
+      break;
+
+    case 'goal':
+      score = msg.score;
+      updateHUD();
+      setMsg(`⚽ GOOOL! ${msg.team===0?'🔴 ROSSI':'🔵 BLU'}! (${score[0]}–${score[1]})`);
+      goalBurst(msg.team===0 ? FL.l : FL.r, H/2);
+      const gf = $('goal-flash');
+      gf.style.opacity = '1'; setTimeout(() => gf.style.opacity = '0', 140);
+      goalCD = 140;
+      break;
+
+    case 'game_over':
+      score = msg.score; updateHUD();
+      gameOver = true;
+      const res = score[0]>score[1] ? `🏆 Vincono i ROSSI! (${score[0]}–${score[1]})` :
+                  score[1]>score[0] ? `🏆 Vincono i BLU! (${score[0]}–${score[1]})` :
+                  `🤝 Pareggio! (${score[0]}–${score[1]})`;
+      setMsg(res + ' — Restart per rigiocare');
+      break;
+
+    case 'chat':
+      pushChatMsg({ pid: msg.pid, name: msg.name, text: msg.text }, msg.pid === myPlayerId);
+      break;
+
+    case 'afk':
+      if (msg.afk) afkPlayers.add(msg.pid); else afkPlayers.delete(msg.pid);
+      if ($('game-menu').classList.contains('open')) renderPmRoster();
+      break;
+
+    case 'skin':
+      playerSkins[msg.pid] = msg.skin;
+      break;
+
+    case 'team_change':
+      // delta minimale: aggiorna solo il giocatore interessato nel roster locale
+      {
+        const r = pmRoster.find(x => x.id === msg.pid);
+        if (r) r.team = msg.team;
+        const p = players.find(x => x.id === msg.pid);
+        if (p) p.team = msg.team;
+      }
+      if ($('game-menu').classList.contains('open')) renderPmRoster();
+      break;
+
+    case 'host_change':
+      hostId = msg.hostId;
+      isHost = (msg.hostId === myPlayerId);
+      if ($('game-menu').classList.contains('open')) { renderPmRoster(); openMenu(menuContext); }
+      break;
+
+    case 'player_left':
+      pmRoster = pmRoster.filter(r => r.id !== msg.pid);
+      players  = players.filter(p => p.id !== msg.pid);
+      if ($('game-menu').classList.contains('open')) renderPmRoster();
+      pushChatMsg({ pid:'system', name:'Sistema', text:`${msg.pid} ha lasciato la stanza`, ts:Date.now() }, false);
+      break;
+
+    case 'kicked':
+      alert('Sei stato rimosso dalla stanza dall\'admin.');
+      leaveGame();
+      break;
+
+    case 'error':
+      setStatus('Errore: ' + msg.msg);
+      break;
   }
 }
 
-// ── INPUT (guest -> host) ───────────────────────────────
-// up|dn|lt|rt|kick -> bitmask 0-31, inviato solo quando cambia.
-let lastSentInputMask = -1;
+// ── APPLY REMOTE STATE (client) ──────────────────────
+// I players arrivano come array posizionale parallelo a room.players
+// L'ordine è deterministico perché deriva dallo stesso roster già ricevuto con 'start'
+function applyRemoteState() {
+  const s = remoteState;
+  if (!s || !s.p) return;
+  const L = 0.55;
+  for (let i = 0; i < s.p.length && i < players.length; i++) {
+    const sp = s.p[i], p = players[i];
+    p.x = lerp(p.x, sp[0], L); p.y = lerp(p.y, sp[1], L);
+    p.vx = sp[2]; p.vy = sp[3]; p.charge = sp[4]; p.held = !!sp[5];
+  }
+  // rimuovi/aggiungi giocatori se la lunghezza cambia (join/leave in-game)
+  if (s.p.length !== players.length) {
+    // mismatch: forza resync al prossimo pm_update/team_change
+    return;
+  }
+  if (s.b) {
+    const b = s.b;
+    ball.x = lerp(ball.x, b[0], L); ball.y = lerp(ball.y, b[1], L);
+    ball.vx = b[2]; ball.vy = b[3];
+  }
+  if (s.gc !== undefined) goalCD = s.gc;
+}
+
+// ── SEND INPUT (chiamato ogni frame dal loop guest) ──────
+let _lastInputMask = -1;
 function sendGuestInput() {
-  if(!channel || !myPlayerId) return;
+  if (!ws || ws.readyState !== 1 || !myPlayerId) return;
+  const me = pmRoster.find(r => r.id === myPlayerId);
+  if (me && me.team === -1) return; // spettatori non mandano input
   const inp = inpLocal();
   const mask = (inp.up?1:0)|(inp.dn?2:0)|(inp.lt?4:0)|(inp.rt?8:0)|(inp.kick?16:0);
-  if(mask === lastSentInputMask) return;
-  lastSentInputMask = mask;
-  channel.send({type:'broadcast', event:'input', payload:{id:myPlayerId, b:mask}});
+  if (mask === _lastInputMask) return; // invia solo sui cambi
+  _lastInputMask = mask;
+  wsSend({ type: 'input', payload: { b: mask } });
 }
 
-function applyRemoteState() {
-  if(!remoteState) return;
-  // Usa L più alto per ridurre lag visivo: il guest segue l'host più rapidamente
-  const s = remoteState, L = 0.55;
-  for(let i=0; i<players.length && i<s.p.length; i++) {
-    const p = players[i], sp = s.p[i];
-    p.x=lerp(p.x,sp[0],L); p.y=lerp(p.y,sp[1],L);
-    p.vx=sp[2]; p.vy=sp[3]; p.charge=sp[4]; p.held=!!sp[5];
-  }
-  ball.x = lerp(ball.x, s.b[0], L); ball.y = lerp(ball.y, s.b[1], L);
-  ball.vx = s.b[2]; ball.vy = s.b[3];
-  goalCD = s.c;
-}
+// Ping separato ogni 2s (non più agganciato all'input)
+setInterval(() => {
+  if (ws && ws.readyState === 1) wsSend({ type: 'ping', payload: { ts: Date.now() } });
+}, 2000);
 
-// ── CHAT ───────────────────────────────────────────────
+// ── CHAT ────────────────────────────────────────────────
 function sendChatMsg(text) {
-  if(!channel || !text.trim()) return;
-  const msg = {name:myNickname, text:text.trim()};
-  channel.send({type:'broadcast', event:'chat', payload:msg});
-  pushChatMsg(msg, true); // mostra subito localmente
+  const msg = { pid: myPlayerId, name: myNickname, text: text.trim() };
+  if (!ws || ws.readyState !== 1) { pushChatMsg(msg, true); return; }
+  wsSend({ type: 'chat', payload: { name: myNickname, text: text.trim() } });
+  pushChatMsg(msg, true);
 }
 function pushChatMsg(msg, isSelf) {
-  chatMessages.push({...msg, isSelf});
-  if(chatMessages.length > 80) chatMessages.shift();
+  chatMessages.push({ ...msg, isSelf });
+  if (chatMessages.length > 80) chatMessages.shift();
   renderChat();
-  // notifica rapida se chat chiusa
-  if(!chatOpen) showChatToast(msg);
+  if (!chatOpen) showChatToast(msg);
 }
 function showChatToast(msg) {
   const toast = $('chat-toast');
@@ -80,30 +213,72 @@ function showChatToast(msg) {
   toast._t = setTimeout(() => toast.classList.remove('show'), 3500);
 }
 function renderChat() {
-  const log = $('chat-log');
-  if(!log) return;
+  const log = $('chat-log'); if (!log) return;
   log.innerHTML = chatMessages.map(m =>
     `<div class="chat-msg${m.isSelf?' chat-self':''}">` +
-    `<span class="chat-nick">${m.name}</span>` +
+    `<span class="chat-nick">${escHtml(m.name)}</span>` +
     `<span class="chat-text">${escHtml(m.text)}</span></div>`
   ).join('');
   log.scrollTop = log.scrollHeight;
 }
-function escHtml(s) {
-  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-}
+function escHtml(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
-// ── ADMIN ACTIONS ──────────────────────────────────────
+// ── ADMIN ACTIONS ────────────────────────────────────────
 function adminKick(pid) {
-  if(!isHost || !channel) return;
-  channel.send({type:'broadcast', event:'admin_action', payload:{action:'kick', pid}});
-  // rimuovi dal roster (admin_action aggiorna già i guest)
+  if (!isHost) return;
+  wsSend({ type: 'kick', payload: { pid } });
   pmRoster = pmRoster.filter(r => r.id !== pid);
-  if($('game-menu').classList.contains('open')) renderPmRoster();
+  if ($('game-menu').classList.contains('open')) renderPmRoster();
 }
 function adminTransfer(pid) {
-  if(!isHost || !channel) return;
-  hostId = pid; isHost = false;
-  channel.send({type:'broadcast', event:'admin_action', payload:{action:'transfer', pid, newHostId:pid}});
-  if($('game-menu').classList.contains('open')) { renderPmRoster(); openMenu(menuContext); }
+  if (!isHost) return;
+  isHost = false; hostId = pid;
+  wsSend({ type: 'transfer', payload: { pid } });
+  if ($('game-menu').classList.contains('open')) { renderPmRoster(); openMenu(menuContext); }
+}
+function adminMoveTeamIngame(pid, team) {
+  if (!isHost) return;
+  wsSend({ type: 'team_change', payload: { pid, team } });
+  const r = pmRoster.find(x => x.id === pid); if (r) r.team = team;
+  if ($('game-menu').classList.contains('open')) renderPmRoster();
+}
+
+// ── AFK ─────────────────────────────────────────────────
+function toggleAfk() {
+  const isAfk = afkPlayers.has(myPlayerId);
+  const newAfk = !isAfk;
+  if (newAfk) {
+    afkPlayers.add(myPlayerId);
+    const r = pmRoster.find(x => x.id === myPlayerId);
+    if (r) { r._prevTeam = r.team; r.team = -1; }
+  } else {
+    afkPlayers.delete(myPlayerId);
+    const r = pmRoster.find(x => x.id === myPlayerId);
+    if (r) r.team = r._prevTeam ?? 0;
+  }
+  wsSend({ type: 'afk', payload: { afk: newAfk } });
+  if ($('game-menu').classList.contains('open')) renderPmRoster();
+  const txt = newAfk ? '👻 Sei ora AFK (spettatore)' : '✅ Sei tornato in gioco';
+  pushChatMsg({ pid:'system', name:'Sistema', text:txt, ts:Date.now() }, true);
+}
+
+// ── SKIN ─────────────────────────────────────────────────
+function setSkin(skinVal) {
+  mySkin = skinVal.slice(0, 2);
+  playerSkins[myPlayerId] = mySkin;
+  localStorage.setItem('hax_skin', mySkin);
+  wsSend({ type: 'skin', payload: { skin: mySkin } });
+}
+
+// ── DISCONNECT / LEAVE ───────────────────────────────────
+function handleWsClose() {
+  // se era in-game torna alla lobby
+  if ($('game').style.display !== 'none' || $('game-menu').classList.contains('open')) {
+    setStatus('Connessione persa.');
+    showLobby();
+  }
+}
+function wsLeave() {
+  if (ws) { ws.close(); ws = null; }
+  wsRoom = null;
 }
