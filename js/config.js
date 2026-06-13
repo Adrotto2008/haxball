@@ -1,10 +1,10 @@
 // ── CONFIG — costanti globali ──────────────────────────
-const VERSION = '1.9.0';
+const VERSION = '2.0.0';
 const W = 1020, H = 600;
 const DPR = Math.min(window.devicePixelRatio||1, 2);
 
 const PR = 18, BR = 11;
-const P_SPEED = 2.0, P_ACCEL = 0.40, P_FRIC = 0.70;
+const P_SPEED = 2.3, P_ACCEL = 0.42, P_FRIC = 0.70;
 const B_FRIC = 0.984, B_BOUNCE = 0.80, B_HIT_R = 0.82;
 const KICK_MIN = 3.8, KICK_MAX = 14.0, KICK_CHG_F = 50;
 const KICK_DIST = PR + BR + 12;

@@ -32,6 +32,8 @@ function createRoom() {
     wsSend({ type: 'create', payload: { pid: myPlayerId, name: myNickname, code, skin: mySkin } });
     setStatus('');
   });
+  // Vai subito in prematch: il codice verrà mostrato lì dentro
+  // (il roster si popola man mano che arrivano joined/pm_update)
 }
 
 // ── ENTRA IN STANZA ──────────────────────────────────────

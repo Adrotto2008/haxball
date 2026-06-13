@@ -25,13 +25,14 @@ function handleServerMsg(msg) {
   switch (msg.type) {
 
     case 'created':
-      // host confermato
       hostId = myPlayerId; isHost = true;
-      $('room-code-shown').textContent = msg.code;
-      $('card-wait').style.display = 'block';
+      pmRoster = [{ id: myPlayerId, name: myNickname, team: 0, skin: mySkin, afk: false }];
+      // vai subito in prematch, mostra il codice nel menu
+      $('card-wait').style.display = 'none';
       $('card-join').style.display = 'none';
-      setStatus('');
-      updateWaitingCard();
+      showPrematch();
+      // mostra il codice stanza nella prematch (riuso #room-code-shown se esiste, altrimenti chat)
+      sysMsg(`🏠 Stanza creata! Codice: ${msg.code} — condividilo con gli amici`);
       break;
 
     case 'joined':
@@ -56,8 +57,11 @@ function handleServerMsg(msg) {
       hostId   = msg.hostId;
       isHost   = (msg.hostId === myPlayerId);
       closeMenu();
-      // tutti sono guest (fisica server-side)
       startGame('guest', pmRoster);
+      if (msg.lateJoin) {
+        // entrato a partita in corso: mostra messaggio e apri chat
+        sysMsg('👋 Sei entrato come spettatore. L\'host può spostarti in una squadra.');
+      }
       break;
 
     case 'restarted':
@@ -292,15 +296,22 @@ function toggleAfk() {
     afkPlayers.add(myPlayerId);
     const r = pmRoster.find(x => x.id === myPlayerId);
     if (r) { r._prevTeam = r.team; r.team = -1; }
+    // nasconde il player locale dalla visuale
+    const p = players.find(x => x.id === myPlayerId);
+    if (p) { p.team = -1; p.x = -9999; p.y = -9999; p.vx = 0; p.vy = 0; }
   } else {
     afkPlayers.delete(myPlayerId);
     const r = pmRoster.find(x => x.id === myPlayerId);
-    if (r) r.team = r._prevTeam ?? 0;
+    const prevTeam = r?._prevTeam ?? 0;
+    if (r) r.team = prevTeam;
+    // riporta il player in campo (il server manderà la posizione reale al prossimo state)
+    const p = players.find(x => x.id === myPlayerId);
+    if (p) { p.team = prevTeam; p.vx = 0; p.vy = 0; }
   }
   wsSend({ type: 'afk', payload: { afk: newAfk } });
   if ($('game-menu').classList.contains('open')) renderPmRoster();
   const txt = newAfk ? '👻 Sei ora AFK (spettatore)' : '✅ Sei tornato in gioco';
-  pushChatMsg({ pid:'system', name:'Sistema', text:txt, ts:Date.now() }, true);
+  pushChatMsg({ pid:'system', name:'Sistema', text:txt }, true);
 }
 
 // ── SKIN ─────────────────────────────────────────────────

@@ -4,6 +4,21 @@ Questo file tiene traccia delle modifiche e delle nuove funzionalità introdotte
 
 ---
 
+## v2.0.0 — Allenamento client-side, join in-game, UX lobby e fix vari
+
+### ✨ Novità
+- **Modalità allenamento completamente client-side** (`js/game.js`): la fisica, i gol e il timer vengono ora simulati localmente senza toccare il server. Funziona offline, restart immediato.
+- **Join durante la partita** (`server.js`, `js/network.js`): un giocatore può connettersi a una stanza anche a partita già iniziata. Entra automaticamente come spettatore, riceve lo stato corrente, e appare un messaggio in chat per tutti. L'host può spostarlo in una squadra dal menu.
+- **Host va subito in prematch** (`js/lobby.js`, `js/network.js`): dopo aver creato la stanza, l'host non aspetta più nella schermata principale ma viene portato direttamente nel menu pre-partita. Il codice stanza appare come messaggio di sistema in chat.
+- **Chat si apre con Invio** (`js/input.js`): premere Enter durante il gioco apre la chat. Se la chat è già aperta, Enter invia il messaggio (già funzionava).
+- **Player più veloci**: `P_SPEED` da 2.0 a 2.3, `P_ACCEL` da 0.40 a 0.42 (`js/config.js`, `server.js`).
+
+### 🔧 Fix
+- **Fix /afk** (`js/network.js`): il player locale ora viene nascosto correttamente (`x=-9999`) quando va AFK, e il team viene ripristinato correttamente al ritorno. Prima il player rimaneva visibile come fantasma in alto a sinistra e non riusciva più a muoversi dopo il secondo toggle.
+- **Host può spostare se stesso** (`js/prematch.js`): rimosso il blocco `r.id !== myPlayerId` per l'host nel roster del prematch.
+
+---
+
 ## v1.9.0 — Timestep fisso, palla fluida, frizione corretta
 
 ### 🔧 Fix

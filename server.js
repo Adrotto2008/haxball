@@ -8,7 +8,7 @@ const http = require('http');
 // ── CONFIG (specchio di config.js) ──────────────────────
 const W = 1020, H = 600;
 const PR = 18, BR = 11;
-const P_SPEED = 2.0, P_ACCEL = 0.40, P_FRIC = 0.70;
+const P_SPEED = 2.3, P_ACCEL = 0.42, P_FRIC = 0.70;
 const B_FRIC = 0.984, B_BOUNCE = 0.80, B_HIT_R = 0.82;
 const KICK_MIN = 3.8, KICK_MAX = 14.0, KICK_CHG_F = 50;
 const KICK_DIST = PR + BR + 12;
@@ -294,13 +294,28 @@ wss.on('connection', ws => {
       myPid = pid;
       myRoom = rooms.get(code);
       if (!myRoom) { send(ws, { type: 'error', msg: 'Stanza non trovata' }); return; }
-      // auto-team bilanciato
-      const reds  = [...myRoom.clients.values()].filter(c => c.team === 0).length;
-      const blues = [...myRoom.clients.values()].filter(c => c.team === 1).length;
-      const team  = reds <= blues ? 0 : 1;
+      // auto-team bilanciato, ma se la partita è già iniziata entra come spettatore
+      let team;
+      if (myRoom.started) {
+        team = -1; // spettatore, potrà essere spostato dall'host
+      } else {
+        const reds  = [...myRoom.clients.values()].filter(c => c.team === 0).length;
+        const blues = [...myRoom.clients.values()].filter(c => c.team === 1).length;
+        team = reds <= blues ? 0 : 1;
+      }
       myRoom.clients.set(ws, { pid, name, team, skin: payload.skin || '', afk: false });
-      syncRoster(myRoom);
-      send(ws, { type: 'joined', code, hostId: myRoom.hostPid, roster: buildRoster(myRoom) });
+      if (myRoom.started) {
+        // aggiunge il player fisico come spettatore parcheggiato fuori campo
+        myRoom.players.push({ id: pid, team: -1, col: '#555', x: -9999, y: -9999, vx: 0, vy: 0, r: PR, charge: 0, held: false });
+        // notifica tutti con messaggio in chat
+        bcastAll(myRoom, { type: 'chat', pid: 'system', name: 'Sistema', text: `👋 ${name} è entrato come spettatore` });
+        // manda al nuovo arrivato lo stato completo per sincronizzarsi
+        send(ws, { type: 'start', roster: buildRoster(myRoom), hostId: myRoom.hostPid, lateJoin: true });
+        syncRoster(myRoom);
+      } else {
+        syncRoster(myRoom);
+        send(ws, { type: 'joined', code, hostId: myRoom.hostPid, roster: buildRoster(myRoom) });
+      }
       return;
     }
 

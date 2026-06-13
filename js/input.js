@@ -20,8 +20,10 @@ document.addEventListener('keydown', e => {
     if(m) { setView(parseInt(m[1])); return; }
   }
   if(e.code === 'Escape' && $('game').style.display !== 'none') { toggleEscMenu(); return; }
-  if(e.code === 'Backslash' && $('game').style.display !== 'none' && !$('game-menu').classList.contains('open')) {
-    e.preventDefault(); toggleChat(); return;
+  // Backslash o Enter aprono la chat (Enter solo se il gioco è attivo e la chat è chiusa)
+  if($('game').style.display !== 'none' && !$('game-menu').classList.contains('open')) {
+    if(e.code === 'Backslash') { e.preventDefault(); toggleChat(); return; }
+    if(e.code === 'Enter' && !chatOpen) { e.preventDefault(); toggleChat(true); return; }
   }
 });
 document.addEventListener('keyup', e => { keys[e.code] = false; });

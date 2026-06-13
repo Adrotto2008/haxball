@@ -11,25 +11,34 @@ let physAccum = 0;
 function update(dt) {
   if(gameOver || escOpen) return;
   if(goalCD>0) { goalCD--; return; }
-  sendGuestInput();
-  if(netMode === 'guest') {
-    // Accumula dt e avanza di tick fissi da 16.67ms.
-    // A 60Hz → 1 tick/frame. A 120/144Hz → alterna 0/1 tick.
-    // Senza questo, su 120Hz il dead reckoning gira 2x veloce
-    // → entità avanzano troppo → snap all'indietro ad ogni pacchetto.
+
+  if(netMode === 'train') {
+    // ── ALLENAMENTO: fisica completa client-side ──────────
+    const p = players[0];
+    if(p) applyInput(p, inpLocal(), ball);
+    // fisica palla
+    ball.x += ball.vx; ball.y += ball.vy;
+    ball.vx *= B_FRIC; ball.vy *= B_FRIC;
+    // bordi palla
+    const inGoal = ball.y > GY && ball.y < GY + GH;
+    if(ball.x - BR < FL.l) { if(inGoal){ score[1]++; updateHUD(); setMsg(`⚽ BLU! (${score[0]}–${score[1]})`); goalCD=90; resetLocal(false); } else { ball.x=FL.l+BR; ball.vx*=-B_BOUNCE; } }
+    if(ball.x + BR > FL.r) { if(inGoal){ score[0]++; updateHUD(); setMsg(`⚽ ROSSO! (${score[0]}–${score[1]})`); goalCD=90; resetLocal(false); } else { ball.x=FL.r-BR; ball.vx*=-B_BOUNCE; } }
+    if(ball.y - BR < FL.t){ ball.y=FL.t+BR; ball.vy*=-B_BOUNCE; }
+    if(ball.y + BR > FL.b){ ball.y=FL.b-BR; ball.vy*=-B_BOUNCE; }
+    // timer
+    if(timeLeft>0){ secondAccum+=dt; if(secondAccum>=1000){secondAccum-=1000;timeLeft--;updateHUD();} }
+    if(timeLeft<=0 && !gameOver){ gameOver=true; setMsg('Fine allenamento — Restart per rigiocare'); }
+  } else {
+    // ── GUEST: dead reckoning server-autoritativo ─────────
+    sendGuestInput();
     physAccum = Math.min(physAccum + dt, PHYS_TICK * 4);
-    while(physAccum >= PHYS_TICK) {
-      tickRemotePhysics();
-      physAccum -= PHYS_TICK;
-    }
+    while(physAccum >= PHYS_TICK) { tickRemotePhysics(); physAccum -= PHYS_TICK; }
+    if(timeLeft>0){ secondAccum+=dt; if(secondAccum>=1000){secondAccum-=1000;timeLeft--;updateHUD();} }
   }
+
   tickParticles();
   const myP = players.find(p=>p.id===myPlayerId);
   if(myP && isTouchDev()) drawKickArc(myP.charge/KICK_CHG_F);
-  if(timeLeft>0) {
-    secondAccum += dt;
-    if(secondAccum>=1000) { secondAccum-=1000; timeLeft--; updateHUD(); }
-  }
 }
 
 // ── GOL / FINE ─────────────────────────────────────────
@@ -51,6 +60,15 @@ function updateHUD() {
   $('sr').textContent=score[0]; $('sb').textContent=score[1];
   const m=Math.floor(timeLeft/60), s=timeLeft%60;
   $('timer').textContent = m+':'+(s<10?'0':'')+s;
+}
+
+// ── RESET CLIENT-SIDE (solo allenamento) ───────────────
+function resetLocal(full) {
+  ball = mkBall();
+  if(full) { score=[0,0]; timeLeft=MATCH_TIME; gameOver=false; secondAccum=0; }
+  goalCD = 90;
+  const p = players[0];
+  if(p) { p.x=FL.l+(FL.r-FL.l)*0.25; p.y=H/2; p.vx=0; p.vy=0; p.charge=0; p.held=false; }
 }
 
 // ── BUILD PLAYERS / BALL / RESET ────────────────────────

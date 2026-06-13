@@ -61,8 +61,8 @@ function renderPmRoster() {
     const isMe    = r.id === myPlayerId;
     const isAdmin = r.id === hostId;
     const isAfk   = afkPlayers.has(r.id);
-    // admin può cliccare sempre (anche in-game per spostare), ma non i giocatori AFK
-    const canClick = isHost && !isAfk && r.id !== myPlayerId;
+    // l'host può cliccare tutti, incluso se stesso
+    const canClick = isHost && !isAfk;
 
     el.className = 'pm-player' +
       (isMe    ? ' me'          : '') +
@@ -176,7 +176,7 @@ function backToPrematch() {
 
 $('pm-btn-start').onclick = hostStartMatch;
 $('esc-resume').onclick   = () => closeMenu();
-$('esc-restart').onclick  = () => { closeMenu(); if(isHost) wsSend({type:'restart',payload:{}}); else if(netMode==='train'){reset(true);updateHUD();} };
+$('esc-restart').onclick  = () => { closeMenu(); if(netMode==='train'){ resetLocal(true); updateHUD(); } else if(isHost) wsSend({type:'restart',payload:{}}); };
 $('esc-leave').onclick    = () => { closeMenu(); leaveGame(); };
 
 // ── CHAT + COMANDI ─────────────────────────────────────
