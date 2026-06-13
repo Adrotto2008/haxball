@@ -11,6 +11,9 @@ function update(dt) {
   const myP = players.find(p=>p.id===myPlayerId);
   if(myP && myP.team !== -1) applyInput(myP, inpLocal());
   sendGuestInput();
+  // dead reckoning: muovi i giocatori remoti con la loro ultima velocità nota
+  // così si muovono fluidamente a 60fps anche tra i 30Hz di state dal server
+  if(netMode === 'guest') tickRemotePhysics();
   tickParticles();
   if(myP && isTouchDev()) drawKickArc(myP.charge/KICK_CHG_F);
   // timer visuale (il server è autoritativo, ma aggiorni HUD in anticipo)

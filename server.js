@@ -17,7 +17,8 @@ const FL = { l: 40, r: W - 40, t: 40, b: H - 40 };
 const GH = 120, GW = 12, GY = H / 2 - 60;
 const TEAM_COLS = ['#ff3333', '#3388ff'];
 const TICK_MS  = 1000 / 60;   // fisica a 60fps
-const BCAST_MS = 33;           // broadcast a ~30fps
+const BCAST_MS = 1000 / 60;   // broadcast a 60fps (il dead reckoning client
+                               // riduce il payload percepito, 60Hz elimina drift)
 
 // ── PHYSICS (identica a physics.js) ─────────────────────
 function circleCollide(a, b, res) {
