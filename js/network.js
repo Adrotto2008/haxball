@@ -157,18 +157,16 @@ function applyRemoteState() {
   if (!s || !s.p) return;
   for (let i = 0; i < s.p.length && i < players.length; i++) {
     const sp = s.p[i], p = players[i];
-    // Il giocatore locale NON viene corretto dal server state:
-    // la client prediction lo gestisce già. Correggerlo causerebbe
-    // rubber-banding ("tu laggi" mentre gli altri sembrano fluidi).
-    if (p.id === myPlayerId) continue;
     const dx = sp[0] - p.x, dy = sp[1] - p.y;
     const dist = Math.hypot(dx, dy);
+    // Snap se troppo lontano (respawn/gol), altrimenti lerp aggressivo
     if (dist > 80) {
       p.x = sp[0]; p.y = sp[1];
-    } else {
-      const L = Math.min(0.85, 0.5 + dist * 0.01);
+    } else if (dist > 1) {
+      const L = Math.min(0.9, 0.6 + dist * 0.012);
       p.x += dx * L; p.y += dy * L;
     }
+    // Aggiorna velocità per dead reckoning (tutti, incluso locale)
     p.vx = sp[2]; p.vy = sp[3]; p.charge = sp[4]; p.held = !!sp[5];
   }
   if (s.p.length !== players.length) return;
@@ -178,8 +176,8 @@ function applyRemoteState() {
     const bdist = Math.hypot(bdx, bdy);
     if (bdist > 120) {
       ball.x = b[0]; ball.y = b[1];
-    } else {
-      const L = Math.min(0.85, 0.5 + bdist * 0.01);
+    } else if (bdist > 1) {
+      const L = Math.min(0.9, 0.6 + bdist * 0.012);
       ball.x += bdx * L; ball.y += bdy * L;
     }
     ball.vx = b[2]; ball.vy = b[3];
@@ -187,14 +185,12 @@ function applyRemoteState() {
   if (s.gc !== undefined) goalCD = s.gc;
 }
 
-// Dead reckoning: tra un pacchetto e l'altro, muovi SOLO i remoti con la loro velocità
-// Il giocatore locale è già mosso da applyInput (client prediction), non va toccato.
-// La palla NON viene mossa qui: è già inclusa nel server state e il lerp in applyRemoteState
-// la gestisce. Muoverla anche qui causerebbe doppio movimento.
+// Dead reckoning: muovi tutti i player e la palla con l'ultima velocità nota.
+// Il server corregge la posizione reale ad ogni pacchetto (60Hz);
+// questo riempie i ~16ms di gap visivamente senza prediction separata.
 function tickRemotePhysics() {
   for (const p of players) {
-    if (p.id === myPlayerId) continue; // locale: già mosso da applyInput
-    if (p.team === -1) continue;       // spettatori: parcheggiati fuori campo
+    if (p.team === -1) continue;
     p.x += p.vx; p.y += p.vy;
     p.vx *= P_FRIC; p.vy *= P_FRIC;
     if (p.x < FL.l + p.r) p.x = FL.l + p.r;
@@ -202,6 +198,12 @@ function tickRemotePhysics() {
     if (p.y < FL.t + p.r) p.y = FL.t + p.r;
     if (p.y > FL.b - p.r) p.y = FL.b - p.r;
   }
+  ball.x += ball.vx; ball.y += ball.vy;
+  ball.vx *= B_FRIC; ball.vy *= B_FRIC;
+  if (ball.x - BR < FL.l) { ball.x = FL.l + BR; ball.vx *= -B_BOUNCE; }
+  if (ball.x + BR > FL.r) { ball.x = FL.r - BR; ball.vx *= -B_BOUNCE; }
+  if (ball.y - BR < FL.t) { ball.y = FL.t + BR; ball.vy *= -B_BOUNCE; }
+  if (ball.y + BR > FL.b) { ball.y = FL.b - BR; ball.vy *= -B_BOUNCE; }
 }
 
 // ── SEND INPUT (chiamato ogni frame dal loop guest) ──────

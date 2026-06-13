@@ -7,16 +7,14 @@
 function update(dt) {
   if(gameOver || escOpen) return;
   if(goalCD>0) { goalCD--; return; }
-  // client-side prediction: applica input locale sul proprio player
-  const myP = players.find(p=>p.id===myPlayerId);
-  if(myP && myP.team !== -1) applyInput(myP, inpLocal());
   sendGuestInput();
-  // dead reckoning: muovi i giocatori remoti con la loro ultima velocità nota
-  // così si muovono fluidamente a 60fps anche tra i 30Hz di state dal server
+  // Dead reckoning: tutti i player (incluso locale) vengono mossi
+  // con la loro ultima velocità nota tra un pacchetto e l'altro.
+  // Il server è autoritativo: applyRemoteState corregge ogni ~16ms.
   if(netMode === 'guest') tickRemotePhysics();
   tickParticles();
+  const myP = players.find(p=>p.id===myPlayerId);
   if(myP && isTouchDev()) drawKickArc(myP.charge/KICK_CHG_F);
-  // timer visuale (il server è autoritativo, ma aggiorni HUD in anticipo)
   if(timeLeft>0) {
     secondAccum += dt;
     if(secondAccum>=1000) { secondAccum-=1000; timeLeft--; updateHUD(); }

@@ -4,6 +4,14 @@ Questo file tiene traccia delle modifiche e delle nuove funzionalità introdotte
 
 ---
 
+## v1.7.0 — Rimozione client prediction, server completamente autoritativo
+
+### 🔧 Fix
+- **Rimossa client prediction sul giocatore locale** (`js/game.js`): `applyInput` non viene più chiamato sul proprio player nel loop guest. La prediction causava posizioni visive non reali (il giocatore sembrava andare più veloce delle collisioni effettive).
+- **Dead reckoning esteso a tutti** (`js/network.js` → `tickRemotePhysics`): ora muove tutti i player (incluso il locale) e la palla con l'ultima velocità nota tra un pacchetto e l'altro. Il server corregge ad ogni pacchetto (60Hz) tramite lerp adattivo.
+- **`applyRemoteState` corregge tutti** (`js/network.js`): rimossa l'eccezione `myPlayerId`. Il server è l'unica fonte di verità per le posizioni.
+- Lerp adattivo leggermente più aggressivo (L max 0.9 invece di 0.85).
+
 ## v1.6.0 — Fix rubber-banding + dead reckoning corretto
 
 ### 🔧 Fix
