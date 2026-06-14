@@ -4,6 +4,18 @@ Questo file tiene traccia delle modifiche e delle nuove funzionalità introdotte
 
 ---
 
+## v2.4.0 — Fix nero late-join, movimento con rampa, modalità di gioco
+
+### 🔧 Fix
+- **Nero late-join definitivo** (`js/network-core.js`): quando si entra in una partita già avviata, ora vengono inizializzati esplicitamente `ball = mkBall()` e `players = buildPlayers(roster)` prima di chiamare `startLoop()`, e `$('game').display = 'flex'` viene impostato prima di `startLoop`. Questo previene crash silenziosi di `draw()` che lasciavano il canvas nero.
+- **`netMode = 'guest'`** impostato esplicitamente nel late-join: senza questo `sendGuestInput` non veniva mai chiamato e il player non poteva muoversi nemmeno dopo essere stato spostato dall'host.
+
+### ✨ Novità
+- **Movimento con accelerazione graduale** (`js/modes/soccer/config.js`, `server.js`): i player ora partono lenti e accelerano fino alla velocità massima (`P_SPEED_MAX = 3.8`). `P_ACCEL` ridotto a 0.22 (ci vogliono ~12 frame per arrivare a velocità di crociera), `P_FRIC = 0.78` (leggermente più alta per bilanciare). La velocità di crociera rimane simile a prima (~2.6), ma cambiare direzione brusca ora richiede un breve momento di decelerazione/riaccelero.
+- **Selezione modalità** (`index.html`, `js/lobby.js`, `css/lobby.css`): la card "Crea stanza" ora include un selettore modalità (attualmente solo ⚽ Calcio). La modalità scelta viene inviata al server nel payload `create`. Aggiunta anche la card `#card-train-mode` per la selezione modalità in allenamento. Nuovo `mode-picker` CSS riutilizzabile.
+
+---
+
 ## v2.3.0 — Fix multipli: nero, AFK, lobby realtime, prediction toggle, tasti
 
 ### 🔧 Fix

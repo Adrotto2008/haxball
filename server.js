@@ -8,7 +8,8 @@ const http = require('http');
 // ── CONFIG (specchio di config.js) ──────────────────────
 const W = 1020, H = 600;
 const PR = 18, BR = 11;
-const P_SPEED = 2.6, P_ACCEL = 0.46, P_FRIC = 0.70;
+const P_SPEED_MAX = 3.8, P_ACCEL = 0.22, P_FRIC = 0.78;
+const P_SPEED = P_SPEED_MAX; // alias usato in applyInput
 const B_FRIC = 0.984, B_BOUNCE = 0.80, B_HIT_R = 0.82;
 const KICK_MIN = 3.8, KICK_MAX = 14.0, KICK_CHG_F = 50;
 const KICK_DIST = PR + BR + 12;

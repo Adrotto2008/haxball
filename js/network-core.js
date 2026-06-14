@@ -77,15 +77,19 @@ function handleServerMsg(msg) {
       isHost   = (msg.hostId === myPlayerId);
       closeMenu();
       if (msg.lateJoin) {
-        players = buildPlayers(msg.roster);
+        // Inizializza lo stato minimo per non crashare il draw
+        if (!ball) ball = mkBall();
+        if (!players.length) players = buildPlayers(msg.roster);
         if(mySkin && myPlayerId) playerSkins[myPlayerId] = mySkin;
         $('game-menu').classList.remove('open');
-        $('lobby').style.display  = 'none';
-        $('game').style.display   = 'flex';   // canvas DEVE essere visibile prima di startLoop
+        $('lobby').style.display = 'none';
+        $('game').style.display  = 'flex';  // canvas deve essere nel DOM visibile
         const badge2 = $('net-badge'); badge2.textContent='GUEST'; badge2.className='badge-guest';
         $('btn-restart').style.display = 'none';
+        $('hud').style.display = 'flex';
         if(isTouchDev()) positionTouchLayer(); else hideTouchLayer();
         applyView();
+        netMode = 'guest';
         startLoop();
         sysMsg('👋 Sei entrato come spettatore. L\'host può spostarti in una squadra.');
       } else {
