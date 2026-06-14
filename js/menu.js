@@ -51,22 +51,13 @@ function toggleEscMenu(forceOpen) {
 }
 function showPrematch() {
   $('lobby').style.display  = 'none';
-  // mostra il canvas in background (evita il nero per i late joiner)
-  // ma nasconde HUD, ctrl-bar e touch
-  $('game').style.display   = 'flex';
-  $('hud').style.visibility       = 'hidden';
-  $('msg-bar').style.visibility   = 'hidden';
-  $('ctrl-bar').style.visibility  = 'hidden';
+  $('game').style.display   = 'none';
   if(isTouchDev()) $('touch-layer').style.display = 'none';
-  // avvia il loop di render se non era attivo
-  if (!running) { lastFrameTime = 0; running = true; requestAnimationFrame(loop); }
   openMenu('prematch');
 }
 
 function hidePrematch() {
-  $('hud').style.visibility       = '';
-  $('msg-bar').style.visibility   = '';
-  $('ctrl-bar').style.visibility  = '';
+  // no-op: mantenuta per compatibilità con le chiamate in game.js e lobby.js
 }
 
 // ── AVVIO / RITORNO PARTITA ────────────────────────────
