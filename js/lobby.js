@@ -12,10 +12,10 @@ function showLobby() {
   $('game-menu').classList.remove('open');
   $('chat-overlay').classList.remove('open');
   $('touch-layer').style.display = 'none';
-  $('card-create').style.display = 'none';
-  $('card-join').style.display   = 'none';
-  $('card-rooms').style.display  = 'none';
-  hidePrematch(); // ripristina HUD/ctrl-bar se erano nascosti
+  $('card-create').style.display    = 'none';
+  $('card-join').style.display      = 'none';
+  $('card-rooms').style.display     = 'none';
+  $('card-train-mode').style.display = 'none';
   const codeEl = $('gm-room-code');
   if (codeEl) { codeEl.textContent = ''; codeEl.style.display = 'none'; }
   stopLoop();
@@ -29,17 +29,37 @@ function updateWaitingCard() {
   $('btn-start-game').style.display = n >= 2 ? 'block' : 'none';
 }
 
+// ── MODE PICKER ─────────────────────────────────────────
+function initModePicker(pickerId) {
+  const picker = $(pickerId);
+  if (!picker) return;
+  picker.querySelectorAll('.mode-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      picker.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+    });
+  });
+}
+function getSelectedMode(pickerId) {
+  const picker = $(pickerId);
+  if (!picker) return 'soccer';
+  return picker.querySelector('.mode-btn.active')?.dataset.mode || 'soccer';
+}
+initModePicker('mode-picker-create');
+initModePicker('mode-picker-train');
+
 // ── CREA STANZA ──────────────────────────────────────────
 function createRoom() {
-  const roomName  = ($('room-name-input').value.trim() || 'Partita').slice(0, 24);
-  const password  = $('room-pw-input').value.trim().slice(0, 20);
+  const roomName = ($('room-name-input').value.trim() || 'Partita').slice(0, 24);
+  const password = $('room-pw-input').value.trim().slice(0, 20);
+  const mode     = getSelectedMode('mode-picker-create');
   myNickname = getNick();
   myPlayerId = uid();
   const code = genCode();
   wsRoom = code;
   setStatus('Connessione al server…');
   wsConnect(() => {
-    wsSend({ type: 'create', payload: { pid: myPlayerId, name: myNickname, code, roomName, password, skin: mySkin } });
+    wsSend({ type: 'create', payload: { pid: myPlayerId, name: myNickname, code, roomName, password, mode, skin: mySkin } });
     setStatus('');
   });
 }
@@ -121,29 +141,43 @@ function leaveGame() {
 
 // ── BUTTONS ──────────────────────────────────────────────
 $('btn-create').onclick     = () => {
-  $('card-join').style.display   = 'none';
-  $('card-rooms').style.display  = 'none';
-  $('card-create').style.display = 'block';
+  $('card-join').style.display       = 'none';
+  $('card-rooms').style.display      = 'none';
+  $('card-train-mode').style.display = 'none';
+  $('card-create').style.display     = 'block';
   $('room-name-input').focus();
 };
-$('btn-create-go').onclick  = () => createRoom();
+$('btn-create-go').onclick     = () => createRoom();
 $('btn-create-cancel').onclick = () => { $('card-create').style.display = 'none'; };
 
 $('btn-join-show').onclick  = () => {
-  $('card-create').style.display = 'none';
-  $('card-rooms').style.display  = 'none';
-  $('card-join').style.display   = 'block';
+  $('card-create').style.display     = 'none';
+  $('card-rooms').style.display      = 'none';
+  $('card-train-mode').style.display = 'none';
+  $('card-join').style.display       = 'block';
   $('code-input').focus();
 };
-$('btn-join-go').onclick    = () => joinRoom();
+$('btn-join-go').onclick       = () => joinRoom();
 $('code-input').addEventListener('keydown', e => { if(e.key === 'Enter') $('btn-join-go').click(); });
 $('btn-join-cancel').onclick   = () => { $('card-join').style.display = 'none'; setStatus(''); };
 
-$('btn-rooms').onclick      = openRoomsList;
-$('btn-rooms-close').onclick = () => { $('card-rooms').style.display = 'none'; };
+$('btn-rooms').onclick         = openRoomsList;
+$('btn-rooms-close').onclick   = () => { $('card-rooms').style.display = 'none'; };
 $('btn-rooms-refresh').onclick = () => openRoomsList();
 
-$('btn-train').onclick      = startTraining;
+// allenamento: mostra selezione modalità
+$('btn-train').onclick = () => {
+  $('card-create').style.display     = 'none';
+  $('card-join').style.display       = 'none';
+  $('card-rooms').style.display      = 'none';
+  $('card-train-mode').style.display = 'block';
+};
+$('btn-train-go').onclick     = () => {
+  const mode = getSelectedMode('mode-picker-train');
+  $('card-train-mode').style.display = 'none';
+  startTraining(mode);
+};
+$('btn-train-cancel').onclick = () => { $('card-train-mode').style.display = 'none'; };
 $('btn-restart').onclick    = () => { if(isHost) wsSend({type:'restart',payload:{}}); else if(netMode==='train'){resetLocal(true);updateHUD();} };
 $('btn-leave').onclick      = leaveGame;
 $('btn-menu-touch').onclick = () => toggleEscMenu();

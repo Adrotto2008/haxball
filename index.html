@@ -47,7 +47,11 @@
     <div class="card-title">Crea nuova stanza</div>
     <input type="text" id="room-name-input" maxlength="24" placeholder="Nome stanza (es. Partita di Marco)" autocomplete="off">
     <input type="text" id="room-pw-input" maxlength="20" placeholder="Password (lascia vuoto per pubblica)" autocomplete="off" style="margin-top:8px">
-    <div class="row" style="margin-top:8px">
+    <div class="gm-section-label" style="margin-top:12px">Modalità di gioco</div>
+    <div class="mode-picker" id="mode-picker-create">
+      <button class="mode-btn active" data-mode="soccer">⚽ Calcio</button>
+    </div>
+    <div class="row" style="margin-top:12px">
       <button class="btn btn-red" id="btn-create-go">Crea →</button>
       <button class="btn btn-ghost btn-sm" id="btn-create-cancel">Annulla</button>
     </div>
@@ -75,6 +79,18 @@
     <div id="rooms-list-content"></div>
   </div>
   <div id="lobby-msg"></div>
+
+  <!-- card: selezione modalità allenamento -->
+  <div class="card" id="card-train-mode" style="display:none">
+    <div class="card-title">🎯 Modalità allenamento</div>
+    <div class="mode-picker" id="mode-picker-train">
+      <button class="mode-btn active" data-mode="soccer">⚽ Calcio</button>
+    </div>
+    <div class="row" style="margin-top:12px">
+      <button class="btn btn-green" id="btn-train-go">Inizia →</button>
+      <button class="btn btn-ghost btn-sm" id="btn-train-cancel">Annulla</button>
+    </div>
+  </div>
 </div>
 
 <!-- GAME -->

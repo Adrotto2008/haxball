@@ -62,6 +62,16 @@ input[type=text]::placeholder{font-family:'Inter',sans-serif;letter-spacing:1px;
 .room-badges { display:flex; align-items:center; gap:6px; flex-shrink:0; }
 .room-badge { font-size:14px; }
 
+/* selezione modalità */
+.mode-picker { display:flex; gap:8px; flex-wrap:wrap; margin-top:4px; }
+.mode-btn {
+  padding:8px 16px; border-radius:8px; border:1.5px solid rgba(255,255,255,.15);
+  background:rgba(255,255,255,.06); color:rgba(255,255,255,.6);
+  font-size:13px; font-weight:600; cursor:pointer; transition:all .15s;
+}
+.mode-btn:hover { border-color:rgba(255,255,255,.3); color:#fff; }
+.mode-btn.active { border-color:#3da84a; background:rgba(61,168,74,.15); color:#6ddc7e; }
+
 /* card nickname compatta */
 #lobby .card:first-of-type {
   padding:14px 20px;

@@ -60,10 +60,15 @@ function handleServerMsg(msg) {
           }
         }
         players = players.filter(p => msg.roster.find(r => r.id === p.id));
+        // aggiorna team di ogni player fisico in base al roster
+        for (const r of msg.roster) {
+          const p = players.find(x => x.id === r.id);
+          if (p) p.team = r.team;
+        }
       }
+      // sempre: aggiorna menu se aperto (prematch + in-game)
+      renderPmRoster();
       updateWaitingCard();
-      // aggiorna sempre il roster se il menu è aperto (prematch o in-game)
-      if ($('game-menu').classList.contains('open')) renderPmRoster();
       break;
 
     case 'start':
@@ -75,7 +80,8 @@ function handleServerMsg(msg) {
         players = buildPlayers(msg.roster);
         if(mySkin && myPlayerId) playerSkins[myPlayerId] = mySkin;
         $('game-menu').classList.remove('open');
-        $('lobby').style.display='none'; $('game').style.display='flex';
+        $('lobby').style.display  = 'none';
+        $('game').style.display   = 'flex';   // canvas DEVE essere visibile prima di startLoop
         const badge2 = $('net-badge'); badge2.textContent='GUEST'; badge2.className='badge-guest';
         $('btn-restart').style.display = 'none';
         if(isTouchDev()) positionTouchLayer(); else hideTouchLayer();
