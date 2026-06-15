@@ -4,6 +4,16 @@ Questo file tiene traccia delle modifiche e delle nuove funzionalità introdotte
 
 ---
 
+## v2.5.0 — Kick-start movimento + pulizia costanti
+
+### ✨ Novità
+- **Kick-start movimento** (`js/modes/soccer/physics.js`, `server.js`): quando premi un tasto direzionale, se la velocità in quella direzione è sotto `P_START`, viene impostata istantaneamente a `P_START` (1.4 px/frame). Questo elimina la sensazione di "partire da fermo": il player risponde immediatamente con una velocità base, poi `P_ACCEL` continua ad accumularla fino a `P_SPEED_MAX`. Cambiare direzione dà subito velocità nella nuova direzione senza dover aspettare che la vecchia decelerazione finisca.
+
+### 🔧 Fix / Pulizia
+- **Costanti unificate** (`js/modes/soccer/config.js`, `server.js`): `P_START`, `P_SPEED_MAX`, `P_ACCEL`, `P_FRIC` ora hanno la stessa struttura e valori identici su client e server. Rimossi commenti obsoleti e il vecchio valore `P_START = 5` che non veniva mai usato. `P_SPEED` mantenuto come alias per compatibilità con codice legacy.
+
+---
+
 ## v2.4.0 — Fix nero late-join, movimento con rampa, modalità di gioco
 
 ### 🔧 Fix

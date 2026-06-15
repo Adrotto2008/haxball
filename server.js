@@ -8,8 +8,11 @@ const http = require('http');
 // ── CONFIG (specchio di config.js) ──────────────────────
 const W = 1020, H = 600;
 const PR = 18, BR = 11;
-const P_SPEED_MAX = 30.8, P_ACCEL = 1.22, P_FRIC = 0.78;
-const P_SPEED = P_SPEED_MAX; // alias usato in applyInput
+const P_START    = 1.4;
+const P_SPEED_MAX = 10.0;
+const P_ACCEL    = 0.01;
+const P_FRIC     = 0.78;
+const P_SPEED    = P_SPEED_MAX;
 const B_FRIC = 0.984, B_BOUNCE = 0.80, B_HIT_R = 0.82;
 const KICK_MIN = 3.8, KICK_MAX = 14.0, KICK_CHG_F = 50;
 const KICK_DIST = PR + BR + 12;
@@ -39,7 +42,7 @@ function doKick(p, ball, force) {
   ball.vy = ny * force + p.vy * 0.28;
 }
 function applyInput(p, inp, ball) {
-  const charging = inp.kick, topSpd = charging ? P_SPEED * 0.45 : P_SPEED;
+  const charging = inp.kick, topSpd = charging ? P_SPEED_MAX * 0.45 : P_SPEED_MAX;
   if (charging) {
     if (!p.held) { p.vx *= 0.3; p.vy *= 0.3; }
     p.charge = Math.min(p.charge + 1, KICK_CHG_F);
@@ -51,8 +54,10 @@ function applyInput(p, inp, ball) {
     p.charge = 0;
   }
   p.held = charging;
-  if (inp.up) p.vy -= P_ACCEL; if (inp.dn) p.vy += P_ACCEL;
-  if (inp.lt) p.vx -= P_ACCEL; if (inp.rt) p.vx += P_ACCEL;
+  if (inp.up) { if (p.vy >  -P_START) p.vy = -P_START; p.vy -= P_ACCEL; }
+  if (inp.dn) { if (p.vy <   P_START) p.vy =  P_START; p.vy += P_ACCEL; }
+  if (inp.lt) { if (p.vx >  -P_START) p.vx = -P_START; p.vx -= P_ACCEL; }
+  if (inp.rt) { if (p.vx <   P_START) p.vx =  P_START; p.vx += P_ACCEL; }
   const spd = Math.hypot(p.vx, p.vy);
   if (spd > topSpd) { p.vx = p.vx / spd * topSpd; p.vy = p.vy / spd * topSpd; }
   p.x += p.vx; p.y += p.vy; p.vx *= P_FRIC; p.vy *= P_FRIC;

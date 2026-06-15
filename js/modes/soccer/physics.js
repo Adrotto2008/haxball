@@ -18,7 +18,7 @@ function doKick(p, force) {
 }
 
 function applyInput(p, inp) {
-  const charging = inp.kick, topSpd = charging ? P_SPEED*0.45 : P_SPEED;
+  const charging = inp.kick, topSpd = charging ? P_SPEED_MAX*0.45 : P_SPEED_MAX;
   if(charging) {
     if(!p.held) { p.vx*=0.3; p.vy*=0.3; }
     p.charge = Math.min(p.charge+1, KICK_CHG_F);
@@ -31,8 +31,15 @@ function applyInput(p, inp) {
     p.charge = 0;
   }
   p.held = charging;
-  if(inp.up) p.vy -= P_ACCEL; if(inp.dn) p.vy += P_ACCEL;
-  if(inp.lt) p.vx -= P_ACCEL; if(inp.rt) p.vx += P_ACCEL;
+
+  // Kick-start: se premi una direzione e la velocità in quella direzione
+  // è sotto P_START, impostala subito a P_START (no partenza da 0).
+  // Poi P_ACCEL continua ad accumularsi fino a P_SPEED_MAX.
+  if(inp.up) { if(p.vy >  -P_START) p.vy = -P_START; p.vy -= P_ACCEL; }
+  if(inp.dn) { if(p.vy <   P_START) p.vy =  P_START; p.vy += P_ACCEL; }
+  if(inp.lt) { if(p.vx >  -P_START) p.vx = -P_START; p.vx -= P_ACCEL; }
+  if(inp.rt) { if(p.vx <   P_START) p.vx =  P_START; p.vx += P_ACCEL; }
+
   const spd = Math.hypot(p.vx, p.vy);
   if(spd > topSpd) { p.vx = p.vx/spd*topSpd; p.vy = p.vy/spd*topSpd; }
   p.x += p.vx; p.y += p.vy; p.vx *= P_FRIC; p.vy *= P_FRIC;
