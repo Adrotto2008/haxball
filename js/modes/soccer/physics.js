@@ -1,4 +1,7 @@
 // ── PHYSICS — collisioni, kick, movimento ───────────────
+// Tutte le costanti fisiche vengono lette da CONFIG (definito in state.js)
+// così si aggiornano in tempo reale quando l'host cambia le variabili.
+
 function circleCollide(a, b, res) {
   const dx = b.x-a.x, dy = b.y-a.y, d = Math.hypot(dx,dy), md = a.r+b.r;
   if(d < md && d > 0.01) {
@@ -10,6 +13,7 @@ function circleCollide(a, b, res) {
 }
 
 function doKick(p, force) {
+  const KICK_DIST = PR + BR + CONFIG.KICK_DIST_X;
   const dx = ball.x-p.x, dy = ball.y-p.y, d = Math.hypot(dx,dy);
   if(d > KICK_DIST) return;
   const nx = d>0.01?dx/d:1, ny = d>0.01?dy/d:0;
@@ -18,6 +22,7 @@ function doKick(p, force) {
 }
 
 function applyInput(p, inp) {
+  const { P_START, P_SPEED_MAX, P_ACCEL, P_FRIC, KICK_MIN, KICK_MAX, KICK_CHG_F } = CONFIG;
   const charging = inp.kick, topSpd = charging ? P_SPEED_MAX*0.45 : P_SPEED_MAX;
   if(charging) {
     if(!p.held) { p.vx*=0.3; p.vy*=0.3; }
@@ -26,20 +31,16 @@ function applyInput(p, inp) {
     if(p.held && p.charge > 0) {
       const t = p.charge/KICK_CHG_F, force = KICK_MIN+t*(KICK_MAX-KICK_MIN);
       doKick(p, force);
-      if(Math.hypot(ball.x-p.x, ball.y-p.y) <= KICK_DIST) spawnP(ball.x, ball.y, 8, p.col, force*.5, 16);
+      if(Math.hypot(ball.x-p.x, ball.y-p.y) <= PR+BR+CONFIG.KICK_DIST_X)
+        spawnP(ball.x, ball.y, 8, p.col, force*.5, 16);
     }
     p.charge = 0;
   }
   p.held = charging;
-
-  // Kick-start: se premi una direzione e la velocità in quella direzione
-  // è sotto P_START, impostala subito a P_START (no partenza da 0).
-  // Poi P_ACCEL continua ad accumularsi fino a P_SPEED_MAX.
   if(inp.up) { if(p.vy >  -P_START) p.vy = -P_START; p.vy -= P_ACCEL; }
   if(inp.dn) { if(p.vy <   P_START) p.vy =  P_START; p.vy += P_ACCEL; }
   if(inp.lt) { if(p.vx >  -P_START) p.vx = -P_START; p.vx -= P_ACCEL; }
   if(inp.rt) { if(p.vx <   P_START) p.vx =  P_START; p.vx += P_ACCEL; }
-
   const spd = Math.hypot(p.vx, p.vy);
   if(spd > topSpd) { p.vx = p.vx/spd*topSpd; p.vy = p.vy/spd*topSpd; }
   p.x += p.vx; p.y += p.vy; p.vx *= P_FRIC; p.vy *= P_FRIC;
