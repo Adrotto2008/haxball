@@ -4,6 +4,27 @@ Questo file tiene traccia delle modifiche e delle nuove funzionalità introdotte
 
 ---
 
+## v2.6.1 — Fix: config isolata per stanza
+
+### 🔧 Fix critico
+- **CONFIG per-room** (`server.js`): il `CONFIG` globale è stato reso immutabile (`CONFIG_DEFAULT`) e usato solo come template. Ogni room riceve `room.config = { ...CONFIG_DEFAULT }` alla creazione. Le modifiche via `set_config` aggiornano solo `room.config`, non toccano le altre stanze. `applyInput`, `doKick` e `tick` ricevono `cfg = room.config` come parametro invece di leggere un globale. L'endpoint `/admin/config` modifica solo il template per le room *future*, non quelle esistenti.
+
+---
+
+## v2.6.0 — CONFIG live: variabili fisiche modificabili in tempo reale
+
+### ✨ Novità
+- **Tab "🎛️ Variabili" nel menu** (`index.html`, `js/menu.js`, `css/menu.css`): nuovo pannello con slider + campo numerico per ogni variabile fisica. Visibile a tutti, modificabile solo dall'host. Le modifiche si applicano istantaneamente a tutti i client senza ricaricare nulla.
+- **CONFIG live server-side** (`server.js`): le costanti fisiche sono ora un oggetto `let CONFIG = {...}` mutabile. L'handler `set_config` (solo host) applica la patch e la broadcasta a tutta la room. Endpoint HTTP `POST /admin/config` con `ADMIN_TOKEN` per modifiche esterne (curl, script). Protetto da `process.env.ADMIN_TOKEN`.
+- **CONFIG live client-side** (`js/state.js`): oggetto `CONFIG` specchio del server, con `CONFIG_META` (label, min, max, step) per ogni variabile usata dal pannello. Aggiornato automaticamente alla ricezione di `config`, `created`, `joined`, `start`.
+- **physics.js e sync.js leggono da CONFIG** (`js/modes/soccer/physics.js`, `js/modes/soccer/sync.js`): tutte le costanti fisiche (`P_START`, `P_FRIC`, `B_FRIC`, ecc.) vengono lette da `CONFIG.xxx` invece delle `const`. Ogni cambio dell'host agisce al frame successivo.
+
+### 📦 Rete
+- `set_config` manda solo la patch (un oggetto con 1 chiave): ~30-50 byte per modifica, solo quando l'host sposta uno slider. Nessun polling.
+- Il server valida ogni chiave (solo quelle presenti in `CONFIG`) e ogni valore (numero, range 0-10000) prima di applicare.
+
+---
+
 ## v2.5.0 — Kick-start movimento + pulizia costanti
 
 ### ✨ Novità

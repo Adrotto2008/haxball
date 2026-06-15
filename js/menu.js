@@ -39,6 +39,52 @@ function switchTab(tab) {
   document.querySelectorAll('.gm-tab').forEach(b => b.classList.toggle('active', b.dataset.tab===tab));
   $('gm-panel-roster').style.display   = tab==='roster'   ? 'flex' : 'none';
   $('gm-panel-settings').style.display = tab==='settings' ? 'flex' : 'none';
+  $('gm-panel-vars').style.display     = tab==='vars'     ? 'flex' : 'none';
+  if (tab === 'vars') renderConfigPanel();
+}
+
+// ── PANNELLO VARIABILI ─────────────────────────────────
+// Visibile a tutti, modificabile solo dall'host.
+// Ogni cambio manda {type:'set_config', payload:{patch:{...}}} al server.
+function renderConfigPanel() {
+  const el = $('config-panel-content');
+  const hint = $('config-hint');
+  if (!el) return;
+  if (!isHost) {
+    hint.textContent = '🔒 Solo l\'host può modificare le variabili';
+    hint.style.display = '';
+  } else {
+    hint.textContent = '⚠️ Le modifiche si applicano immediatamente a tutti i client';
+    hint.style.display = '';
+  }
+  el.innerHTML = CONFIG_META.map(m => `
+    <div class="cfg-row">
+      <label class="cfg-label">${m.label}</label>
+      <div class="cfg-controls">
+        <input type="range" class="cfg-slider"
+          data-key="${m.key}" min="${m.min}" max="${m.max}" step="${m.step}"
+          value="${CONFIG[m.key]}" ${isHost ? '' : 'disabled'}>
+        <input type="number" class="cfg-num"
+          data-key="${m.key}" min="${m.min}" max="${m.max}" step="${m.step}"
+          value="${CONFIG[m.key]}" ${isHost ? '' : 'disabled'}>
+      </div>
+    </div>
+  `).join('');
+
+  // listener: slider e number input sincronizzati, inviano patch al server
+  el.querySelectorAll('.cfg-slider, .cfg-num').forEach(inp => {
+    inp.addEventListener('input', () => {
+      if (!isHost) return;
+      const key = inp.dataset.key;
+      const val = parseFloat(inp.value);
+      if (isNaN(val)) return;
+      CONFIG[key] = val;
+      // sincronizza l'altro input (slider <-> number)
+      el.querySelectorAll(`[data-key="${key}"]`).forEach(x => { if (x !== inp) x.value = val; });
+      // invia patch al server (debounced tramite l'evento 'change' per gli slider)
+      wsSend({ type: 'set_config', payload: { patch: { [key]: val } } });
+    });
+  });
 }
 
 function toggleEscMenu(forceOpen) {

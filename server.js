@@ -1,31 +1,27 @@
 // ── SERVER — HaxBall 2 autoritativo ────────────────────
-// Node.js + ws, fisica identica al client
-// Deploy: Render free tier (Web Service, node server.js)
-
 const { WebSocketServer } = require('ws');
 const http = require('http');
 
-// ── CONFIG LIVE (mutabile a runtime via /admin/config o WS set_config) ──
-// L'host può modificarle dal menu "Variabili" senza riavviare il server.
-// Il server fa broadcast ai client che aggiornano il loro CONFIG locale.
-let CONFIG = {
-  P_START:     1.4,    // velocità base al primo frame di input
-  P_SPEED_MAX: 10.0,   // velocità massima
-  P_ACCEL:     0.01,   // accelerazione per frame dopo kick-start
-  P_FRIC:      0.78,   // attrito per frame (moltiplicatore)
-  B_FRIC:      0.984,  // attrito palla
-  B_BOUNCE:    0.80,   // rimbalzo palla sui muri
-  B_HIT_R:     0.82,   // restituzione collisione player-palla
-  KICK_MIN:    3.8,    // forza tiro minima (tap)
-  KICK_MAX:    14.0,   // forza tiro massima (carica completa)
-  KICK_CHG_F:  50,     // frame per caricare al massimo
-  KICK_DIST_X: 12,     // distanza extra oltre PR+BR per il tiro
-  GOAL_CD:     140,    // frame di pausa dopo un gol
-  MATCH_TIME:  180     // durata partita in secondi
+// ── CONFIG DEFAULT (immutabile — template per ogni room) ─
+// Ogni room riceve una copia indipendente: le modifiche di una
+// stanza non influenzano le altre.
+const CONFIG_DEFAULT = {
+  P_START:     1.4,
+  P_SPEED_MAX: 10.0,
+  P_ACCEL:     0.01,
+  P_FRIC:      0.78,
+  B_FRIC:      0.984,
+  B_BOUNCE:    0.80,
+  B_HIT_R:     0.82,
+  KICK_MIN:    3.8,
+  KICK_MAX:    14.0,
+  KICK_CHG_F:  50,
+  KICK_DIST_X: 12,
+  GOAL_CD:     140,
+  MATCH_TIME:  180
 };
 const ADMIN_TOKEN = process.env.ADMIN_TOKEN || 'hax-admin-dev';
 
-// costanti strutturali (non cambiano a runtime)
 const W = 1020, H = 600;
 const PR = 18, BR = 11;
 const FL = { l: 40, r: W - 40, t: 40, b: H - 40 };
@@ -34,7 +30,7 @@ const TEAM_COLS = ['#ff3333', '#3388ff'];
 const TICK_MS  = 1000 / 60;
 const BCAST_MS = 1000 / 60;
 
-// ── PHYSICS (usa CONFIG.xxx per tutti i valori fisici) ──
+// ── PHYSICS (riceve cfg = room.config) ──────────────────
 function circleCollide(a, b, res) {
   const dx = b.x - a.x, dy = b.y - a.y, d = Math.hypot(dx, dy), md = a.r + b.r;
   if (d < md && d > 0.01) {
@@ -44,16 +40,16 @@ function circleCollide(a, b, res) {
     if (rv < 0) { const imp = rv * (res || 1); a.vx += imp * nx; a.vy += imp * ny; b.vx -= imp * nx; b.vy -= imp * ny; }
   }
 }
-function doKick(p, ball, force) {
-  const KICK_DIST = PR + BR + CONFIG.KICK_DIST_X;
+function doKick(p, ball, force, cfg) {
+  const dist = PR + BR + cfg.KICK_DIST_X;
   const dx = ball.x - p.x, dy = ball.y - p.y, d = Math.hypot(dx, dy);
-  if (d > KICK_DIST) return;
+  if (d > dist) return;
   const nx = d > 0.01 ? dx / d : 1, ny = d > 0.01 ? dy / d : 0;
   ball.vx = nx * force + p.vx * 0.28;
   ball.vy = ny * force + p.vy * 0.28;
 }
-function applyInput(p, inp, ball) {
-  const { P_START, P_SPEED_MAX, P_ACCEL, P_FRIC, KICK_MIN, KICK_MAX, KICK_CHG_F } = CONFIG;
+function applyInput(p, inp, ball, cfg) {
+  const { P_START, P_SPEED_MAX, P_ACCEL, P_FRIC, KICK_MIN, KICK_MAX, KICK_CHG_F } = cfg;
   const charging = inp.kick, topSpd = charging ? P_SPEED_MAX * 0.45 : P_SPEED_MAX;
   if (charging) {
     if (!p.held) { p.vx *= 0.3; p.vy *= 0.3; }
@@ -61,7 +57,7 @@ function applyInput(p, inp, ball) {
   } else {
     if (p.held && p.charge > 0) {
       const t = p.charge / KICK_CHG_F, force = KICK_MIN + t * (KICK_MAX - KICK_MIN);
-      doKick(p, ball, force);
+      doKick(p, ball, force, cfg);
     }
     p.charge = 0;
   }
@@ -84,8 +80,9 @@ function mkBall() { return { x: W / 2, y: H / 2, vx: 0, vy: 0, r: BR }; }
 function mkRoom(code, name, password) {
   return {
     code, name: name || `Stanza ${code}`, password: password || '',
+    config: { ...CONFIG_DEFAULT }, // copia indipendente per stanza
     clients: new Map(), players: [], ball: mkBall(),
-    score: [0, 0], timeLeft: CONFIG.MATCH_TIME, gameOver: false,
+    score: [0, 0], timeLeft: CONFIG_DEFAULT.MATCH_TIME, gameOver: false,
     goalCD: 0, started: false, hostPid: null, roster: [],
     inputs: {}, afkSet: new Set(), skins: {},
     ticker: null, secondAccum: 0, lastBcast: 0
@@ -139,7 +136,7 @@ function buildPlayers(roster) {
 // ── RESPAWN ──────────────────────────────────────────────
 function resetPositions(room, full) {
   room.ball = mkBall();
-  if (full) { room.score = [0, 0]; room.timeLeft = CONFIG.MATCH_TIME; room.gameOver = false; room.secondAccum = 0; }
+  if (full) { room.score = [0, 0]; room.timeLeft = room.config.MATCH_TIME; room.gameOver = false; room.secondAccum = 0; }
   room.goalCD = 90;
   const byTeam = [[], []];
   for (const p of room.players) if (p.team === 0 || p.team === 1) byTeam[p.team].push(p);
@@ -178,7 +175,7 @@ function broadcastMeta(room) {
 // ── GOL ──────────────────────────────────────────────────
 function handleGoal(room, team) {
   room.score[team]++;
-  room.goalCD = CONFIG.GOAL_CD;
+  room.goalCD = room.config.GOAL_CD;
   resetPositions(room, false);
   bcastAll(room, { type: 'goal', team, score: room.score.slice() });
   if (room.score[0] > 99 || room.score[1] > 99) endMatch(room);
@@ -192,6 +189,7 @@ function endMatch(room) {
 function tick(room) {
   if (!room.started || room.gameOver) return;
   if (room.goalCD > 0) { room.goalCD--; return; }
+  const cfg = room.config;
   room.secondAccum += TICK_MS;
   if (room.secondAccum >= 1000) {
     room.secondAccum -= 1000;
@@ -200,7 +198,7 @@ function tick(room) {
   }
   for (const p of room.players) {
     if (p.team === -1) continue;
-    applyInput(p, room.inputs[p.id] || {}, room.ball);
+    applyInput(p, room.inputs[p.id] || {}, room.ball, cfg);
   }
   for (let i = 0; i < room.players.length; i++)
     for (let j = i + 1; j < room.players.length; j++) {
@@ -209,13 +207,13 @@ function tick(room) {
     }
   const ball = room.ball;
   ball.x += ball.vx; ball.y += ball.vy;
-  ball.vx *= CONFIG.B_FRIC; ball.vy *= CONFIG.B_FRIC;
-  for (const p of room.players) { if (p.team !== -1) circleCollide(p, ball, CONFIG.B_HIT_R); }
+  ball.vx *= cfg.B_FRIC; ball.vy *= cfg.B_FRIC;
+  for (const p of room.players) { if (p.team !== -1) circleCollide(p, ball, cfg.B_HIT_R); }
   const inGoal = ball.y > GY && ball.y < GY + GH;
-  if (ball.x - ball.r < FL.l) { if (inGoal) { handleGoal(room, 1); return; } ball.x = FL.l + ball.r; ball.vx *= -CONFIG.B_BOUNCE; }
-  if (ball.x + ball.r > FL.r) { if (inGoal) { handleGoal(room, 0); return; } ball.x = FL.r - ball.r; ball.vx *= -CONFIG.B_BOUNCE; }
-  if (ball.y - ball.r < FL.t) { ball.y = FL.t + ball.r; ball.vy *= -CONFIG.B_BOUNCE; }
-  if (ball.y + ball.r > FL.b) { ball.y = FL.b - ball.r; ball.vy *= -CONFIG.B_BOUNCE; }
+  if (ball.x - ball.r < FL.l) { if (inGoal) { handleGoal(room, 1); return; } ball.x = FL.l + ball.r; ball.vx *= -cfg.B_BOUNCE; }
+  if (ball.x + ball.r > FL.r) { if (inGoal) { handleGoal(room, 0); return; } ball.x = FL.r - ball.r; ball.vx *= -cfg.B_BOUNCE; }
+  if (ball.y - ball.r < FL.t) { ball.y = FL.t + ball.r; ball.vy *= -cfg.B_BOUNCE; }
+  if (ball.y + ball.r > FL.b) { ball.y = FL.b - ball.r; ball.vy *= -cfg.B_BOUNCE; }
   const now = Date.now();
   if (now - room.lastBcast >= BCAST_MS) {
     room.lastBcast = now;
@@ -230,34 +228,26 @@ function startMatch(room) {
   room.players = buildPlayers(room.roster);
   resetPositions(room, true);
   room.started = true;
-  bcastAll(room, { type: 'start', roster: room.roster, hostId: room.hostPid, config: CONFIG });
+  bcastAll(room, { type: 'start', roster: room.roster, hostId: room.hostPid, config: room.config });
   if (!room.ticker) room.ticker = setInterval(() => tick(room), TICK_MS);
 }
 
-// ── APPLICA PATCH CONFIG E BROADCAST ────────────────────
+// ── APPLICA PATCH CONFIG (solo per la room, non globale) ─
 function applyConfigPatch(patch, room) {
-  // valida: accetta solo chiavi note e valori numerici ragionevoli
-  const allowed = new Set(Object.keys(CONFIG));
-  const clean = {};
+  const allowed = new Set(Object.keys(CONFIG_DEFAULT));
   for (const [k, v] of Object.entries(patch)) {
     if (!allowed.has(k)) continue;
     const n = parseFloat(v);
     if (isNaN(n) || n < 0 || n > 10000) continue;
-    clean[k] = n;
+    room.config[k] = n;
   }
-  Object.assign(CONFIG, clean);
-  // broadcast a tutti i client della room (o a tutti se room=null)
-  const payload = { type: 'config', config: CONFIG };
-  if (room) {
-    bcastAll(room, payload);
-  } else {
-    for (const [, r] of rooms) bcastAll(r, payload);
-  }
-  return CONFIG;
+  bcastAll(room, { type: 'config', config: room.config });
 }
 
-// ── HTTP SERVER (keep-alive + admin endpoint) ────────────
+// ── HTTP SERVER ──────────────────────────────────────────
 const server = http.createServer((req, res) => {
+  // Endpoint admin per modificare il CONFIG_DEFAULT (nuovo template per room future)
+  // Non modifica le room già esistenti.
   if (req.method === 'POST' && req.url === '/admin/config') {
     let body = '';
     req.on('data', c => body += c);
@@ -265,9 +255,14 @@ const server = http.createServer((req, res) => {
       try {
         const { token, patch } = JSON.parse(body);
         if (token !== ADMIN_TOKEN) { res.writeHead(403); res.end('forbidden'); return; }
-        const result = applyConfigPatch(patch, null);
+        const allowed = new Set(Object.keys(CONFIG_DEFAULT));
+        for (const [k, v] of Object.entries(patch)) {
+          if (!allowed.has(k)) continue;
+          const n = parseFloat(v);
+          if (!isNaN(n) && n >= 0 && n <= 10000) CONFIG_DEFAULT[k] = n;
+        }
         res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify(result));
+        res.end(JSON.stringify(CONFIG_DEFAULT));
       } catch { res.writeHead(400); res.end('bad request'); }
     });
     return;
@@ -300,7 +295,7 @@ wss.on('connection', ws => {
       myRoom.hostPid = pid;
       myRoom.clients.set(ws, { pid, name, team: 0, skin: payload.skin || '', afk: false });
       syncRoster(myRoom);
-      send(ws, { type: 'created', code, hostId: pid, roomName: myRoom.name, hasPassword: !!myRoom.password, config: CONFIG });
+      send(ws, { type: 'created', code, hostId: pid, roomName: myRoom.name, hasPassword: !!myRoom.password, config: myRoom.config });
       return;
     }
 
@@ -321,11 +316,11 @@ wss.on('connection', ws => {
       if (myRoom.started) {
         myRoom.players.push({ id: pid, team: -1, col: '#555', x: -9999, y: -9999, vx: 0, vy: 0, r: PR, charge: 0, held: false });
         bcastAll(myRoom, { type: 'chat', pid: 'system', name: 'Sistema', text: `👋 ${name} è entrato come spettatore` });
-        send(ws, { type: 'start', roster: buildRoster(myRoom), hostId: myRoom.hostPid, lateJoin: true, config: CONFIG });
+        send(ws, { type: 'start', roster: buildRoster(myRoom), hostId: myRoom.hostPid, lateJoin: true, config: myRoom.config });
         syncRoster(myRoom);
       } else {
         syncRoster(myRoom);
-        send(ws, { type: 'joined', code, hostId: myRoom.hostPid, roster: buildRoster(myRoom), config: CONFIG });
+        send(ws, { type: 'joined', code, hostId: myRoom.hostPid, roster: buildRoster(myRoom), config: myRoom.config });
       }
       return;
     }
@@ -346,12 +341,9 @@ wss.on('connection', ws => {
     }
     if (type === 'chat') { bcastAll(myRoom, { type: 'chat', pid: myPid, name: payload.name, text: payload.text }); return; }
 
-    // ── MODIFICA CONFIG IN TEMPO REALE ──────────────────
-    // Solo l'host può cambiarla; il server la applica globalmente e
-    // la broadcast a tutti i client della room.
     if (type === 'set_config') {
       if (myPid !== myRoom.hostPid) return;
-      applyConfigPatch(payload.patch, myRoom);
+      applyConfigPatch(payload.patch, myRoom); // modifica solo room.config
       return;
     }
 

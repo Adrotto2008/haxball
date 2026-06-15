@@ -26,9 +26,16 @@ function wsSend(obj) {
 function handleServerMsg(msg) {
   switch (msg.type) {
 
+    case 'config':
+      // aggiornamento live delle variabili fisiche dall'host
+      Object.assign(CONFIG, msg.config);
+      if ($('game-menu').classList.contains('open')) renderConfigPanel();
+      break;
+
     case 'created':
       hostId = myPlayerId; isHost = true;
       pmRoster = [{ id: myPlayerId, name: myNickname, team: 0, skin: mySkin, afk: false }];
+      if (msg.config) Object.assign(CONFIG, msg.config);
       $('card-create').style.display = 'none';
       $('card-join').style.display = 'none';
       wsRoom = msg.code;
@@ -42,6 +49,7 @@ function handleServerMsg(msg) {
       // guest: entra nella sala
       pmRoster = msg.roster;
       hostId   = msg.hostId;
+      if (msg.config) Object.assign(CONFIG, msg.config);
       setStatus('');
       $('card-join').style.display  = 'none';
       $('lobby').style.display      = 'none';
@@ -75,6 +83,7 @@ function handleServerMsg(msg) {
       pmRoster = msg.roster;
       hostId   = msg.hostId;
       isHost   = (msg.hostId === myPlayerId);
+      if (msg.config) Object.assign(CONFIG, msg.config);
       closeMenu();
       if (msg.lateJoin) {
         // Inizializza lo stato minimo per non crashare il draw

@@ -161,3 +161,32 @@
 }
 .gm-checkbox:checked{background:#3da84a;border-color:#3da84a;}
 .gm-checkbox:checked::after{left:19px;}
+
+/* ── PANNELLO VARIABILI ────────────────────────────── */
+#config-panel-content { display:flex; flex-direction:column; gap:10px; width:100%; }
+.cfg-row {
+  display:flex; flex-direction:column; gap:4px;
+  padding:8px 0; border-bottom:1px solid rgba(255,255,255,.06);
+}
+.cfg-label {
+  font-size:12px; font-weight:600; color:rgba(255,255,255,.6); letter-spacing:.5px;
+}
+.cfg-controls { display:flex; align-items:center; gap:10px; }
+.cfg-slider {
+  flex:1; height:4px; border-radius:2px;
+  accent-color:#3da84a; cursor:pointer;
+}
+.cfg-slider:disabled { opacity:.35; cursor:not-allowed; }
+.cfg-num {
+  width:72px; background:rgba(255,255,255,.07);
+  border:1px solid rgba(255,255,255,.12); border-radius:6px;
+  color:#fff; font-size:13px; font-weight:700;
+  padding:4px 8px; text-align:right; outline:none;
+}
+.cfg-num:disabled { opacity:.35; cursor:not-allowed; }
+.cfg-num:focus { border-color:rgba(80,150,255,.5); }
+.config-hint {
+  font-size:11px; color:rgba(255,200,80,.7); margin-top:8px;
+  padding:6px 8px; background:rgba(255,200,0,.06);
+  border-radius:6px; border:1px solid rgba(255,200,0,.12);
+}
