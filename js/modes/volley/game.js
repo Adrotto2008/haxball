@@ -23,12 +23,20 @@ function vUpdate(dt) {
     const p = vPlayers[0];
     if (p) {
       vApplyInput(p, inpLocal());
-      // cattura
-      if (!vBall.capturedBy) vTryCapture(p);
+      // collisione diretta player↔palla (se non catturata)
+      if (!vBall.capturedBy) {
+        vTryCapture(p);
+        vPlayerBallCollide(p);
+      }
     }
-    // aggiorna cattura
+    // collisioni player↔player (per future modalità multi)
+    for (let i = 0; i < vPlayers.length; i++)
+      for (let j = i + 1; j < vPlayers.length; j++)
+        if (vPlayers[i].team !== -1 && vPlayers[j].team !== -1)
+          vCircleCollide(vPlayers[i], vPlayers[j]);
+    // aggiorna cattura (posizione + fuga offset)
     vUpdateCapture();
-    // fisica palla
+    // fisica palla libera
     vTickBall();
     // check pavimento → punto
     if (vBall.y + V_BR > V_FL.b) {
@@ -36,7 +44,7 @@ function vUpdate(dt) {
       vGoal(team);
       return;
     }
-    // cambio lato
+    // cambio lato → reset tocchi
     vCheckSideChange();
     // trail
     if (!vBall.trail) vBall.trail = [];
@@ -78,7 +86,17 @@ function vGoal(team) {
   vGoalCD = V_GOAL_CD;
   vTouches[0] = 0; vTouches[1] = 0;
   vBallLastSide = null;
-  vResetBall();
+  // reset palla e posizioni player
+  vBall = vMkBall();
+  for (const p of vPlayers) {
+    if (p.team === -1) continue;
+    const byTeam = vPlayers.filter(x => x.team === p.team);
+    const n = byTeam.length;
+    const i = byTeam.indexOf(p);
+    p.x = V_FL.l + (V_FL.r - V_FL.l) * (p.team === 0 ? .22 : .78);
+    p.y = V_FL.t + (V_FL.b - V_FL.t) * (i + 1) / (n + 1);
+    p.vx = 0; p.vy = 0; p.held = false;
+  }
 }
 
 function vHandleGameOverLocal() {
@@ -86,7 +104,8 @@ function vHandleGameOverLocal() {
               vScore[1] > vScore[0] ? `🏆 Vincono i BLU! (${vScore[0]}–${vScore[1]})` :
               `🤝 Pareggio! (${vScore[0]}–${vScore[1]})`;
   setMsg(msg);
-  setTimeout(() => { vResetLocal(true); vUpdateHUD(); }, 3000);
+  setTimeout(() => { vScore = [0, 0]; vTimeLeft = V_MATCH_TIME; vGameOver = false; vSecondAccum = 0; vReset(false); vUpdateHUD();
+    setMsg('🏐 Pallavolo — WASD muovi · 0/Ctrl/Spazio cattura/rilancio'); }, 3000);
 }
 
 function vHandleGameOver() {

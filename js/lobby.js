@@ -18,7 +18,9 @@ function showLobby() {
   $('card-train-mode').style.display = 'none';
   const codeEl = $('gm-room-code');
   if (codeEl) { codeEl.textContent = ''; codeEl.style.display = 'none'; }
-  stopLoop();
+  stopLoop();   // ferma loop calcio
+  vStopLoop();  // ferma loop pallavolo
+  currentGameMode = 'soccer'; // reset a default per la prossima partita
   isHost = false; pmRoster = []; hostId = null;
   chatMessages = []; chatOpen = false; afkPlayers = new Set(); playerSkins = {};
   _lastInputMask = -1;
@@ -179,7 +181,14 @@ $('btn-train-go').onclick     = () => {
   else startTraining(mode);
 };
 $('btn-train-cancel').onclick = () => { $('card-train-mode').style.display = 'none'; };
-$('btn-restart').onclick    = () => { if(isHost) wsSend({type:'restart',payload:{}}); else if(netMode==='train'){resetLocal(true);updateHUD();} };
+$('btn-restart').onclick    = () => {
+  if (isHost) {
+    wsSend({type:'restart',payload:{}});
+  } else if (netMode === 'train') {
+    if (currentGameMode === 'volley') { vScore=[0,0]; vTimeLeft=V_MATCH_TIME; vGameOver=false; vSecondAccum=0; vReset(false); vUpdateHUD(); setMsg(''); }
+    else { resetLocal(true); updateHUD(); }
+  }
+};
 $('btn-leave').onclick      = leaveGame;
 $('btn-menu-touch').onclick = () => toggleEscMenu();
 
