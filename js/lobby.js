@@ -175,7 +175,8 @@ $('btn-train').onclick = () => {
 $('btn-train-go').onclick     = () => {
   const mode = getSelectedMode('mode-picker-train');
   $('card-train-mode').style.display = 'none';
-  startTraining(mode);
+  if (mode === 'volley') startVolleyTraining();
+  else startTraining(mode);
 };
 $('btn-train-cancel').onclick = () => { $('card-train-mode').style.display = 'none'; };
 $('btn-restart').onclick    = () => { if(isHost) wsSend({type:'restart',payload:{}}); else if(netMode==='train'){resetLocal(true);updateHUD();} };

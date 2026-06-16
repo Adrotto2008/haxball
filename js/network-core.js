@@ -2,12 +2,13 @@
 // Il server (Render) è autoritativo: la fisica è server-side.
 // Tutti i client sono "guest": mandano input, ricevono state.
 // Questo file non conosce le regole del calcio — smista i messaggi
-// verso le funzioni di chat/roster/admin e di modes/soccer/.
+// verso le funzioni di chat/roster/admin e di modes/soccer/ o modes/volley/.
 
 const WS_URL = 'wss://haxball-9dkw.onrender.com';
 
 let ws = null;
-let wsRoom = null; // codice stanza corrente
+let wsRoom = null;           // codice stanza corrente
+let currentGameMode = 'soccer'; // modalità attiva: 'soccer' | 'volley'
 
 // ── CONNESSIONE ─────────────────────────────────────────
 function wsConnect(onOpen) {
@@ -36,6 +37,7 @@ function handleServerMsg(msg) {
       hostId = myPlayerId; isHost = true;
       pmRoster = [{ id: myPlayerId, name: myNickname, team: 0, skin: mySkin, afk: false }];
       if (msg.config) Object.assign(CONFIG, msg.config);
+      if (msg.mode) currentGameMode = msg.mode;
       $('card-create').style.display = 'none';
       $('card-join').style.display = 'none';
       wsRoom = msg.code;
@@ -61,17 +63,30 @@ function handleServerMsg(msg) {
       if (msg.hostId) { hostId = msg.hostId; isHost = (msg.hostId === myPlayerId); }
       // sincronizza player fisici se in-game
       if ($('game').style.display !== 'none' && netMode !== 'train') {
-        for (const r of msg.roster) {
-          if (!players.find(p => p.id === r.id)) {
-            const col = r.team === 0 ? TEAM_COLS[0] : r.team === 1 ? TEAM_COLS[1] : '#555';
-            players.push({ id: r.id, team: r.team, col, x: -9999, y: -9999, vx: 0, vy: 0, r: PR, charge: 0, held: false });
+        if (currentGameMode === 'volley') {
+          for (const r of msg.roster) {
+            if (!vPlayers.find(p => p.id === r.id)) {
+              const col = r.team === 0 ? V_TEAM_COLS[0] : r.team === 1 ? V_TEAM_COLS[1] : '#555';
+              vPlayers.push({ id: r.id, team: r.team, col, x: -9999, y: -9999, vx: 0, vy: 0, r: V_PR, held: false });
+            }
           }
-        }
-        players = players.filter(p => msg.roster.find(r => r.id === p.id));
-        // aggiorna team di ogni player fisico in base al roster
-        for (const r of msg.roster) {
-          const p = players.find(x => x.id === r.id);
-          if (p) p.team = r.team;
+          vPlayers = vPlayers.filter(p => msg.roster.find(r => r.id === p.id));
+          for (const r of msg.roster) {
+            const p = vPlayers.find(x => x.id === r.id);
+            if (p) p.team = r.team;
+          }
+        } else {
+          for (const r of msg.roster) {
+            if (!players.find(p => p.id === r.id)) {
+              const col = r.team === 0 ? TEAM_COLS[0] : r.team === 1 ? TEAM_COLS[1] : '#555';
+              players.push({ id: r.id, team: r.team, col, x: -9999, y: -9999, vx: 0, vy: 0, r: PR, charge: 0, held: false });
+            }
+          }
+          players = players.filter(p => msg.roster.find(r => r.id === p.id));
+          for (const r of msg.roster) {
+            const p = players.find(x => x.id === r.id);
+            if (p) p.team = r.team;
+          }
         }
       }
       // sempre: aggiorna menu se aperto (prematch + in-game)
@@ -84,41 +99,70 @@ function handleServerMsg(msg) {
       hostId   = msg.hostId;
       isHost   = (msg.hostId === myPlayerId);
       if (msg.config) Object.assign(CONFIG, msg.config);
+      if (msg.mode) currentGameMode = msg.mode;
       closeMenu();
       if (msg.lateJoin) {
         // Inizializza lo stato minimo per non crashare il draw
-        if (!ball) ball = mkBall();
-        if (!players.length) players = buildPlayers(msg.roster);
-        if(mySkin && myPlayerId) playerSkins[myPlayerId] = mySkin;
-        $('game-menu').classList.remove('open');
-        $('lobby').style.display = 'none';
-        $('game').style.display  = 'flex';  // canvas deve essere nel DOM visibile
-        const badge2 = $('net-badge'); badge2.textContent='GUEST'; badge2.className='badge-guest';
-        $('btn-restart').style.display = 'none';
-        $('hud').style.display = 'flex';
-        if(isTouchDev()) positionTouchLayer(); else hideTouchLayer();
-        applyView();
-        netMode = 'guest';
-        startLoop();
+        if (currentGameMode === 'volley') {
+          if (!vBall) vBall = vMkBall();
+          if (!vPlayers.length) vPlayers = vBuildPlayers(msg.roster);
+          if(mySkin && myPlayerId) playerSkins[myPlayerId] = mySkin;
+          $('game-menu').classList.remove('open');
+          $('lobby').style.display = 'none';
+          $('game').style.display  = 'flex';
+          const badgeV = $('net-badge'); badgeV.textContent='GUEST'; badgeV.className='badge-guest';
+          $('btn-restart').style.display = 'none';
+          $('hud').style.display = 'flex';
+          if(isTouchDev()) positionTouchLayer(); else hideTouchLayer();
+          applyView();
+          netMode = 'guest';
+          vStartLoop();
+        } else {
+          if (!ball) ball = mkBall();
+          if (!players.length) players = buildPlayers(msg.roster);
+          if(mySkin && myPlayerId) playerSkins[myPlayerId] = mySkin;
+          $('game-menu').classList.remove('open');
+          $('lobby').style.display = 'none';
+          $('game').style.display  = 'flex';
+          const badge2 = $('net-badge'); badge2.textContent='GUEST'; badge2.className='badge-guest';
+          $('btn-restart').style.display = 'none';
+          $('hud').style.display = 'flex';
+          if(isTouchDev()) positionTouchLayer(); else hideTouchLayer();
+          applyView();
+          netMode = 'guest';
+          startLoop();
+        }
         sysMsg('👋 Sei entrato come spettatore. L\'host può spostarti in una squadra.');
       } else {
-        startGame('guest', pmRoster);
+        if (currentGameMode === 'volley') startVolleyGame('guest', pmRoster);
+        else startGame('guest', pmRoster);
       }
       break;
 
     case 'restarted':
-      reset(true); updateHUD();
+      if (currentGameMode === 'volley') { vReset(true); vUpdateHUD(); }
+      else { reset(true); updateHUD(); }
       break;
 
     case 'state':
-      remoteState = msg;
-      applyRemoteState();
+      if (currentGameMode === 'volley') {
+        vRemoteState = msg;
+        vApplyRemoteState();
+      } else {
+        remoteState = msg;
+        applyRemoteState();
+      }
       break;
 
     case 'meta':
       // score/timer/gameOver arrivano solo quando cambiano
-      score = msg.s; timeLeft = msg.t; updateHUD();
-      if (msg.g && !gameOver) { gameOver = true; }
+      if (currentGameMode === 'volley') {
+        vScore = msg.s; vTimeLeft = msg.t; vUpdateHUD();
+        if (msg.g && !vGameOver) { vGameOver = true; }
+      } else {
+        score = msg.s; timeLeft = msg.t; updateHUD();
+        if (msg.g && !gameOver) { gameOver = true; }
+      }
       break;
 
     case 'pong':
@@ -129,18 +173,34 @@ function handleServerMsg(msg) {
       break;
 
     case 'goal':
-      score = msg.score;
-      updateHUD();
-      setMsg(`⚽ GOOOL! ${msg.team===0?'🔴 ROSSI':'🔵 BLU'}! (${score[0]}–${score[1]})`);
-      goalBurst(msg.team===0 ? FL.l : FL.r, H/2);
-      const gf = $('goal-flash');
-      gf.style.opacity = '1'; setTimeout(() => gf.style.opacity = '0', 140);
-      goalCD = 140;
+      if (currentGameMode === 'volley') {
+        vScore = msg.score;
+        vUpdateHUD();
+        setMsg(`🏐 PUNTO! ${msg.team===0?'🔴 ROSSI':'🔵 BLU'}! (${vScore[0]}–${vScore[1]})`);
+        goalBurst(msg.team===0 ? V_FL.l : V_FL.r, H/2);
+        const gfv = $('goal-flash');
+        gfv.style.opacity = '1'; setTimeout(() => gfv.style.opacity = '0', 140);
+        vGoalCD = V_GOAL_CD;
+        vTouches[0] = 0; vTouches[1] = 0; vBallLastSide = null;
+      } else {
+        score = msg.score;
+        updateHUD();
+        setMsg(`⚽ GOOOL! ${msg.team===0?'🔴 ROSSI':'🔵 BLU'}! (${score[0]}–${score[1]})`);
+        goalBurst(msg.team===0 ? FL.l : FL.r, H/2);
+        const gf = $('goal-flash');
+        gf.style.opacity = '1'; setTimeout(() => gf.style.opacity = '0', 140);
+        goalCD = 140;
+      }
       break;
 
     case 'game_over':
-      score = msg.score; updateHUD();
-      handleGameOver(); // torna al menu P dopo 3s
+      if (currentGameMode === 'volley') {
+        vScore = msg.score; vUpdateHUD();
+        vHandleGameOver();
+      } else {
+        score = msg.score; updateHUD();
+        handleGameOver();
+      }
       break;
 
     case 'chat':
@@ -161,8 +221,13 @@ function handleServerMsg(msg) {
       {
         const r = pmRoster.find(x => x.id === msg.pid);
         if (r) r.team = msg.team;
-        const p = players.find(x => x.id === msg.pid);
-        if (p) p.team = msg.team;
+        if (currentGameMode === 'volley') {
+          const p = vPlayers.find(x => x.id === msg.pid);
+          if (p) p.team = msg.team;
+        } else {
+          const p = players.find(x => x.id === msg.pid);
+          if (p) p.team = msg.team;
+        }
       }
       if ($('game-menu').classList.contains('open')) renderPmRoster();
       break;
@@ -175,7 +240,11 @@ function handleServerMsg(msg) {
 
     case 'player_left':
       pmRoster = pmRoster.filter(r => r.id !== msg.pid);
-      players  = players.filter(p => p.id !== msg.pid);
+      if (currentGameMode === 'volley') {
+        vPlayers = vPlayers.filter(p => p.id !== msg.pid);
+      } else {
+        players = players.filter(p => p.id !== msg.pid);
+      }
       if ($('game-menu').classList.contains('open')) renderPmRoster();
       pushChatMsg({ pid:'system', name:'Sistema', text:`${msg.name || msg.pid} ha lasciato la stanza` }, false);
       break;

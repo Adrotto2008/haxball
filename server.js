@@ -23,14 +23,43 @@ const CONFIG_DEFAULT = {
 const ADMIN_TOKEN = process.env.ADMIN_TOKEN || 'hax-admin-dev';
 
 const W = 1020, H = 600;
+
+// ── COSTANTI CALCIO ──────────────────────────────────────
 const PR = 18, BR = 11;
 const FL = { l: 40, r: W - 40, t: 40, b: H - 40 };
 const GH = 120, GW = 12, GY = H / 2 - 60;
 const TEAM_COLS = ['#ff3333', '#3388ff'];
+
+// ── COSTANTI PALLAVOLO ───────────────────────────────────
+const V_PR = 20, V_BR = 10;
+const V_FL = { l: 40, r: W - 40, t: 40, b: H - 40 };
+const V_NET_X = W / 2;
+const V_POST_W = 8;
+const V_POST_H = (V_FL.b - V_FL.t) / 8;
+const V_POST_X1 = V_NET_X - V_POST_W / 2;
+const V_POST_X2 = V_NET_X + V_POST_W / 2;
+const V_POST_Y1 = V_FL.b - V_POST_H;
+const V_POST_Y2 = V_FL.b;
+const V_B_FRIC = 0.99;
+const V_B_GRAV_BASE = 0.015;
+const V_B_GRAV_MAX  = 0.06;
+const V_B_GRAV_RAMP = 0.0008;
+const V_B_BOUNCE_WALL = 0.35;
+const V_CATCH_R = V_PR + V_BR + 2;
+const V_RELEASE_MIN = 3.0;
+const V_RELEASE_MAX = 10.0;
+const V_TEAM_MAX_TOUCHES = 3;
+const V_P_START = 1.4;
+const V_P_SPEED_MAX = 10.0;
+const V_P_ACCEL = 0.01;
+const V_P_FRIC = 0.78;
+const V_MATCH_TIME = 180;
+const V_GOAL_CD = 120;
+
 const TICK_MS  = 1000 / 60;
 const BCAST_MS = 1000 / 60;
 
-// ── PHYSICS (riceve cfg = room.config) ──────────────────
+// ── PHYSICS CALCIO ───────────────────────────────────────
 function circleCollide(a, b, res) {
   const dx = b.x - a.x, dy = b.y - a.y, d = Math.hypot(dx, dy), md = a.r + b.r;
   if (d < md && d > 0.01) {
@@ -75,22 +104,139 @@ function applyInput(p, inp, ball, cfg) {
   if (p.y > FL.b - p.r) { p.y = FL.b - p.r; p.vy *= -.4; }
 }
 
-// ── ROOM ────────────────────────────────────────────────
+// ── PHYSICS PALLAVOLO ────────────────────────────────────
+function vApplyInputSrv(p, inp, ball) {
+  const charging = inp.kick;
+  const topSpd = charging ? V_P_SPEED_MAX * 0.45 : V_P_SPEED_MAX;
+  if (charging) {
+    if (!p.held) { p.vx *= 0.3; p.vy *= 0.3; }
+  } else {
+    if (p.held && ball.capturedBy === p.id) {
+      vDoReleaseSrv(p, ball);
+    }
+  }
+  p.held = charging;
+  if (inp.up) { if (p.vy >  -V_P_START) p.vy = -V_P_START; p.vy -= V_P_ACCEL; }
+  if (inp.dn) { if (p.vy <   V_P_START) p.vy =  V_P_START; p.vy += V_P_ACCEL; }
+  if (inp.lt) { if (p.vx >  -V_P_START) p.vx = -V_P_START; p.vx -= V_P_ACCEL; }
+  if (inp.rt) { if (p.vx <   V_P_START) p.vx =  V_P_START; p.vx += V_P_ACCEL; }
+  const spd = Math.hypot(p.vx, p.vy);
+  if (spd > topSpd) { p.vx = p.vx / spd * topSpd; p.vy = p.vy / spd * topSpd; }
+  p.x += p.vx; p.y += p.vy; p.vx *= V_P_FRIC; p.vy *= V_P_FRIC;
+  if (p.x < V_FL.l + p.r) { p.x = V_FL.l + p.r; p.vx *= -.4; }
+  if (p.x > V_FL.r - p.r) { p.x = V_FL.r - p.r; p.vx *= -.4; }
+  if (p.y < V_FL.t + p.r) { p.y = V_FL.t + p.r; p.vy *= -.4; }
+  if (p.y > V_FL.b - p.r) { p.y = V_FL.b - p.r; p.vy *= -.4; }
+  // rete: blocca player
+  if (p.team === 0 && p.x + p.r > V_NET_X) { p.x = V_NET_X - p.r; p.vx *= -.4; }
+  if (p.team === 1 && p.x - p.r < V_NET_X) { p.x = V_NET_X + p.r; p.vx *= -.4; }
+}
+
+function vBallCollidePostSrv(ball) {
+  const bx = ball.x, by = ball.y, br = V_BR;
+  const nearX = bx >= V_POST_X1 - br && bx <= V_POST_X2 + br;
+  const nearY = by >= V_POST_Y1 - br && by <= V_POST_Y2 + br;
+  if (!nearX || !nearY) return;
+  const cx = Math.max(V_POST_X1, Math.min(V_POST_X2, bx));
+  const cy = Math.max(V_POST_Y1, Math.min(V_POST_Y2, by));
+  const dx = bx - cx, dy = by - cy;
+  const dist = Math.hypot(dx, dy);
+  if (dist >= br || dist < 0.01) return;
+  const nx = dx / dist, ny = dy / dist;
+  const overlap = br - dist;
+  ball.x += nx * overlap;
+  ball.y += ny * overlap;
+  const dot = ball.vx * nx + ball.vy * ny;
+  if (dot < 0) {
+    ball.vx -= 2 * dot * nx * V_B_BOUNCE_WALL;
+    ball.vy -= 2 * dot * ny * V_B_BOUNCE_WALL;
+  }
+  if (ny < -0.5) ball.grav = V_B_GRAV_BASE;
+}
+
+function vTryCaptureSrv(p, ball) {
+  if (ball.capturedBy) return;
+  const dx = ball.x - p.x, dy = ball.y - p.y;
+  if (Math.hypot(dx, dy) <= V_CATCH_R) {
+    ball.capturedBy = p.id;
+    ball.offset = { x: dx, y: dy };
+  }
+}
+
+function vUpdateCaptureSrv(players, ball) {
+  if (!ball.capturedBy) return;
+  const p = players.find(pl => pl.id === ball.capturedBy);
+  if (!p) { ball.capturedBy = null; return; }
+  ball.offset.y += (ball.grav || V_B_GRAV_BASE);
+  ball.grav = Math.min((ball.grav || V_B_GRAV_BASE) + V_B_GRAV_RAMP, V_B_GRAV_MAX);
+  ball.x = p.x + ball.offset.x;
+  ball.y = p.y + ball.offset.y;
+  if (Math.hypot(ball.offset.x, ball.offset.y) >= V_CATCH_R) {
+    ball.vx = p.vx;
+    ball.vy = p.vy;
+    ball.capturedBy = null;
+    ball.offset = null;
+  }
+}
+
+function vDoReleaseSrv(p, ball) {
+  const off = ball.offset;
+  if (!off) { ball.capturedBy = null; return null; }
+  const dist = Math.hypot(off.x, off.y);
+  const nx = dist > 0.5 ? off.x / dist : 0;
+  const ny = dist > 0.5 ? off.y / dist : -1;
+  // forza INVERSA: palla vicina al centro → forza MAX
+  const t = Math.min(dist / V_CATCH_R, 1);
+  const force = V_RELEASE_MAX - t * (V_RELEASE_MAX - V_RELEASE_MIN);
+  ball.vx = nx * force + p.vx * 0.28;
+  ball.vy = ny * force + p.vy * 0.28;
+  ball.grav = V_B_GRAV_BASE;
+  ball.capturedBy = null;
+  ball.offset = null;
+  return p.team;
+}
+
+function vTickBallSrv(ball) {
+  if (ball.capturedBy) return;
+  ball.grav = (ball.grav !== undefined) ? ball.grav : V_B_GRAV_BASE;
+  ball.vy += ball.grav;
+  ball.grav = Math.min(ball.grav + V_B_GRAV_RAMP, V_B_GRAV_MAX);
+  ball.vx *= V_B_FRIC;
+  ball.vy *= V_B_FRIC;
+  ball.x += ball.vx;
+  ball.y += ball.vy;
+  vBallCollidePostSrv(ball);
+  if (ball.x - V_BR < V_FL.l) { ball.x = V_FL.l + V_BR; ball.vx *= -V_B_BOUNCE_WALL; }
+  if (ball.x + V_BR > V_FL.r) { ball.x = V_FL.r - V_BR; ball.vx *= -V_B_BOUNCE_WALL; }
+  if (ball.y - V_BR < V_FL.t) { ball.y = V_FL.t + V_BR; ball.vy *= -V_B_BOUNCE_WALL; ball.grav = V_B_GRAV_BASE; }
+}
+
+// ── ROOM ─────────────────────────────────────────────────
 function mkBall() { return { x: W / 2, y: H / 2, vx: 0, vy: 0, r: BR }; }
-function mkRoom(code, name, password) {
+function mkVolleyBall() {
+  return { x: W / 2, y: H / 2 - 60, vx: 0, vy: 0, r: V_BR, grav: V_B_GRAV_BASE, capturedBy: null, offset: null };
+}
+function mkRoom(code, name, password, mode) {
+  const isVolley = (mode === 'volley');
   return {
     code, name: name || `Stanza ${code}`, password: password || '',
-    config: { ...CONFIG_DEFAULT }, // copia indipendente per stanza
-    clients: new Map(), players: [], ball: mkBall(),
-    score: [0, 0], timeLeft: CONFIG_DEFAULT.MATCH_TIME, gameOver: false,
+    mode: mode || 'soccer',
+    config: { ...CONFIG_DEFAULT },
+    clients: new Map(), players: [],
+    ball: isVolley ? mkVolleyBall() : mkBall(),
+    score: [0, 0],
+    timeLeft: isVolley ? V_MATCH_TIME : CONFIG_DEFAULT.MATCH_TIME,
+    gameOver: false,
     goalCD: 0, started: false, hostPid: null, roster: [],
     inputs: {}, afkSet: new Set(), skins: {},
+    // stato pallavolo
+    vTouches: { 0: 0, 1: 0 }, vBallLastSide: null,
     ticker: null, secondAccum: 0, lastBcast: 0
   };
 }
 const rooms = new Map();
-function getOrCreate(code, name, password) {
-  if (!rooms.has(code)) rooms.set(code, mkRoom(code, name, password));
+function getOrCreate(code, name, password, mode) {
+  if (!rooms.has(code)) rooms.set(code, mkRoom(code, name, password, mode));
   return rooms.get(code);
 }
 function cleanRoom(room) {
@@ -98,12 +244,12 @@ function cleanRoom(room) {
   rooms.delete(room.code);
 }
 
-// ── BROADCAST HELPERS ───────────────────────────────────
+// ── BROADCAST HELPERS ────────────────────────────────────
 function send(ws, obj) { if (ws.readyState === 1) ws.send(JSON.stringify(obj)); }
 function bcast(room, obj, exceptWs) { for (const [ws] of room.clients) if (ws !== exceptWs) send(ws, obj); }
 function bcastAll(room, obj) { for (const [ws] of room.clients) send(ws, obj); }
 
-// ── ROSTER UTILS ────────────────────────────────────────
+// ── ROSTER UTILS ─────────────────────────────────────────
 function buildRoster(room) {
   return [...room.clients.values()].map(c => ({
     id: c.pid, name: c.name, team: c.team, skin: c.skin || '', afk: c.afk || false
@@ -114,26 +260,29 @@ function syncRoster(room) {
   bcastAll(room, { type: 'pm_update', roster: room.roster, hostId: room.hostPid });
 }
 
-// ── BUILD PLAYERS ────────────────────────────────────────
-function buildPlayers(roster) {
+// ── BUILD PLAYERS ─────────────────────────────────────────
+function buildPlayers(roster, mode) {
+  const isVolley = (mode === 'volley');
+  const pRadius = isVolley ? V_PR : PR;
+  const fieldL = isVolley ? V_FL : FL;
   const result = [], byTeam = [[], []];
   for (const r of roster) if ((r.team === 0 || r.team === 1) && !r.afk) byTeam[r.team].push(r);
   for (const team of [0, 1]) {
     const grp = byTeam[team], n = grp.length;
     grp.forEach((r, i) => result.push({
       id: r.id, team, col: TEAM_COLS[team],
-      x: FL.l + (FL.r - FL.l) * (team === 0 ? .22 : .78),
-      y: FL.t + (FL.b - FL.t) * (i + 1) / (n + 1),
-      vx: 0, vy: 0, r: PR, charge: 0, held: false
+      x: fieldL.l + (fieldL.r - fieldL.l) * (team === 0 ? .22 : .78),
+      y: fieldL.t + (fieldL.b - fieldL.t) * (i + 1) / (n + 1),
+      vx: 0, vy: 0, r: pRadius, charge: 0, held: false
     }));
   }
   for (const r of roster)
     if (r.team === -1 || r.afk)
-      result.push({ id: r.id, team: -1, col: '#555', x: -9999, y: -9999, vx: 0, vy: 0, r: PR, charge: 0, held: false });
+      result.push({ id: r.id, team: -1, col: '#555', x: -9999, y: -9999, vx: 0, vy: 0, r: pRadius, charge: 0, held: false });
   return result;
 }
 
-// ── RESPAWN ──────────────────────────────────────────────
+// ── RESPAWN CALCIO ────────────────────────────────────────
 function resetPositions(room, full) {
   room.ball = mkBall();
   if (full) { room.score = [0, 0]; room.timeLeft = room.config.MATCH_TIME; room.gameOver = false; room.secondAccum = 0; }
@@ -150,7 +299,26 @@ function resetPositions(room, full) {
   }
 }
 
-// ── SERIALIZE STATE ──────────────────────────────────────
+// ── RESPAWN PALLAVOLO ─────────────────────────────────────
+function vResetPositions(room, full) {
+  room.ball = mkVolleyBall();
+  room.vTouches = { 0: 0, 1: 0 };
+  room.vBallLastSide = null;
+  if (full) { room.score = [0, 0]; room.timeLeft = V_MATCH_TIME; room.gameOver = false; room.secondAccum = 0; }
+  room.goalCD = V_GOAL_CD;
+  const byTeam = [[], []];
+  for (const p of room.players) if (p.team === 0 || p.team === 1) byTeam[p.team].push(p);
+  for (const team of [0, 1]) {
+    const grp = byTeam[team], n = grp.length;
+    grp.forEach((p, i) => {
+      p.x = V_FL.l + (V_FL.r - V_FL.l) * (team === 0 ? .22 : .78);
+      p.y = V_FL.t + (V_FL.b - V_FL.t) * (i + 1) / (n + 1);
+      p.vx = 0; p.vy = 0; p.held = false;
+    });
+  }
+}
+
+// ── SERIALIZE STATE ───────────────────────────────────────
 function serializeState(room) {
   return {
     type: 'state',
@@ -164,6 +332,29 @@ function serializeState(room) {
     gc: room.goalCD
   };
 }
+
+function vSerializeState(room) {
+  const ball = room.ball;
+  return {
+    type: 'state',
+    p: room.players.map(p => [
+      Math.round(p.x), Math.round(p.y),
+      Math.round(p.vx * 100) / 100, Math.round(p.vy * 100) / 100,
+      p.held ? 1 : 0
+    ]),
+    b: [
+      Math.round(ball.x), Math.round(ball.y),
+      Math.round(ball.vx * 100) / 100, Math.round(ball.vy * 100) / 100,
+      ball.capturedBy || null,
+      Math.round((ball.grav || V_B_GRAV_BASE) * 10000) / 10000,
+      ball.offset ? Math.round(ball.offset.x * 10) / 10 : null,
+      ball.offset ? Math.round(ball.offset.y * 10) / 10 : null
+    ],
+    gc: room.goalCD,
+    touches: [room.vTouches[0], room.vTouches[1]]
+  };
+}
+
 let _lastMeta = {};
 function broadcastMeta(room) {
   const key = `${room.score[0]},${room.score[1]},${room.timeLeft},${room.gameOver?1:0}`;
@@ -172,7 +363,7 @@ function broadcastMeta(room) {
   bcastAll(room, { type: 'meta', s: room.score.slice(), t: room.timeLeft, g: room.gameOver ? 1 : 0 });
 }
 
-// ── GOL ──────────────────────────────────────────────────
+// ── GOL CALCIO ────────────────────────────────────────────
 function handleGoal(room, team) {
   room.score[team]++;
   room.goalCD = room.config.GOAL_CD;
@@ -180,12 +371,21 @@ function handleGoal(room, team) {
   bcastAll(room, { type: 'goal', team, score: room.score.slice() });
   if (room.score[0] > 99 || room.score[1] > 99) endMatch(room);
 }
+
+// ── PUNTO PALLAVOLO ───────────────────────────────────────
+function vHandlePoint(room, team) {
+  room.score[team]++;
+  vResetPositions(room, false);
+  bcastAll(room, { type: 'goal', team, score: room.score.slice() });
+  if (room.score[0] > 99 || room.score[1] > 99) endMatch(room);
+}
+
 function endMatch(room) {
   room.gameOver = true;
   bcastAll(room, { type: 'game_over', score: room.score.slice() });
 }
 
-// ── GAME TICK ────────────────────────────────────────────
+// ── GAME TICK CALCIO ──────────────────────────────────────
 function tick(room) {
   if (!room.started || room.gameOver) return;
   if (room.goalCD > 0) { room.goalCD--; return; }
@@ -222,17 +422,90 @@ function tick(room) {
   }
 }
 
-// ── AVVIA MATCH ──────────────────────────────────────────
-function startMatch(room) {
-  room.roster  = buildRoster(room);
-  room.players = buildPlayers(room.roster);
-  resetPositions(room, true);
-  room.started = true;
-  bcastAll(room, { type: 'start', roster: room.roster, hostId: room.hostPid, config: room.config });
-  if (!room.ticker) room.ticker = setInterval(() => tick(room), TICK_MS);
+// ── GAME TICK PALLAVOLO ───────────────────────────────────
+function vTick(room) {
+  if (!room.started || room.gameOver) return;
+  if (room.goalCD > 0) { room.goalCD--; return; }
+
+  room.secondAccum += TICK_MS;
+  if (room.secondAccum >= 1000) {
+    room.secondAccum -= 1000;
+    room.timeLeft--;
+    if (room.timeLeft <= 0) { endMatch(room); return; }
+  }
+
+  const ball = room.ball;
+  const players = room.players;
+
+  // input player
+  for (const p of players) {
+    if (p.team === -1) continue;
+    vApplyInputSrv(p, room.inputs[p.id] || {}, ball);
+  }
+
+  // collisioni player-player
+  for (let i = 0; i < players.length; i++)
+    for (let j = i + 1; j < players.length; j++) {
+      if (players[i].team === -1 || players[j].team === -1) continue;
+      const a = players[i], b = players[j];
+      const dx = b.x - a.x, dy = b.y - a.y, d = Math.hypot(dx, dy), md = a.r + b.r;
+      if (d < md && d > 0.01) {
+        const nx = dx / d, ny = dy / d, ov = (md - d) / 2;
+        a.x -= nx * ov; a.y -= ny * ov; b.x += nx * ov; b.y += ny * ov;
+        const rv = (b.vx - a.vx) * nx + (b.vy - a.vy) * ny;
+        if (rv < 0) { const imp = rv * 0.8; a.vx += imp * nx; a.vy += imp * ny; b.vx -= imp * nx; b.vy -= imp * ny; }
+      }
+    }
+
+  // aggiorna cattura (gravità agisce sull'offset)
+  vUpdateCaptureSrv(players, ball);
+
+  // fisica palla libera
+  vTickBallSrv(ball);
+
+  // prova cattura per ogni player vicino
+  for (const p of players) {
+    if (p.team === -1) continue;
+    vTryCaptureSrv(p, ball);
+  }
+
+  // cambio lato → reset tocchi
+  if (!ball.capturedBy) {
+    const side = ball.x < V_NET_X ? 0 : 1;
+    if (room.vBallLastSide !== null && side !== room.vBallLastSide) {
+      room.vTouches[0] = 0; room.vTouches[1] = 0;
+    }
+    room.vBallLastSide = side;
+  }
+
+  // palla tocca il pavimento → punto
+  if (ball.y + V_BR > V_FL.b && !ball.capturedBy) {
+    const team = ball.x < V_NET_X ? 1 : 0; // punto alla squadra opposta
+    vHandlePoint(room, team);
+    return;
+  }
+
+  const now = Date.now();
+  if (now - room.lastBcast >= BCAST_MS) {
+    room.lastBcast = now;
+    bcastAll(room, vSerializeState(room));
+    broadcastMeta(room);
+  }
 }
 
-// ── APPLICA PATCH CONFIG (solo per la room, non globale) ─
+// ── AVVIA MATCH ───────────────────────────────────────────
+function startMatch(room) {
+  room.roster  = buildRoster(room);
+  room.players = buildPlayers(room.roster, room.mode);
+  if (room.mode === 'volley') vResetPositions(room, true);
+  else resetPositions(room, true);
+  room.started = true;
+  bcastAll(room, { type: 'start', roster: room.roster, hostId: room.hostPid, config: room.config, mode: room.mode });
+  const tickFn = (room.mode === 'volley') ? () => vTick(room) : () => tick(room);
+  if (!room.ticker) room.ticker = setInterval(tickFn, TICK_MS);
+}
+
+// ── APPLICA PATCH CONFIG ──────────────────────────────────
 function applyConfigPatch(patch, room) {
   const allowed = new Set(Object.keys(CONFIG_DEFAULT));
   for (const [k, v] of Object.entries(patch)) {
@@ -244,10 +517,8 @@ function applyConfigPatch(patch, room) {
   bcastAll(room, { type: 'config', config: room.config });
 }
 
-// ── HTTP SERVER ──────────────────────────────────────────
+// ── HTTP SERVER ───────────────────────────────────────────
 const server = http.createServer((req, res) => {
-  // Endpoint admin per modificare il CONFIG_DEFAULT (nuovo template per room future)
-  // Non modifica le room già esistenti.
   if (req.method === 'POST' && req.url === '/admin/config') {
     let body = '';
     req.on('data', c => body += c);
@@ -283,19 +554,19 @@ wss.on('connection', ws => {
     if (type === 'list_rooms') {
       const list = [];
       for (const [, r] of rooms)
-        list.push({ code: r.code, name: r.name, players: r.clients.size, hasPassword: !!r.password, started: r.started });
+        list.push({ code: r.code, name: r.name, players: r.clients.size, hasPassword: !!r.password, started: r.started, mode: r.mode });
       send(ws, { type: 'rooms_list', rooms: list });
       return;
     }
 
     if (type === 'create') {
-      const { pid, name, code, roomName, password } = payload;
+      const { pid, name, code, roomName, password, mode } = payload;
       myPid = pid;
-      myRoom = getOrCreate(code, roomName, password);
+      myRoom = getOrCreate(code, roomName, password, mode || 'soccer');
       myRoom.hostPid = pid;
       myRoom.clients.set(ws, { pid, name, team: 0, skin: payload.skin || '', afk: false });
       syncRoster(myRoom);
-      send(ws, { type: 'created', code, hostId: pid, roomName: myRoom.name, hasPassword: !!myRoom.password, config: myRoom.config });
+      send(ws, { type: 'created', code, hostId: pid, roomName: myRoom.name, hasPassword: !!myRoom.password, config: myRoom.config, mode: myRoom.mode });
       return;
     }
 
@@ -313,14 +584,15 @@ wss.on('connection', ws => {
         team = reds <= blues ? 0 : 1;
       }
       myRoom.clients.set(ws, { pid, name, team, skin: payload.skin || '', afk: false });
+      const pRadius = myRoom.mode === 'volley' ? V_PR : PR;
       if (myRoom.started) {
-        myRoom.players.push({ id: pid, team: -1, col: '#555', x: -9999, y: -9999, vx: 0, vy: 0, r: PR, charge: 0, held: false });
+        myRoom.players.push({ id: pid, team: -1, col: '#555', x: -9999, y: -9999, vx: 0, vy: 0, r: pRadius, charge: 0, held: false });
         bcastAll(myRoom, { type: 'chat', pid: 'system', name: 'Sistema', text: `👋 ${name} è entrato come spettatore` });
-        send(ws, { type: 'start', roster: buildRoster(myRoom), hostId: myRoom.hostPid, lateJoin: true, config: myRoom.config });
+        send(ws, { type: 'start', roster: buildRoster(myRoom), hostId: myRoom.hostPid, lateJoin: true, config: myRoom.config, mode: myRoom.mode });
         syncRoster(myRoom);
       } else {
         syncRoster(myRoom);
-        send(ws, { type: 'joined', code, hostId: myRoom.hostPid, roster: buildRoster(myRoom), config: myRoom.config });
+        send(ws, { type: 'joined', code, hostId: myRoom.hostPid, roster: buildRoster(myRoom), config: myRoom.config, mode: myRoom.mode });
       }
       return;
     }
@@ -336,14 +608,16 @@ wss.on('connection', ws => {
     if (type === 'start') { if (myPid === myRoom.hostPid) startMatch(myRoom); return; }
     if (type === 'restart') {
       if (myPid !== myRoom.hostPid) return;
-      resetPositions(myRoom, true); myRoom.gameOver = false;
+      if (myRoom.mode === 'volley') vResetPositions(myRoom, true);
+      else { resetPositions(myRoom, true); myRoom.gameOver = false; }
+      myRoom.gameOver = false;
       bcastAll(myRoom, { type: 'restarted' }); return;
     }
     if (type === 'chat') { bcastAll(myRoom, { type: 'chat', pid: myPid, name: payload.name, text: payload.text }); return; }
 
     if (type === 'set_config') {
       if (myPid !== myRoom.hostPid) return;
-      applyConfigPatch(payload.patch, myRoom); // modifica solo room.config
+      applyConfigPatch(payload.patch, myRoom);
       return;
     }
 

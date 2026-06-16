@@ -50,6 +50,7 @@
     <div class="gm-section-label" style="margin-top:12px">Modalità di gioco</div>
     <div class="mode-picker" id="mode-picker-create">
       <button class="mode-btn active" data-mode="soccer">⚽ Calcio</button>
+      <button class="mode-btn" data-mode="volley">🏐 Pallavolo</button>
     </div>
     <div class="row" style="margin-top:12px">
       <button class="btn btn-red" id="btn-create-go">Crea →</button>
@@ -85,6 +86,7 @@
     <div class="card-title">🎯 Modalità allenamento</div>
     <div class="mode-picker" id="mode-picker-train">
       <button class="mode-btn active" data-mode="soccer">⚽ Calcio</button>
+      <button class="mode-btn" data-mode="volley">🏐 Pallavolo</button>
     </div>
     <div class="row" style="margin-top:12px">
       <button class="btn btn-green" id="btn-train-go">Inizia →</button>
@@ -242,6 +244,13 @@
 <script src="js/modes/soccer/draw.js"></script>
 <script src="js/modes/soccer/sync.js"></script>
 <script src="js/modes/soccer/game.js"></script>
+
+<!-- modalità: pallavolo -->
+<script src="js/modes/volley/config.js"></script>
+<script src="js/modes/volley/physics.js"></script>
+<script src="js/modes/volley/draw.js"></script>
+<script src="js/modes/volley/sync.js"></script>
+<script src="js/modes/volley/game.js"></script>
 
 <!-- lobby (per ultima: usa startTraining/showPrematch già definiti) -->
 <script src="js/lobby.js"></script>
