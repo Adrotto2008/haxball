@@ -12,33 +12,36 @@ const V_P_FRIC      = 0.78;
 const V_FL = { l: 40, r: W-40, t: 40, b: H-40 };  // limiti campo
 
 // ── RETE e MURETTO CENTRALE ─────────────────────────────
-// La rete non ha collisione con la palla (solo con i player).
-// Il muretto è un ostacolo fisico basso al centro che blocca ANCHE la palla.
-const V_NET_X    = W / 2;              // X della rete (per player)
+const V_NET_X    = W / 2;
 
-// Muretto fisico centrale: larghezza 8px, alto 1/8 del campo
-// Posizionato al centro X, parte dalla base (pavimento) verso l'alto
-const V_POST_W   = 8;                  // metà larghezza muretto (±4px da V_NET_X)
-const V_POST_H   = (V_FL.b - V_FL.t) / 8;   // altezza = 1/8 campo
+// Muretto fisico centrale: base al pavimento, alto 1/8 campo
+const V_POST_W   = 8;
+const V_POST_H   = (V_FL.b - V_FL.t) / 8;
 const V_POST_X1  = V_NET_X - V_POST_W / 2;
 const V_POST_X2  = V_NET_X + V_POST_W / 2;
-const V_POST_Y1  = V_FL.b - V_POST_H; // dal pavimento verso l'alto
+const V_POST_Y1  = V_FL.b - V_POST_H;
 const V_POST_Y2  = V_FL.b;
 
 // ── FISICA PALLA ────────────────────────────────────────
-const V_B_FRIC       = 0.99;
-const V_B_GRAV_BASE  = 0.015;
-const V_B_GRAV_MAX   = 0.06;
-const V_B_GRAV_RAMP  = 0.0008;
-const V_B_BOUNCE_WALL = 0.35;          // rimbalzo su muri esterni
+const V_B_FRIC        = 0.99;
+const V_B_GRAV_BASE   = 0.015;
+const V_B_GRAV_MAX    = 0.06;
+const V_B_GRAV_RAMP   = 0.0008;
+const V_B_BOUNCE_WALL = 0.35;
 
-// ── CATTURA / RILANCIO ──────────────────────────────────
-const V_CATCH_R     = V_PR + V_BR + 2; // raggio cattura (~32px)
-const V_RELEASE_MIN = 3.0;             // forza al bordo zona (vicino) → MINIMA
-const V_RELEASE_MAX = 10.0;            // forza al centro (palla ferma vicino) → MASSIMA
-// NOTA: la forza è INVERSA alla distanza —
-// palla vicina al centro del player → rilancio POTENTE
-// palla al bordo della zona di cattura → rilancio DEBOLE
+// ── COLPO PALLA (modalità base: spinta diretta) ──────────
+// Quando la palla tocca il player, riceve un impulso proporzionale
+// alla velocità relativa + un bonus fisso V_HIT_BONUS.
+// Questo dà una "spinta" immediata potente senza cattura.
+const V_HIT_R     = 1.4;    // moltiplicatore impulso su contatto (> B_HIT_R calcio=0.82)
+const V_HIT_BONUS = 6.0;    // impulso bonus in direzione palla←player al contatto
+
+// ── TIRO CARICATO (modalità avanzata) ───────────────────
+// Come il calcio: tieni AZIONE per caricare, rilascia per tirare.
+const V_KICK_MIN    = 4.0;
+const V_KICK_MAX    = 14.0;
+const V_KICK_CHG_F  = 50;
+const V_KICK_DIST_X = 14;   // raggio zona tiro (player.r + V_BR + margine)
 
 // ── REGOLA TOCCHI ───────────────────────────────────────
 const V_TEAM_MAX_TOUCHES = 3;
@@ -50,3 +53,36 @@ const V_TEAM_HI   = ['#ff7777', '#77bbff'];
 // ── MATCH ───────────────────────────────────────────────
 const V_MATCH_TIME = 180;
 const V_GOAL_CD    = 120;
+
+// ── CONFIG LIVE VOLLEY (specchio server, modificabile da host) ──
+let V_CONFIG = {
+  V_P_START:    1.4,
+  V_P_SPEED_MAX:10.0,
+  V_P_ACCEL:    0.01,
+  V_P_FRIC:     0.78,
+  V_B_FRIC:     0.99,
+  V_B_BOUNCE:   0.35,
+  V_HIT_R:      1.4,
+  V_HIT_BONUS:  6.0,
+  V_KICK_MIN:   4.0,
+  V_KICK_MAX:   14.0,
+  V_KICK_CHG_F: 50,
+  V_MATCH_TIME: 180,
+  V_GOAL_CD:    120,
+};
+
+const V_CONFIG_META = [
+  { key:'V_P_START',    label:'Velocità iniziale',      min:0,   max:5,   step:0.1  },
+  { key:'V_P_SPEED_MAX',label:'Velocità massima',       min:1,   max:30,  step:0.5  },
+  { key:'V_P_ACCEL',    label:'Accelerazione',          min:0,   max:1,   step:0.005},
+  { key:'V_P_FRIC',     label:'Attrito player',         min:0.5, max:1,   step:0.01 },
+  { key:'V_B_FRIC',     label:'Attrito palla',          min:0.9, max:1,   step:0.001},
+  { key:'V_B_BOUNCE',   label:'Rimbalzo palla',         min:0,   max:1,   step:0.05 },
+  { key:'V_HIT_R',      label:'Moltiplicatore colpo',   min:0,   max:3,   step:0.05 },
+  { key:'V_HIT_BONUS',  label:'Impulso bonus colpo',    min:0,   max:20,  step:0.5  },
+  { key:'V_KICK_MIN',   label:'Tiro caricato minimo',   min:1,   max:20,  step:0.5  },
+  { key:'V_KICK_MAX',   label:'Tiro caricato massimo',  min:5,   max:40,  step:0.5  },
+  { key:'V_KICK_CHG_F', label:'Frame carica tiro',      min:10,  max:120, step:5    },
+  { key:'V_MATCH_TIME', label:'Durata partita (sec)',    min:30,  max:600, step:30   },
+  { key:'V_GOAL_CD',    label:'Pausa dopo punto (frame)',min:30,  max:300, step:10   },
+];

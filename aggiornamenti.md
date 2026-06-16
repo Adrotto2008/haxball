@@ -4,6 +4,34 @@ Questo file tiene traccia delle modifiche e delle nuove funzionalità introdotte
 
 ---
 
+## v2.7.0 — Nuova modalità: Pallavolo 🏐
+
+### ✨ Novità
+- **Modalità Pallavolo completa** (`js/modes/volley/`): nuova cartella con 5 file che specchiano l'architettura di `modes/soccer/`.
+  - `config.js` — costanti con prefisso `V_` (nessuna collisione con il calcio): dimensioni, fisica palla, rete, muretto, cattura/rilancio, tocchi.
+  - `physics.js` — fisica pura: movimento player, gravità progressiva palla, collisione muretto (AABB vs cerchio), cattura/offset, rilancio con forza **inversa** alla distanza (palla vicina al centro = rilancio potente), contatore tocchi per squadra.
+  - `draw.js` — rendering campo sabbia, rete con pali e filo, muretto centrale, palla pallavolo con sezioni colorate e trail, player con alone cattura, indicatori tocchi rimanenti.
+  - `sync.js` — dead reckoning e `applyRemoteState` adattati per lo stato "catturato" (serializza `capturedBy`/`offset`).
+  - `game.js` — stato partita, loop RAF dedicato (`vLoop`/`vStartLoop`/`vStopLoop`), gol con respawn, fine partita, `startVolleyGame`/`startVolleyTraining`.
+- **Muretto centrale fisico**: rettangolo 8×(campo/8)px a `W/2`, base al pavimento. Ha collisione con la palla (rimbalzo `V_B_BOUNCE_WALL`, reset gravità se colpito sopra) ma — come i muri esterni — **non conta come tocco squadra**. I player non collide con esso (solo con la rete invisibile a `V_NET_X`).
+- **Forza di rilancio inversa**: `force = V_RELEASE_MAX - t*(V_RELEASE_MAX-V_RELEASE_MIN)` dove `t = dist/V_CATCH_R`. Palla vicina al centro del player → rilancio più potente; palla al bordo zona cattura → rilancio più debole.
+- **Gravità progressiva sulla palla**: ogni tick `ball.vy += ball.grav`, `ball.grav` sale da `0.015` a `0.06` con rampa `0.0008`. Si azzera al rimbalzo sul soffitto/muretto e al rilancio.
+- **Regola dei 3 tocchi**: ogni rilancio riuscito incrementa `vTouches[team]`; al 4° tocco è punto per la squadra avversaria. I contatori si azzerano quando la palla cambia metà campo o dopo ogni punto.
+- **Supporto server-side** (`server.js`): aggiunto `vTick` con fisica pallavolo 1:1 al client (gravità, muretto, cattura, rilancio, tocchi, punto al pavimento). Costanti `V_` duplicate nel server. `startMatch` sceglie `tick` o `vTick` in base a `room.mode`. `mkVolleyBall`, `vResetPositions`, `vSerializeState`, `vHandlePoint` aggiunti.
+- **Mode picker** (`index.html`): bottone "🏐 Pallavolo" aggiunto in entrambi i mode picker (crea stanza + allenamento).
+- **Routing modalità** (`js/network-core.js`): variabile `currentGameMode` introdotta; tutti i messaggi `start`, `state`, `goal`, `game_over`, `restarted`, `pm_update`, `team_change`, `player_left` ora smistano verso le funzioni volley o soccer in base alla modalità attiva.
+- **Lobby** (`js/lobby.js`): `btn-train-go` avvia `startVolleyTraining()` se selezionata pallavolo; `showLobby` chiama `vStopLoop()` oltre a `stopLoop()`; `btn-restart` in train gestisce entrambe le modalità; `currentGameMode` resettato a `'soccer'` al ritorno in lobby.
+
+### 🔧 Fix / Dettagli implementativi
+- `startGame` (calcio) chiama `vStopLoop()` prima di avviare il loop; `startTraining` idem.
+- `startVolleyGame` chiama `stopLoop()` prima di avviare `vStartLoop()`.
+- `vUpdate` in train: ordine corretto — `vApplyInput` → `vTryCapture`+`vPlayerBallCollide` (solo se non catturata) → `vCircleCollide` player↔player → `vUpdateCapture` → `vTickBall` → check pavimento → `vCheckSideChange`.
+- `vGoal` resetta posizione di tutti i player (non solo la palla).
+- `vHandleGameOverLocal` resetta correttamente `vGameOver=false` e lo stato completo dopo 3 secondi.
+- `vTouches` serializzato nello state broadcast (`touches: [n0, n1]`) per sincronizzare gli indicatori HUD sui client.
+
+---
+
 ## v2.6.1 — Fix: config isolata per stanza
 
 ### 🔧 Fix critico

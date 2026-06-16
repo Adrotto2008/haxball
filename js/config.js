@@ -1,6 +1,6 @@
 // ── CONFIG — costanti davvero globali (mode-agnostiche) ──
 // Tutto ciò che è specifico del calcio sta in js/modes/soccer/config.js
-const VERSION = '2.6.1';
+const VERSION = '2.7.0';
 const W = 1020, H = 600;
 const DPR = Math.min(window.devicePixelRatio||1, 2);
 

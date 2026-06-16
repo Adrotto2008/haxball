@@ -161,6 +161,7 @@ function startLoop() {
 
 // ── START GAME ─────────────────────────────────────────
 function startGame(mode, roster) {
+  vStopLoop(); // ferma eventuale loop pallavolo attivo
   netMode = mode; players = buildPlayers(roster);
   if(mySkin && myPlayerId) playerSkins[myPlayerId] = mySkin;
   $('game-menu').classList.remove('open');
@@ -176,6 +177,7 @@ function startGame(mode, roster) {
   startLoop();
 }
 function startTraining() {
+  vStopLoop(); // ferma eventuale loop pallavolo attivo
   myNickname = (typeof getNick==='function') ? getNick() : 'Giocatore';
   myPlayerId='local'; hostId='local'; netMode='train'; isHost=true;
   startGame('train',[{id:'local',team:0,name:myNickname}]);

@@ -225,6 +225,7 @@ function vStartLoop() {
 
 // ── START GAME VOLLEY ───────────────────────────────────
 function startVolleyGame(mode, roster) {
+  stopLoop();   // ferma eventuale loop calcio attivo
   netMode = mode; vPlayers = vBuildPlayers(roster);
   if (mySkin && myPlayerId) playerSkins[myPlayerId] = mySkin;
   $('game-menu').classList.remove('open');
