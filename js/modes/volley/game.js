@@ -23,19 +23,13 @@ function vUpdate(dt) {
     const p = vPlayers[0];
     if (p) {
       vApplyInput(p, inpLocal());
-      // collisione diretta player↔palla (se non catturata)
-      if (!vBall.capturedBy) {
-        vTryCapture(p);
-        vPlayerBallCollide(p);
-      }
+      vPlayerBallCollide(p); // spinge palla (base) o tira (advanced)
     }
-    // collisioni player↔player (per future modalità multi)
+    // collisioni player↔player
     for (let i = 0; i < vPlayers.length; i++)
       for (let j = i + 1; j < vPlayers.length; j++)
         if (vPlayers[i].team !== -1 && vPlayers[j].team !== -1)
           vCircleCollide(vPlayers[i], vPlayers[j]);
-    // aggiorna cattura (posizione + fuga offset)
-    vUpdateCapture();
     // fisica palla libera
     vTickBall();
     // check pavimento → punto
@@ -105,7 +99,7 @@ function vHandleGameOverLocal() {
               `🤝 Pareggio! (${vScore[0]}–${vScore[1]})`;
   setMsg(msg);
   setTimeout(() => { vScore = [0, 0]; vTimeLeft = V_MATCH_TIME; vGameOver = false; vSecondAccum = 0; vReset(false); vUpdateHUD();
-    setMsg('🏐 Pallavolo — WASD muovi · 0/Ctrl/Spazio cattura/rilancio'); }, 3000);
+    setMsg('🏐 Pallavolo — WASD muovi · 0/Ctrl/Spazio tiro caricato (modale avanzata)'); }, 3000);
 }
 
 function vHandleGameOver() {
@@ -178,7 +172,7 @@ function vBuildPlayers(roster) {
         id: r.id, team, col: V_TEAM_COLS[team],
         x: V_FL.l + (V_FL.r - V_FL.l) * (team === 0 ? .22 : .78),
         y: V_FL.t + (V_FL.b - V_FL.t) * (i + 1) / (n + 1),
-        vx: 0, vy: 0, r: V_PR, held: false
+        vx: 0, vy: 0, r: V_PR, held: false, charge: 0
       });
     });
   }
@@ -195,7 +189,6 @@ function vMkBall() {
     x: W / 2, y: H / 2 - 60,
     vx: 0, vy: 0, r: V_BR,
     grav: V_B_GRAV_BASE,
-    capturedBy: null, offset: null,
     trail: []
   };
 }

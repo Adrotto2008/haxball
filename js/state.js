@@ -68,3 +68,8 @@ let currentView = 8;
 // Migliora la fluidità su reti buone, peggiora su reti instabili.
 // Ogni giocatore può cambiarla nelle impostazioni.
 let useLocalPrediction = JSON.parse(localStorage.getItem('hax_prediction') ?? 'true');
+
+// ── IMPOSTAZIONE: modalità controlli volley ────────────────
+// 'base'     = contatto diretto spinge la palla con impulso bonus (default)
+// 'advanced' = tieni AZIONE per caricare, rilascia per tirare (come calcio)
+let vControlMode = localStorage.getItem('hax_vcontrol') || 'base';

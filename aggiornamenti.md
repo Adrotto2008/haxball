@@ -4,6 +4,27 @@ Questo file tiene traccia delle modifiche e delle nuove funzionalità introdotte
 
 ---
 
+## v2.8.0 — Fix fisica pallavolo + controlli avanzati + pannello variabili per modalità + fix chat doppia
+
+### ✨ Novità
+- **Palla pallavolo non si attacca più al player**: rimossa completamente la meccanica di cattura/offset. Il contatto fisico spinge direttamente la palla tramite `vPlayerBallCollide` con impulso velocità relativa × `V_HIT_R` + bonus fisso `V_HIT_BONUS`. La palla attraversa il player normalmente.
+- **Colpo base più potente**: `V_HIT_BONUS = 6.0` garantisce un impulso minimo in direzione centrifuga ad ogni contatto, anche se il player è fermo. Il tocco conta solo se la velocità di avvicinamento supera 0.5 px/tick.
+- **Modalità controlli avanzati** (impostazioni → Pallavolo): toggle `⚙️ Controlli avanzati` visibile solo quando la modalità attiva è pallavolo. In modalità avanzata: tieni AZIONE per caricare il tiro, rilascia per tirare (stessa meccanica del calcio con `V_KICK_MIN/MAX/CHG_F`). La carica è visualizzata da un anello tratteggiato giallo attorno al player e dalla palla che pulsa.
+- **Pannello variabili per modalità**: il tab «🎛️ Variabili» mostra le variabili specifiche della modalità attiva (calcio: `CONFIG_META`, pallavolo: `V_CONFIG_META`). Le variabili volley sono modificabili localmente (non richiedono sync server). Label chiara in cima al pannello.
+- **`V_CONFIG` live**: oggetto separato da `CONFIG` per le variabili pallavolo, modificabile in-game via slider/number input.
+- **`vControlMode`** salvato in `localStorage` (`hax_vcontrol`): persiste tra sessioni.
+
+### 🔧 Fix
+- **Chat doppio messaggio risolto**: `sendChatMsg` non fa più `pushChatMsg` localmente quando online — il server rimanda il messaggio a tutti incluso il mittente, che viene già mostrato dal case `chat` in `network-core.js` con `isSelf=true`.
+- **Rimossi tutti i riferimenti a `capturedBy`/`offset`** da `game.js`, `draw.js`, `sync.js` e `physics.js` (la cattura non esiste più).
+- **`vMkBall`** non include più `capturedBy`/`offset`.
+- **`vBuildPlayers`** aggiunge `charge: 0` ai player volley (necessario per modalità avanzata).
+- **`menu.js` riscritto** per supportare: pannello variabili per modalità, toggle vcontrol, restart corretto per entrambe le modalità in ESC menu.
+- **`vcontrol-row`** nell'HTML è nascosto di default e mostrato solo in-game pallavolo.
+- **`.cfg-mode-label`** aggiunto al CSS del menu.
+
+---
+
 ## v2.7.0 — Nuova modalità: Pallavolo 🏐
 
 ### ✨ Novità

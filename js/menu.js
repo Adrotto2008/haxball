@@ -14,9 +14,15 @@ function openMenu(context) {
   $('esc-leave').textContent       = menuContext === 'prematch' ? '← Lascia stanza' : '✕ Esci';
   $('pm-admin-hint').style.display = isHost ? '' : 'none';
   $('gm-close-btn').style.display  = menuContext === 'ingame' ? '' : 'none';
-  // sincronizza il toggle con il valore corrente
   const chk = $('toggle-prediction');
   if (chk) chk.checked = useLocalPrediction;
+  // mostra/nascondi toggle controlli avanzati volley
+  const vctrlRow = $('vcontrol-row');
+  if (vctrlRow) {
+    vctrlRow.style.display = (currentGameMode === 'volley') ? '' : 'none';
+    const vchk = $('toggle-vcontrol');
+    if (vchk) vchk.checked = (vControlMode === 'advanced');
+  }
   switchTab('roster');
   $('game-menu').classList.add('open');
   escOpen = (menuContext === 'ingame');
@@ -29,67 +35,74 @@ function closeMenu() {
 }
 
 $('game-menu').addEventListener('click', e => {
-  // chiude solo se sei in-game e clicchi fuori dalla box
-  if(e.target === $('game-menu') && $('game').style.display !== 'none') closeMenu();
+  if (e.target === $('game-menu') && $('game').style.display !== 'none') closeMenu();
 });
 $('gm-close-btn').addEventListener('click', closeMenu);
-$('gm-tabs').addEventListener('click', e => { const t=e.target.closest('.gm-tab'); if(t) switchTab(t.dataset.tab); });
+$('gm-tabs').addEventListener('click', e => { const t = e.target.closest('.gm-tab'); if (t) switchTab(t.dataset.tab); });
 
 function switchTab(tab) {
-  document.querySelectorAll('.gm-tab').forEach(b => b.classList.toggle('active', b.dataset.tab===tab));
-  $('gm-panel-roster').style.display   = tab==='roster'   ? 'flex' : 'none';
-  $('gm-panel-settings').style.display = tab==='settings' ? 'flex' : 'none';
-  $('gm-panel-vars').style.display     = tab==='vars'     ? 'flex' : 'none';
+  document.querySelectorAll('.gm-tab').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+  $('gm-panel-roster').style.display   = tab === 'roster'   ? 'flex' : 'none';
+  $('gm-panel-settings').style.display = tab === 'settings' ? 'flex' : 'none';
+  $('gm-panel-vars').style.display     = tab === 'vars'     ? 'flex' : 'none';
   if (tab === 'vars') renderConfigPanel();
 }
 
-// ── PANNELLO VARIABILI ─────────────────────────────────
-// Visibile a tutti, modificabile solo dall'host.
-// Ogni cambio manda {type:'set_config', payload:{patch:{...}}} al server.
+// ── PANNELLO VARIABILI ──────────────────────────────────
+// Mostra variabili calcio o pallavolo in base a currentGameMode.
+// Modificabile solo dall'host. Per il volley le patch sono solo locali
+// (il server usa le costanti fisse compilate in server.js).
 function renderConfigPanel() {
-  const el = $('config-panel-content');
+  const el   = $('config-panel-content');
   const hint = $('config-hint');
   if (!el) return;
-  if (!isHost) {
-    hint.textContent = '🔒 Solo l\'host può modificare le variabili';
-    hint.style.display = '';
-  } else {
-    hint.textContent = '⚠️ Le modifiche si applicano immediatamente a tutti i client';
-    hint.style.display = '';
-  }
-  el.innerHTML = CONFIG_META.map(m => `
-    <div class="cfg-row">
-      <label class="cfg-label">${m.label}</label>
-      <div class="cfg-controls">
-        <input type="range" class="cfg-slider"
-          data-key="${m.key}" min="${m.min}" max="${m.max}" step="${m.step}"
-          value="${CONFIG[m.key]}" ${isHost ? '' : 'disabled'}>
-        <input type="number" class="cfg-num"
-          data-key="${m.key}" min="${m.min}" max="${m.max}" step="${m.step}"
-          value="${CONFIG[m.key]}" ${isHost ? '' : 'disabled'}>
-      </div>
-    </div>
-  `).join('');
 
-  // listener: slider e number input sincronizzati, inviano patch al server
+  hint.textContent = isHost
+    ? '⚠️ Le modifiche si applicano immediatamente a tutti i client'
+    : '🔒 Solo l\'host può modificare le variabili';
+  hint.style.display = '';
+
+  const isVolley = (currentGameMode === 'volley');
+  const meta   = isVolley ? V_CONFIG_META : CONFIG_META;
+  const source = isVolley ? V_CONFIG      : CONFIG;
+
+  const modeLabel = isVolley ? '🏐 Variabili Pallavolo' : '⚽ Variabili Calcio';
+
+  let html = '<div class="cfg-mode-label">' + modeLabel + '</div>';
+  for (const m of meta) {
+    html += '<div class="cfg-row">' +
+      '<label class="cfg-label">' + m.label + '</label>' +
+      '<div class="cfg-controls">' +
+        '<input type="range" class="cfg-slider" data-key="' + m.key +
+          '" min="' + m.min + '" max="' + m.max + '" step="' + m.step +
+          '" value="' + source[m.key] + '"' + (isHost ? '' : ' disabled') + '>' +
+        '<input type="number" class="cfg-num" data-key="' + m.key +
+          '" min="' + m.min + '" max="' + m.max + '" step="' + m.step +
+          '" value="' + source[m.key] + '"' + (isHost ? '' : ' disabled') + '>' +
+      '</div></div>';
+  }
+  el.innerHTML = html;
+
   el.querySelectorAll('.cfg-slider, .cfg-num').forEach(inp => {
     inp.addEventListener('input', () => {
       if (!isHost) return;
       const key = inp.dataset.key;
       const val = parseFloat(inp.value);
       if (isNaN(val)) return;
-      CONFIG[key] = val;
-      // sincronizza l'altro input (slider <-> number)
-      el.querySelectorAll(`[data-key="${key}"]`).forEach(x => { if (x !== inp) x.value = val; });
-      // invia patch al server (debounced tramite l'evento 'change' per gli slider)
-      wsSend({ type: 'set_config', payload: { patch: { [key]: val } } });
+      if (isVolley) {
+        V_CONFIG[key] = val;
+      } else {
+        CONFIG[key] = val;
+        wsSend({ type: 'set_config', payload: { patch: { [key]: val } } });
+      }
+      el.querySelectorAll('[data-key="' + key + '"]').forEach(x => { if (x !== inp) x.value = val; });
     });
   });
 }
 
 function toggleEscMenu(forceOpen) {
   const isOpen = $('game-menu').classList.contains('open');
-  if(forceOpen === true || (!isOpen && forceOpen !== false)) {
+  if (forceOpen === true || (!isOpen && forceOpen !== false)) {
     openMenu('ingame');
   } else {
     closeMenu();
@@ -98,7 +111,7 @@ function toggleEscMenu(forceOpen) {
 function showPrematch() {
   $('lobby').style.display  = 'none';
   $('game').style.display   = 'none';
-  if(isTouchDev()) $('touch-layer').style.display = 'none';
+  if (isTouchDev()) $('touch-layer').style.display = 'none';
   openMenu('prematch');
 }
 
@@ -108,24 +121,46 @@ function hidePrematch() {
 
 // ── AVVIO / RITORNO PARTITA ────────────────────────────
 function hostStartMatch() {
-  if(!pmRoster.filter(r=>r.team===0||r.team===1).length) return;
-  wsSend({ type:'start', payload:{} });
-  // startGame verrà chiamato quando arriverà msg 'start' dal server
+  if (!pmRoster.filter(r => r.team === 0 || r.team === 1).length) return;
+  wsSend({ type: 'start', payload: {} });
 }
 function backToPrematch() {
-  running=false; $('game').style.display='none';
-  if(isTouchDev()) $('touch-layer').style.display='none';
-  wsSend({ type:'back_prematch', payload:{} });
+  running = false; $('game').style.display = 'none';
+  if (isTouchDev()) $('touch-layer').style.display = 'none';
+  wsSend({ type: 'back_prematch', payload: {} });
   showPrematch();
 }
 
 $('pm-btn-start').onclick = hostStartMatch;
 $('esc-resume').onclick   = () => closeMenu();
-$('esc-restart').onclick  = () => { closeMenu(); if(netMode==='train'){ resetLocal(true); updateHUD(); } else if(isHost) wsSend({type:'restart',payload:{}}); };
-$('esc-leave').onclick    = () => { closeMenu(); leaveGame(); };
+$('esc-restart').onclick  = () => {
+  closeMenu();
+  if (netMode === 'train') {
+    if (currentGameMode === 'volley') { vScore = [0,0]; vTimeLeft = V_MATCH_TIME; vGameOver = false; vSecondAccum = 0; vReset(false); vUpdateHUD(); setMsg(''); }
+    else { resetLocal(true); updateHUD(); }
+  } else if (isHost) {
+    wsSend({ type: 'restart', payload: {} });
+  }
+};
+$('esc-leave').onclick = () => { closeMenu(); leaveGame(); };
 
-// toggle prediction locale
+// ── TOGGLE: prediction locale ──────────────────────────
 document.getElementById('toggle-prediction').addEventListener('change', e => {
   useLocalPrediction = e.target.checked;
   localStorage.setItem('hax_prediction', JSON.stringify(useLocalPrediction));
 });
+
+// ── TOGGLE: controlli avanzati volley ─────────────────
+// Il toggle è nell'HTML con id="toggle-vcontrol" dentro id="vcontrol-row".
+// La riga è mostrata solo quando currentGameMode === 'volley'.
+const _vctrl = document.getElementById('toggle-vcontrol');
+if (_vctrl) {
+  _vctrl.addEventListener('change', e => {
+    vControlMode = e.target.checked ? 'advanced' : 'base';
+    localStorage.setItem('hax_vcontrol', vControlMode);
+    const hint = e.target.checked
+      ? '🏐 Controlli avanzati: tieni AZIONE per caricare, rilascia per tirare'
+      : '🏐 Controlli base: avvicinati alla palla per colpirla';
+    sysMsg(hint);
+  });
+}

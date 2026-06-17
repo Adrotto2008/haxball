@@ -185,6 +185,11 @@
 }
 .cfg-num:disabled { opacity:.35; cursor:not-allowed; }
 .cfg-num:focus { border-color:rgba(80,150,255,.5); }
+.cfg-mode-label {
+  font-size:10px; font-weight:700; letter-spacing:2px; text-transform:uppercase;
+  color:rgba(255,255,255,.4); padding:4px 0 8px;
+  border-bottom:1px solid rgba(255,255,255,.08); margin-bottom:4px;
+}
 .config-hint {
   font-size:11px; color:rgba(255,200,80,.7); margin-top:8px;
   padding:6px 8px; background:rgba(255,200,0,.06);

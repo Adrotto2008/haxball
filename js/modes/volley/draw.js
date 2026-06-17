@@ -120,14 +120,15 @@ function vDrawBall() {
   ctx.fillStyle = 'rgba(255,255,255,0.45)';
   ctx.beginPath(); ctx.arc(bx - 3, by - 3, br * 0.28, 0, Math.PI * 2); ctx.fill();
 
-  // indicatore cattura: anello intorno alla palla quando è catturata
-  if (vBall.capturedBy) {
-    const p = vPlayers.find(pl => pl.id === vBall.capturedBy);
-    if (p) {
-      const pulse = 0.5 + 0.5 * Math.sin(Date.now() * 0.01);
-      ctx.strokeStyle = `rgba(${p.team===0?'255,100,100':'100,160,255'},${0.5+pulse*0.4})`;
-      ctx.lineWidth = 2; ctx.setLineDash([3, 3]);
-      ctx.beginPath(); ctx.arc(bx, by, br + 5, 0, Math.PI * 2); ctx.stroke();
+  // indicatore carica tiro (modalità avanzata)
+  if (vControlMode === 'advanced') {
+    const chargeP = vPlayers.find(pl => pl.id === myPlayerId);
+    if (chargeP && chargeP.held && (chargeP.charge || 0) > 0) {
+      const t = chargeP.charge / V_CONFIG.V_KICK_CHG_F;
+      const pulse = 0.5 + 0.5 * Math.sin(Date.now() * 0.018);
+      ctx.strokeStyle = `rgba(255,220,80,${0.5 + pulse * 0.4})`;
+      ctx.lineWidth = 2 + t * 2; ctx.setLineDash([3, 3]);
+      ctx.beginPath(); ctx.arc(bx, by, br + 4 + t * 6, 0, Math.PI * 2); ctx.stroke();
       ctx.setLineDash([]);
     }
   }
@@ -137,11 +138,11 @@ function vDrawBall() {
 function vDrawPlayer(p) {
   if (p.team === -1) return;
   const isAfk = afkPlayers.has(p.id);
-  const isCatching = vBall.capturedBy === p.id;
+  const isCharging = (vControlMode === 'advanced') && p.held && (p.charge || 0) > 0;
 
   // alone
-  const ga = isAfk ? 0.06 : (isCatching ? 0.18 : 0.04);
-  const glowR = p.r + 14 + (isCatching ? 10 : 0);
+  const ga = isAfk ? 0.06 : (isCharging ? 0.18 : 0.04);
+  const glowR = p.r + 14 + (isCharging ? 10 : 0);
   const grc = isAfk ? `rgba(150,150,150,${ga})` :
     p.team === 0 ? `rgba(255,80,80,${ga})` : `rgba(80,140,255,${ga})`;
   const grd = ctx.createRadialGradient(p.x, p.y, p.r * 0.3, p.x, p.y, glowR);
@@ -151,8 +152,8 @@ function vDrawPlayer(p) {
   // anello esterno
   ctx.beginPath(); ctx.arc(p.x, p.y, p.r + 6, 0, Math.PI * 2);
   ctx.strokeStyle = isAfk ? 'rgba(180,180,180,0.2)' :
-    (isCatching ? 'rgba(255,255,100,0.8)' : 'rgba(255,255,255,0.12)');
-  ctx.lineWidth = isCatching ? 3 : 1.2; ctx.stroke();
+    (isCharging ? 'rgba(255,220,80,0.8)' : 'rgba(255,255,255,0.12)');
+  ctx.lineWidth = isCharging ? 3 : 1.2; ctx.stroke();
 
   // ombra corpo
   ctx.fillStyle = 'rgba(0,0,0,.22)';
@@ -168,12 +169,12 @@ function vDrawPlayer(p) {
   } else {
     const hi = V_TEAM_HI[p.team];
     const bg = ctx.createRadialGradient(p.x - 4, p.y - 4, 1, p.x, p.y, p.r);
-    bg.addColorStop(0, isCatching ? '#ffffff' : hi);
-    bg.addColorStop(1, isCatching ? V_TEAM_COLS[p.team] : V_TEAM_COLS[p.team]);
+    bg.addColorStop(0, isCharging ? '#ffffff' : hi);
+    bg.addColorStop(1, isCharging ? V_TEAM_COLS[p.team] : V_TEAM_COLS[p.team]);
     ctx.fillStyle = bg;
     ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2); ctx.fill();
-    ctx.strokeStyle = isCatching ? 'rgba(255,255,100,0.9)' : 'rgba(255,255,255,0.5)';
-    ctx.lineWidth = isCatching ? 2.5 : 1.5;
+    ctx.strokeStyle = isCharging ? 'rgba(255,220,80,0.9)' : 'rgba(255,255,255,0.5)';
+    ctx.lineWidth = isCharging ? 2.5 : 1.5;
     ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2); ctx.stroke();
   }
 
@@ -195,16 +196,14 @@ function vDrawPlayer(p) {
   ctx.fillText(label, p.x, p.y + 0.5); ctx.shadowBlur = 0;
   ctx.globalAlpha = 1;
 
-  // zona di cattura (anello tratteggiato attorno al player)
-  if (!isAfk && !isCatching && !vBall.capturedBy) {
-    const catchDist = Math.hypot(vBall.x - p.x, vBall.y - p.y);
-    if (catchDist < V_CATCH_R * 1.8) {
-      const a = Math.max(0, 1 - catchDist / (V_CATCH_R * 1.8)) * 0.3;
-      ctx.strokeStyle = `rgba(255,255,200,${a})`;
-      ctx.lineWidth = 1; ctx.setLineDash([4, 4]);
-      ctx.beginPath(); ctx.arc(p.x, p.y, V_CATCH_R, 0, Math.PI * 2); ctx.stroke();
-      ctx.setLineDash([]);
-    }
+  // zona carica (anello tratteggiato attorno al player in modalità avanzata)
+  if (!isAfk && vControlMode === 'advanced' && p.held) {
+    const t = Math.min((p.charge || 0) / V_CONFIG.V_KICK_CHG_F, 1);
+    const a = 0.15 + t * 0.35;
+    ctx.strokeStyle = `rgba(255,220,80,${a})`;
+    ctx.lineWidth = 1; ctx.setLineDash([4, 4]);
+    ctx.beginPath(); ctx.arc(p.x, p.y, p.r + V_BR + V_CONFIG.V_KICK_DIST_X, 0, Math.PI * 2); ctx.stroke();
+    ctx.setLineDash([]);
   }
 }
 

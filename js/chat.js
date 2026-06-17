@@ -2,10 +2,18 @@
 
 // ── INVIO / RICEZIONE ──────────────────────────────────
 function sendChatMsg(text) {
-  const msg = { pid: myPlayerId, name: myNickname, text: text.trim() };
-  if (!ws || ws.readyState !== 1) { pushChatMsg(msg, true); return; }
-  wsSend({ type: 'chat', payload: { name: myNickname, text: text.trim() } });
-  pushChatMsg(msg, true);
+  const trimmed = text.trim();
+  if (!trimmed) return;
+  const msg = { pid: myPlayerId, name: myNickname, text: trimmed };
+  if (!ws || ws.readyState !== 1) {
+    // offline/train: mostra subito localmente
+    pushChatMsg(msg, true);
+    return;
+  }
+  // online: NON aggiungere subito — il server rimanda il msg a tutti compreso noi.
+  // Il case 'chat' in network-core.js chiama pushChatMsg con isSelf=true
+  // quando pid===myPlayerId, quindi non dupliciamo qui.
+  wsSend({ type: 'chat', payload: { name: myNickname, text: trimmed } });
 }
 function pushChatMsg(msg, isSelf) {
   chatMessages.push({ ...msg, isSelf });
