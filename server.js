@@ -331,6 +331,20 @@ function vTick(room){
   // 3. Fisica palla
   vTickBallSrv(ball);
 
+  // CHECK POST-TICK (modalità base): palle veloci che attraversano il player
+  if (!advanced) {
+    for (const p of players) {
+      if (p.team === -1 || !p.held) continue;
+      const kicked2 = vDoKickSrv(p, ball, false);
+      if (kicked2) {
+        const opp2 = p.team === 0 ? 1 : 0;
+        room.vTouches[opp2] = 0;
+        room.vTouches[p.team]++;
+        if (room.vTouches[p.team] > V_TEAM_MAX_TOUCHES) { vHandlePoint(room, opp2); return; }
+      }
+    }
+  }
+
   // 5. Cambio lato → reset tocchi ENTRAMBE le squadre
   const side=ball.x<V_NET_X?0:1;
   if(room.vBallLastSide!==null&&side!==room.vBallLastSide){

@@ -33,8 +33,18 @@ function vUpdate(dt) {
         if (vPlayers[i].team !== -1 && vPlayers[j].team !== -1)
           vCircleCollide(vPlayers[i], vPlayers[j]);
 
-    // Fisica palla libera
+    // Fisica palla
     vTickBall();
+
+    // CHECK POST-TICK (modalità base): se AZIONE è premuto e la palla
+    // ha appena attraversato il player in questo frame, tirala via.
+    // Questo cattura le palle veloci che arrivano da fuori.
+    if (vControlMode !== 'advanced') {
+      for (const p of vPlayers) {
+        if (p.team === -1 || !p.held) continue;
+        vDoKick(p);
+      }
+    }
 
     // Cambio lato → reset tocchi
     vCheckSideChange();

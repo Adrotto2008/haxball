@@ -153,26 +153,25 @@ function vDrawPlayer(p) {
   }
 
   // ── ANIMAZIONI AZIONE ────────────────────────────────
+  // Entrambe le modalità: cerchio giallo attorno al player quando AZIONE è premuto.
+  // In avanzata il cerchio cresce con la carica.
   if (!isAfk && pressing) {
-    if (advanced) {
-      // AVANZATA: freccia carica stile calcio
-      const t = Math.min((p.charge || 0) / V_CONFIG.V_KICK_CHG_F, 1);
-      _vDrawShotArrow(p, t);
-    } else {
-      // BASE: cerchio pieno attorno al player (immediato, nessuna carica)
-      ctx.beginPath();
-      ctx.arc(p.x, p.y, p.r + 6, 0, Math.PI * 2);
-      ctx.strokeStyle = `rgba(255,220,80,0.85)`;
-      ctx.lineWidth = 3;
-      ctx.stroke();
-      // secondo cerchio esterno pulsante
-      const pulse = 0.5 + 0.5 * Math.sin(Date.now() * 0.025);
-      ctx.beginPath();
-      ctx.arc(p.x, p.y, p.r + 10 + pulse * 4, 0, Math.PI * 2);
-      ctx.strokeStyle = `rgba(255,220,80,${0.3 + pulse * 0.3})`;
-      ctx.lineWidth = 1.5;
-      ctx.stroke();
-    }
+    const t = (vControlMode === 'advanced')
+      ? Math.min((p.charge || 0) / V_CONFIG.V_KICK_CHG_F, 1)
+      : 1; // base: sempre pieno
+    // cerchio interno fisso
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.r + 6, 0, Math.PI * 2);
+    ctx.strokeStyle = `rgba(255,220,80,${0.6 + t * 0.3})`;
+    ctx.lineWidth = 2 + t * 2;
+    ctx.stroke();
+    // cerchio esterno pulsante
+    const pulse = 0.5 + 0.5 * Math.sin(Date.now() * 0.025);
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.r + 10 + t * 6 + pulse * 3, 0, Math.PI * 2);
+    ctx.strokeStyle = `rgba(255,220,80,${(0.2 + t * 0.3) * (0.5 + pulse * 0.5)})`;
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
   }
 
   // indicatore "io"
