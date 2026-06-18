@@ -1,11 +1,10 @@
 // ── VOLLEY PHYSICS ─────────────────────────────────────
-// La palla NON viene mai spinta dal contatto fisico col player.
-// L'unico modo per muovere la palla è AZIONE:
-//   BASE     — premi AZIONE vicino alla palla per tirare subito (no carica)
-//   AVANZATA — tieni AZIONE per caricare, rilascia per tirare (più potente)
+// Player e palla NON hanno collisioni tra loro: la palla passa liberamente
+// attraverso i player. L'unico modo per muoverla è AZIONE mentre la palla
+// si trova sovrapposta (dentro) al player (dist < player.r + ball.r).
 //
-// Collisione player↔palla: separazione geometrica pura (evita compenetrazione).
-// Tocchi: si azzerano quando la palla passa dall'altra parte della rete.
+//   BASE     — premi AZIONE → tiro immediato (no carica)
+//   AVANZATA — tieni AZIONE per caricare, rilascia per tirare
 
 // ── MOVIMENTO PLAYER ────────────────────────────────────
 function vApplyInput(p, inp) {
@@ -14,8 +13,7 @@ function vApplyInput(p, inp) {
   const pressing = inp.kick;
 
   if (advanced) {
-    // MODALITÀ AVANZATA: carica tenendo, tira al rilascio
-    const topSpd = pressing ? cfg.V_P_SPEED_MAX * 0.45 : cfg.V_P_SPEED_MAX;
+    // AVANZATA: carica tenendo AZIONE, tira al rilascio
     if (pressing) {
       if (!p.held) { p.vx *= 0.3; p.vy *= 0.3; }
       p.charge = Math.min((p.charge || 0) + 1, cfg.V_KICK_CHG_F);
@@ -24,70 +22,43 @@ function vApplyInput(p, inp) {
       p.charge = 0;
     }
     p.held = pressing;
-    const spd = Math.hypot(p.vx, p.vy);
-    if (spd > topSpd) { p.vx = p.vx/spd*topSpd; p.vy = p.vy/spd*topSpd; }
   } else {
-    // MODALITÀ BASE: premi AZIONE → tiro immediato (no carica)
-    if (pressing && !p.held) {
-      // Rising edge: tiro istantaneo
-      vDoKick(p);
-    }
+    // BASE: tiro immediato al rising edge di AZIONE
+    if (pressing && !p.held) vDoKick(p);
     p.held = pressing;
     p.charge = 0;
   }
 
-  // Movimento (uguale in entrambe le modalità)
+  // Movimento
   if (inp.up) { if (p.vy > -cfg.V_P_START) p.vy = -cfg.V_P_START; p.vy -= cfg.V_P_ACCEL; }
   if (inp.dn) { if (p.vy <  cfg.V_P_START) p.vy =  cfg.V_P_START; p.vy += cfg.V_P_ACCEL; }
   if (inp.lt) { if (p.vx > -cfg.V_P_START) p.vx = -cfg.V_P_START; p.vx -= cfg.V_P_ACCEL; }
   if (inp.rt) { if (p.vx <  cfg.V_P_START) p.vx =  cfg.V_P_START; p.vx += cfg.V_P_ACCEL; }
 
-  const maxSpd = (advanced && pressing) ? cfg.V_P_SPEED_MAX * 0.45 : cfg.V_P_SPEED_MAX;
-  const spd2 = Math.hypot(p.vx, p.vy);
-  if (spd2 > maxSpd) { p.vx = p.vx/spd2*maxSpd; p.vy = p.vy/spd2*maxSpd; }
+  const topSpd = (advanced && pressing) ? cfg.V_P_SPEED_MAX * 0.45 : cfg.V_P_SPEED_MAX;
+  const spd = Math.hypot(p.vx, p.vy);
+  if (spd > topSpd) { p.vx = p.vx/spd*topSpd; p.vy = p.vy/spd*topSpd; }
 
   p.x += p.vx; p.y += p.vy; p.vx *= cfg.V_P_FRIC; p.vy *= cfg.V_P_FRIC;
 
-  // Bordi campo
   if (p.x < V_FL.l + p.r) { p.x = V_FL.l + p.r; p.vx *= -.4; }
   if (p.x > V_FL.r - p.r) { p.x = V_FL.r - p.r; p.vx *= -.4; }
   if (p.y < V_FL.t + p.r) { p.y = V_FL.t + p.r; p.vy *= -.4; }
   if (p.y > V_FL.b - p.r) { p.y = V_FL.b - p.r; p.vy *= -.4; }
-  // Rete: blocca per metà campo
   if (p.team === 0 && p.x + p.r > V_NET_X) { p.x = V_NET_X - p.r; p.vx *= -.4; }
   if (p.team === 1 && p.x - p.r < V_NET_X) { p.x = V_NET_X + p.r; p.vx *= -.4; }
 }
 
-// ── COLLISIONE PLAYER ↔ PALLA ─────────────────────────
-// Solo separazione geometrica. Mai impulso, mai tocco automatico.
-// La palla si muove SOLO tramite vDoKick (AZIONE).
-function vPlayerBallCollide(p) {
-  const dx = vBall.x - p.x, dy = vBall.y - p.y;
-  const d = Math.hypot(dx, dy);
-  const md = p.r + V_BR;
-  if (d >= md || d < 0.01) return;
-  const nx = dx / d, ny = dy / d;
-  const ov = md - d;
-  vBall.x += nx * ov;
-  vBall.y += ny * ov;
-  // Trasferisci la componente di velocità del player sulla palla
-  // (solo per evitare che la palla si blocchi contro un muro quando il player la spinge)
-  const dot = (vBall.vx - p.vx) * nx + (vBall.vy - p.vy) * ny;
-  if (dot < 0) {
-    vBall.vx -= dot * nx;
-    vBall.vy -= dot * ny;
-  }
-}
-
 // ── TIRO (AZIONE) ───────────────────────────────────────
-// BASE: forza fissa (V_KICK_MIN + una frazione fissa verso MAX)
-// AVANZATA: forza proporzionale alla carica accumulata
+// Tira solo se la palla è DENTRO il player (dist < p.r + V_BR).
+// BASE: forza fissa media.
+// AVANZATA: forza proporzionale alla carica.
 function vDoKick(p) {
   const cfg = V_CONFIG;
-  const distKick = p.r + V_BR + cfg.V_KICK_DIST_X;
   const dx = vBall.x - p.x, dy = vBall.y - p.y;
   const d = Math.hypot(dx, dy);
-  if (d > distKick) return false;
+  // Condizione: palla sovrapposta al player
+  if (d >= p.r + V_BR) return false;
 
   const nx = d > 0.01 ? dx / d : 0;
   const ny = d > 0.01 ? dy / d : -1;
@@ -97,7 +68,6 @@ function vDoKick(p) {
     const t = Math.min((p.charge || 0) / cfg.V_KICK_CHG_F, 1);
     force = cfg.V_KICK_MIN + t * (cfg.V_KICK_MAX - cfg.V_KICK_MIN);
   } else {
-    // Base: forza fissa media
     force = cfg.V_KICK_MIN + (cfg.V_KICK_MAX - cfg.V_KICK_MIN) * 0.45;
   }
 
@@ -159,10 +129,6 @@ function vCircleCollide(a, b) {
 }
 
 // ── TOCCHI ──────────────────────────────────────────────
-// Incrementa i tocchi della squadra che ha tirato.
-// Si azzerano quando la palla cambia lato (vCheckSideChange)
-// — questo significa che quando il nemico tocca la palla (e cambia lato)
-// i miei tocchi tornano a 3, come da regola pallavolo.
 function vIncrementTouch(team) {
   vTouches[team]++;
   if (vTouches[team] > V_TEAM_MAX_TOUCHES) {
@@ -171,7 +137,6 @@ function vIncrementTouch(team) {
 }
 
 // ── CAMBIO LATO ──────────────────────────────────────────
-// Reset tocchi ENTRAMBE le squadre quando la palla attraversa la rete.
 function vCheckSideChange() {
   const side = vBall.x < V_NET_X ? 0 : 1;
   if (vBallLastSide !== null && side !== vBallLastSide) {

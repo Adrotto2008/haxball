@@ -4,6 +4,29 @@ Questo file tiene traccia delle modifiche e delle nuove funzionalità introdotte
 
 ---
 
+## v2.10.0 — Pallavolo: nessuna collisione player↔palla, tiro solo con palla dentro il player
+
+### 🔧 Fix
+- **Nessuna collisione fisica tra player e palla** (`js/modes/volley/physics.js`, `server.js`): rimossa completamente `vPlayerBallCollide` e `vPlayerBallCollideSrv`. La palla attraversa i player liberamente senza interazioni fisiche. Solo le collisioni player↔player rimangono.
+- **Tiro condizionato alla sovrapposizione** (`js/modes/volley/physics.js` → `vDoKick`, `server.js` → `vDoKickSrv`): AZIONE tira la palla **solo se** `dist(player, palla) < player.r + ball.r`, cioè solo quando la palla si trova fisicamente dentro/sovrapposta al player. Se la palla è fuori, AZIONE non fa nulla.
+- **`vUpdate` training pulito** (`js/modes/volley/game.js`): rimosso il loop di separazione geometrica che non c'è più.
+
+---
+
+## v2.9.0 — Fisica pallavolo: solo AZIONE muove la palla, reset tocchi corretto
+
+### 🔧 Fix
+- **La palla NON viene più spinta dal contatto fisico** in nessuna delle due modalità (`js/modes/volley/physics.js`, `server.js`): `vPlayerBallCollide` esegue solo separazione geometrica pura (evita compenetrazione e trasferisce la componente di avvicinamento per evitare blocchi contro muri). Nessun impulso, nessun tocco automatico. Il commento nella vecchia versione era fuorviante: in modalità base il contatto spingeva, ora non più in nessuna modalità.
+- **AZIONE è l'unico modo per muovere la palla**, in entrambe le modalità:
+  - **BASE**: rising edge di AZIONE (primo frame in cui si preme) → tiro immediato con forza fissa (~45% del range `V_KICK_MIN`…`V_KICK_MAX`). `js/modes/volley/physics.js` → `vApplyInput`, `server.js` → `vApplyInputSrv`.
+  - **AVANZATA**: tieni AZIONE per caricare, rilascia per tirare con forza proporzionale alla carica. Comportamento identico al calcio. `js/modes/volley/physics.js` → `vApplyInput`/`vDoKick`, `server.js` → `vApplyInputSrv`/`vDoKickSrv`.
+- **Reset tocchi al cambio lato corretto** (`js/modes/volley/physics.js` → `vCheckSideChange`, `server.js` → `vTick`): quando la palla attraversa la rete, i tocchi di **entrambe** le squadre vengono azzerati. Questo significa che non appena il nemico tocca la palla (e questa cambia lato), i propri tocchi tornano a 3, come da regola pallavolo.
+- **`vUpdate` training aggiornato** (`js/modes/volley/game.js`): ordine corretto — `vApplyInput` (gestisce AZIONE + movimento) → `vPlayerBallCollide` (solo separazione geometrica) → `vCircleCollide` player↔player → `vTickBall` → check pavimento → `vCheckSideChange`.
+- **Server `vTick` riscritto pulito** (`server.js`): `vApplyInputSrv` ora ritorna `true` se ha effettuato un tiro, e `vTick` usa quel valore per incrementare `room.vTouches[team]` e chiamare `vHandlePoint` se necessario. Eliminata tutta la logica duplicata e le IIFE inutili presenti nella versione precedente.
+- **Messaggio ingame aggiornato** (`js/modes/volley/game.js`): il testo di hint ora recita `AZIONE (Ctrl/Spazio/0) per tirare` invece del vecchio riferimento alla cattura/rilascio.
+
+---
+
 ## v2.8.0 — Fix fisica pallavolo + controlli avanzati + pannello variabili per modalità + fix chat doppia
 
 ### ✨ Novità

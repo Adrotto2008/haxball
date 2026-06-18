@@ -70,11 +70,10 @@ function applyInput(p,inp,ball,cfg){
 // BASE: rising edge di AZIONE → tiro immediato (forza fissa)
 // AVANZATA: tieni AZIONE carica, rilascia → tiro (forza proporzionale alla carica)
 
-// Tiro pallavolo. Ritorna true se il tiro ha colpito la palla.
-// advanced: se true usa la carica, altrimenti forza fissa.
+// Tiro pallavolo. Tira solo se la palla è DENTRO il player (dist < p.r + V_BR).
 function vDoKickSrv(p, ball, advanced) {
   const dx=ball.x-p.x, dy=ball.y-p.y, d=Math.hypot(dx,dy);
-  if(d > p.r+V_BR+V_KICK_DIST_X) return false;
+  if(d >= p.r+V_BR) return false;  // palla fuori dal player, niente tiro
   const nx=d>0.01?dx/d:0, ny=d>0.01?dy/d:-1;
   let force;
   if(advanced){
@@ -325,12 +324,7 @@ function vTick(room){
       }
     }
 
-  // 3. Separazione geometrica player↔palla (mai impulso, mai tocco)
-  for(const p of players){
-    if(p.team!==-1)vPlayerBallCollideSrv(p,ball);
-  }
-
-  // 4. Fisica palla
+  // 3. Fisica palla
   vTickBallSrv(ball);
 
   // 5. Cambio lato → reset tocchi ENTRAMBE le squadre

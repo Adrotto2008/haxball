@@ -20,19 +20,14 @@ function vUpdate(dt) {
   if (vGoalCD > 0) { vGoalCD--; return; }
 
   if (netMode === 'train') {
-    // INPUT + TIRO locale
+    // INPUT + TIRO locale (AZIONE tira se palla dentro il player)
+    const inp = inpLocal();
     for (const p of vPlayers) {
       if (p.team === -1) continue;
-      const inp = inpLocal();
-      vApplyInput(p, inp);  // gestisce AZIONE + movimento + separazione geometrica si fa dopo
+      vApplyInput(p, inp);
     }
 
-    // Separazione geometrica player↔palla (niente impulso, il tiro è già avvenuto in vApplyInput)
-    for (const p of vPlayers) {
-      if (p.team !== -1) vPlayerBallCollide(p);
-    }
-
-    // Collisioni player↔player
+    // Collisioni player↔player (nessuna collisione player↔palla)
     for (let i = 0; i < vPlayers.length; i++)
       for (let j = i + 1; j < vPlayers.length; j++)
         if (vPlayers[i].team !== -1 && vPlayers[j].team !== -1)
