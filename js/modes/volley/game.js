@@ -2,7 +2,7 @@
 
 // ── STATO PARTITA ───────────────────────────────────────
 let vScore = [0, 0], vTimeLeft = V_MATCH_TIME, vGameOver = false;
-let vGoalCD = 0, vTicker2 = 0, vLastFrameTime = 0, vSecondAccum = 0;
+let vGoalCD = 0, vLastFrameTime = 0, vSecondAccum = 0;
 let vPlayers = [], vBall;
 let vTouches = { 0: 0, 1: 0 };
 let vBallLastSide = null;
@@ -20,27 +20,38 @@ function vUpdate(dt) {
   if (vGoalCD > 0) { vGoalCD--; return; }
 
   if (netMode === 'train') {
-    const p = vPlayers[0];
-    if (p) {
-      vApplyInput(p, inpLocal());
-      vPlayerBallCollide(p); // spinge palla (base) o tira (advanced)
+    // INPUT + TIRO locale
+    for (const p of vPlayers) {
+      if (p.team === -1) continue;
+      const inp = inpLocal();
+      vApplyInput(p, inp);  // gestisce AZIONE + movimento + separazione geometrica si fa dopo
     }
-    // collisioni player↔player
+
+    // Separazione geometrica player↔palla (niente impulso, il tiro è già avvenuto in vApplyInput)
+    for (const p of vPlayers) {
+      if (p.team !== -1) vPlayerBallCollide(p);
+    }
+
+    // Collisioni player↔player
     for (let i = 0; i < vPlayers.length; i++)
       for (let j = i + 1; j < vPlayers.length; j++)
         if (vPlayers[i].team !== -1 && vPlayers[j].team !== -1)
           vCircleCollide(vPlayers[i], vPlayers[j]);
-    // fisica palla libera
+
+    // Fisica palla libera
     vTickBall();
-    // check pavimento → punto
+
+    // Cambio lato → reset tocchi
+    vCheckSideChange();
+
+    // Pavimento → punto
     if (vBall.y + V_BR > V_FL.b) {
       const team = vBall.x < V_NET_X ? 1 : 0;
       vGoal(team);
       return;
     }
-    // cambio lato → reset tocchi
-    vCheckSideChange();
-    // trail
+
+    // Trail
     if (!vBall.trail) vBall.trail = [];
     vBall.trail.push({ x: vBall.x, y: vBall.y });
     if (vBall.trail.length > 12) vBall.trail.shift();
@@ -52,12 +63,12 @@ function vUpdate(dt) {
     if (vTimeLeft <= 0 && !vGameOver) { vGameOver = true; vHandleGameOverLocal(); }
 
   } else {
-    // MULTIPLAYER (host/guest)
+    // MULTIPLAYER: manda input, ricevi state dal server
     sendGuestInput();
     vPhysAccum = Math.min(vPhysAccum + dt, V_PHYS_TICK * 4);
     while (vPhysAccum >= V_PHYS_TICK) { vTickRemotePhysics(); vPhysAccum -= V_PHYS_TICK; }
 
-    // trail
+    // Trail
     if (!vBall.trail) vBall.trail = [];
     vBall.trail.push({ x: vBall.x, y: vBall.y });
     if (vBall.trail.length > 12) vBall.trail.shift();
@@ -78,18 +89,16 @@ function vGoal(team) {
   goalBurst(team === 0 ? V_FL.l : V_FL.r, H / 2);
   const gf = $('goal-flash'); gf.style.opacity = '1'; setTimeout(() => gf.style.opacity = '0', 140);
   vGoalCD = V_GOAL_CD;
-  vTouches[0] = 0; vTouches[1] = 0;
+  vTouches = { 0: 0, 1: 0 };
   vBallLastSide = null;
-  // reset palla e posizioni player
   vBall = vMkBall();
   for (const p of vPlayers) {
     if (p.team === -1) continue;
     const byTeam = vPlayers.filter(x => x.team === p.team);
-    const n = byTeam.length;
-    const i = byTeam.indexOf(p);
+    const n = byTeam.length, i = byTeam.indexOf(p);
     p.x = V_FL.l + (V_FL.r - V_FL.l) * (p.team === 0 ? .22 : .78);
     p.y = V_FL.t + (V_FL.b - V_FL.t) * (i + 1) / (n + 1);
-    p.vx = 0; p.vy = 0; p.held = false;
+    p.vx = 0; p.vy = 0; p.held = false; p.charge = 0;
   }
 }
 
@@ -98,8 +107,11 @@ function vHandleGameOverLocal() {
               vScore[1] > vScore[0] ? `🏆 Vincono i BLU! (${vScore[0]}–${vScore[1]})` :
               `🤝 Pareggio! (${vScore[0]}–${vScore[1]})`;
   setMsg(msg);
-  setTimeout(() => { vScore = [0, 0]; vTimeLeft = V_MATCH_TIME; vGameOver = false; vSecondAccum = 0; vReset(false); vUpdateHUD();
-    setMsg('🏐 Pallavolo — WASD muovi · 0/Ctrl/Spazio tiro caricato (modale avanzata)'); }, 3000);
+  setTimeout(() => {
+    vScore = [0, 0]; vTimeLeft = V_MATCH_TIME; vGameOver = false; vSecondAccum = 0;
+    vReset(false); vUpdateHUD();
+    setMsg('🏐 Pallavolo — WASD muovi · AZIONE (Ctrl/Spazio/0) per tirare');
+  }, 3000);
 }
 
 function vHandleGameOver() {
@@ -123,20 +135,6 @@ function vUpdateHUD() {
 }
 
 // ── RESET ────────────────────────────────────────────────
-function vResetBall() {
-  vBall = vMkBall();
-}
-
-function vResetLocal(full) {
-  vBall = vMkBall();
-  if (full) { vScore = [0, 0]; vTimeLeft = V_MATCH_TIME; vGameOver = false; vSecondAccum = 0; }
-  vGoalCD = V_GOAL_CD;
-  vTouches = { 0: 0, 1: 0 }; vBallLastSide = null;
-  const p = vPlayers[0];
-  if (p) { p.x = V_FL.l + (V_FL.r - V_FL.l) * 0.25; p.y = H / 2; p.vx = 0; p.vy = 0; p.held = false; }
-  setMsg('🏐 Pallavolo — WASD muovi · 0/Ctrl/Spazio cattura/rilancio');
-}
-
 function vReset(full) {
   vBall = vMkBall();
   vRemoteState = null; particles = [];
@@ -149,19 +147,18 @@ function vReset(full) {
       grp.forEach((p, i) => {
         p.x = V_FL.l + (V_FL.r - V_FL.l) * (team === 0 ? .22 : .78);
         p.y = V_FL.t + (V_FL.b - V_FL.t) * (i + 1) / (n + 1);
-        p.vx = 0; p.vy = 0; p.held = false;
+        p.vx = 0; p.vy = 0; p.held = false; p.charge = 0;
       });
     }
   }
-  if (full) { vScore = [0, 0]; vTimeLeft = V_MATCH_TIME; vGameOver = false; vTicker2 = 0; vSecondAccum = 0; }
+  if (full) { vScore = [0, 0]; vTimeLeft = V_MATCH_TIME; vGameOver = false; vSecondAccum = 0; }
   vGoalCD = V_GOAL_CD;
   if (full) setMsg('');
 }
 
 // ── BUILD PLAYERS / BALL ────────────────────────────────
 function vBuildPlayers(roster) {
-  const result = [];
-  const byTeam = [[], []];
+  const result = [], byTeam = [[], []];
   for (const r of roster) {
     if (r.team === 0 || r.team === 1) byTeam[r.team].push(r);
   }
@@ -178,19 +175,14 @@ function vBuildPlayers(roster) {
   }
   for (const r of roster) {
     if (r.team === -1) {
-      result.push({ id: r.id, team: -1, col: '#555', x: -9999, y: -9999, vx: 0, vy: 0, r: V_PR, held: false });
+      result.push({ id: r.id, team: -1, col: '#555', x: -9999, y: -9999, vx: 0, vy: 0, r: V_PR, held: false, charge: 0 });
     }
   }
   return result;
 }
 
 function vMkBall() {
-  return {
-    x: W / 2, y: H / 2 - 60,
-    vx: 0, vy: 0, r: V_BR,
-    grav: V_B_GRAV_BASE,
-    trail: []
-  };
+  return { x: W / 2, y: H / 2 - 60, vx: 0, vy: 0, r: V_BR, grav: V_B_GRAV_BASE, trail: [] };
 }
 
 // ── LOOP ────────────────────────────────────────────────
@@ -211,14 +203,14 @@ function vStopLoop() {
 
 function vStartLoop() {
   if (vRunning) return;
-  vLastFrameTime = 0;
-  vRunning = true;
+  vLastFrameTime = 0; vRunning = true;
   _vRafId = requestAnimationFrame(vLoop);
 }
 
 // ── START GAME VOLLEY ───────────────────────────────────
 function startVolleyGame(mode, roster) {
-  stopLoop();   // ferma eventuale loop calcio attivo
+  stopLoop();
+  currentGameMode = 'volley';
   netMode = mode; vPlayers = vBuildPlayers(roster);
   if (mySkin && myPlayerId) playerSkins[myPlayerId] = mySkin;
   $('game-menu').classList.remove('open');
