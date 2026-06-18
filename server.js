@@ -89,31 +89,34 @@ function vDoKickSrv(p, ball, advanced) {
 }
 
 // Applica input player pallavolo. Ritorna true se ha tirato (per incrementare tocchi).
+// BASE: tira ogni frame che AZIONE è premuta E la palla è dentro il player.
+// AVANZATA: carica tenendo, tira al rilascio se la palla era dentro.
 function vApplyInputSrv(p, inp, ball, advanced) {
-  const pressing=inp.kick||false;
-  const prevHeld=p.held;
-  const prevCharge=p.charge||0;
-  let kicked=false;
+  const pressing = inp.kick || false;
+  const prevHeld = p.held;
+  const prevCharge = p.charge || 0;
+  let kicked = false;
 
-  if(advanced){
-    if(pressing){
-      if(!prevHeld){p.vx*=0.3;p.vy*=0.3;}
-      p.charge=Math.min(prevCharge+1, V_KICK_CHG_F);
+  if (advanced) {
+    if (pressing) {
+      if (!prevHeld) { p.vx *= 0.3; p.vy *= 0.3; }
+      p.charge = Math.min(prevCharge + 1, V_KICK_CHG_F);
     } else {
-      if(prevHeld && prevCharge>0){
-        p.charge=prevCharge; // deve essere >0 per calcolare la forza
-        kicked=vDoKickSrv(p, ball, true);
+      if (prevHeld && prevCharge > 0) {
+        p.charge = prevCharge;
+        kicked = vDoKickSrv(p, ball, true);
       }
-      p.charge=0;
+      p.charge = 0;
     }
-    p.held=pressing;
+    p.held = pressing;
   } else {
-    // BASE: rising edge → tiro immediato
-    if(pressing && !prevHeld){
-      kicked=vDoKickSrv(p, ball, false);
+    // BASE: tira ogni frame con AZIONE premuta (non solo rising edge)
+    if (pressing) {
+      if (!prevHeld) { p.vx *= 0.3; p.vy *= 0.3; }
+      kicked = vDoKickSrv(p, ball, false);
     }
-    p.charge=0;
-    p.held=pressing;
+    p.charge = 0;
+    p.held = pressing;
   }
 
   // Movimento
@@ -121,7 +124,7 @@ function vApplyInputSrv(p, inp, ball, advanced) {
   if(inp.dn){if(p.vy< V_P_START)p.vy= V_P_START;p.vy+=V_P_ACCEL;}
   if(inp.lt){if(p.vx>-V_P_START)p.vx=-V_P_START;p.vx-=V_P_ACCEL;}
   if(inp.rt){if(p.vx< V_P_START)p.vx= V_P_START;p.vx+=V_P_ACCEL;}
-  const topSpd=(advanced&&pressing)?V_P_SPEED_MAX*0.45:V_P_SPEED_MAX;
+  const topSpd = pressing ? V_P_SPEED_MAX * 0.45 : V_P_SPEED_MAX; // rallenta tenendo AZIONE
   const spd=Math.hypot(p.vx,p.vy);
   if(spd>topSpd){p.vx=p.vx/spd*topSpd;p.vy=p.vy/spd*topSpd;}
   p.x+=p.vx;p.y+=p.vy;p.vx*=V_P_FRIC;p.vy*=V_P_FRIC;
@@ -301,11 +304,12 @@ function vTick(room){
     if(p.team===-1)continue;
     const kicked=vApplyInputSrv(p, room.inputs[p.id]||{}, ball, advanced);
     if(kicked){
-      // Conta il tocco per la squadra che ha tirato
+      const opp = p.team === 0 ? 1 : 0;
+      room.vTouches[opp] = 0;          // avversario recupera i suoi tocchi
       room.vTouches[p.team]++;
       if(room.vTouches[p.team]>V_TEAM_MAX_TOUCHES){
-        vHandlePoint(room, p.team===0?1:0);
-        return; // punto segnato, esci dal tick
+        vHandlePoint(room, opp);
+        return;
       }
     }
   }

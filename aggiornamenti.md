@@ -4,6 +4,23 @@ Questo file tiene traccia delle modifiche e delle nuove funzionalità introdotte
 
 ---
 
+## v2.11.0 — Pallavolo: fix tocchi avversario, modalità avanzata online, animazioni e comportamento base
+
+### 🔧 Fix
+- **Tocchi avversario si azzerano correttamente** (`js/modes/volley/physics.js` → `vIncrementTouch`, `server.js` → `vTick`): quando una squadra tocca la palla, i tocchi dell'avversario tornano a 0 (recupera i suoi 3 tocchi). Prima si azzeravano solo al cambio lato fisico della palla.
+- **Modalità avanzata funziona online** (`js/menu.js`): il toggle «Controlli avanzati» ora invia `vmode` al server via WebSocket. Il server aggiorna `room.vAdvanced` e la trasmette a tutti. Prima `vControlMode` era client-only e il server non sapeva mai che modalità usare.
+
+### ✨ Novità comportamento
+- **BASE — tiro continuo mentre AZIONE è premuto** (`js/modes/volley/physics.js` → `vApplyInput`, `server.js` → `vApplyInputSrv`): non è più solo il rising edge ma ogni frame con AZIONE premuto. Se tieni premuto e la palla ti entra dentro, parte subito.
+- **Rallentamento con AZIONE premuto** in entrambe le modalità (server e client): `topSpd = V_P_SPEED_MAX * 0.45` quando `pressing`, indipendentemente dalla modalità.
+
+### 🎨 Animazioni
+- **AVANZATA — freccia carica sul player** (`js/modes/volley/draw.js` → `_vDrawShotArrow`): replica `drawShotArrow` del calcio. Freccia gialla che punta verso la palla con lunghezza proporzionale alla carica, più anello tratteggiato attorno al player. Rimosso l'anello tratteggiato attorno alla *palla*.
+- **BASE — cerchio pieno immediato sul player** (`js/modes/volley/draw.js` → `vDrawPlayer`): quando AZIONE è premuto appare subito un cerchio giallo solido attorno al player + un secondo cerchio esterno pulsante. Nessuna freccia, nessuna carica progressiva.
+- Rimossa animazione precedente sulla palla in modalità avanzata.
+
+---
+
 ## v2.10.0 — Pallavolo: nessuna collisione player↔palla, tiro solo con palla dentro il player
 
 ### 🔧 Fix

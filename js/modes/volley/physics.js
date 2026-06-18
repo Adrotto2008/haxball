@@ -1,10 +1,12 @@
 // ── VOLLEY PHYSICS ─────────────────────────────────────
-// Player e palla NON hanno collisioni tra loro: la palla passa liberamente
-// attraverso i player. L'unico modo per muoverla è AZIONE mentre la palla
-// si trova sovrapposta (dentro) al player (dist < player.r + ball.r).
+// Player e palla NON hanno collisioni tra loro: la palla passa liberamente.
+// L'unico modo per muoverla è AZIONE mentre la palla è dentro il player.
 //
-//   BASE     — premi AZIONE → tiro immediato (no carica)
-//   AVANZATA — tieni AZIONE per caricare, rilascia per tirare
+//   BASE     — tieni AZIONE premuto → tira ogni frame che la palla è dentro
+//              (se tieni premuto e la palla ci entra, parte subito)
+//              Rallentamento durante la pressione. Cerchio pieno attorno al player.
+//   AVANZATA — tieni AZIONE per caricare, rilascia → tira (se palla dentro).
+//              Animazione freccia carica sul player (come calcio).
 
 // ── MOVIMENTO PLAYER ────────────────────────────────────
 function vApplyInput(p, inp) {
@@ -13,7 +15,7 @@ function vApplyInput(p, inp) {
   const pressing = inp.kick;
 
   if (advanced) {
-    // AVANZATA: carica tenendo AZIONE, tira al rilascio
+    // AVANZATA: carica tenendo AZIONE, tira al rilascio (se palla dentro)
     if (pressing) {
       if (!p.held) { p.vx *= 0.3; p.vy *= 0.3; }
       p.charge = Math.min((p.charge || 0) + 1, cfg.V_KICK_CHG_F);
@@ -23,11 +25,18 @@ function vApplyInput(p, inp) {
     }
     p.held = pressing;
   } else {
-    // BASE: tiro immediato al rising edge di AZIONE
-    if (pressing && !p.held) vDoKick(p);
+    // BASE: tira ogni frame che AZIONE è premuto E la palla è dentro
+    // (rallentamento durante la pressione come avanzata)
+    if (pressing) {
+      if (!p.held) { p.vx *= 0.3; p.vy *= 0.3; } // kick-start lento
+      vDoKick(p); // tenta ogni frame, vDoKick verifica se palla è dentro
+    }
     p.held = pressing;
     p.charge = 0;
   }
+
+  // Velocità ridotta mentre si tiene AZIONE (base o avanzata)
+  const topSpd = pressing ? cfg.V_P_SPEED_MAX * 0.45 : cfg.V_P_SPEED_MAX;
 
   // Movimento
   if (inp.up) { if (p.vy > -cfg.V_P_START) p.vy = -cfg.V_P_START; p.vy -= cfg.V_P_ACCEL; }
@@ -35,7 +44,6 @@ function vApplyInput(p, inp) {
   if (inp.lt) { if (p.vx > -cfg.V_P_START) p.vx = -cfg.V_P_START; p.vx -= cfg.V_P_ACCEL; }
   if (inp.rt) { if (p.vx <  cfg.V_P_START) p.vx =  cfg.V_P_START; p.vx += cfg.V_P_ACCEL; }
 
-  const topSpd = (advanced && pressing) ? cfg.V_P_SPEED_MAX * 0.45 : cfg.V_P_SPEED_MAX;
   const spd = Math.hypot(p.vx, p.vy);
   if (spd > topSpd) { p.vx = p.vx/spd*topSpd; p.vy = p.vy/spd*topSpd; }
 
@@ -51,14 +59,13 @@ function vApplyInput(p, inp) {
 
 // ── TIRO (AZIONE) ───────────────────────────────────────
 // Tira solo se la palla è DENTRO il player (dist < p.r + V_BR).
-// BASE: forza fissa media.
-// AVANZATA: forza proporzionale alla carica.
+// BASE: forza fissa (chiamato ogni frame con AZIONE premuta).
+// AVANZATA: forza proporzionale alla carica (chiamato al rilascio).
 function vDoKick(p) {
   const cfg = V_CONFIG;
   const dx = vBall.x - p.x, dy = vBall.y - p.y;
   const d = Math.hypot(dx, dy);
-  // Condizione: palla sovrapposta al player
-  if (d >= p.r + V_BR) return false;
+  if (d >= p.r + V_BR) return false; // palla fuori: niente tiro
 
   const nx = d > 0.01 ? dx / d : 0;
   const ny = d > 0.01 ? dy / d : -1;
@@ -129,14 +136,21 @@ function vCircleCollide(a, b) {
 }
 
 // ── TOCCHI ──────────────────────────────────────────────
+// Quando una squadra tocca la palla, i tocchi dell'avversario si azzerano
+// (l'avversario recupera i suoi 3 tocchi) e i propri aumentano.
 function vIncrementTouch(team) {
+  const opp = team === 0 ? 1 : 0;
+  vTouches[opp] = 0;          // avversario recupera 3 tocchi
   vTouches[team]++;
   if (vTouches[team] > V_TEAM_MAX_TOUCHES) {
-    vGoal(team === 0 ? 1 : 0);
+    vGoal(opp);
   }
 }
 
 // ── CAMBIO LATO ──────────────────────────────────────────
+// Ulteriore reset tocchi quando la palla attraversa la rete
+// (ridondante rispetto a vIncrementTouch ma utile per la palla
+//  che rimbalza da sola senza essere toccata).
 function vCheckSideChange() {
   const side = vBall.x < V_NET_X ? 0 : 1;
   if (vBallLastSide !== null && side !== vBallLastSide) {

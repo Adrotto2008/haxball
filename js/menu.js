@@ -158,9 +158,13 @@ if (_vctrl) {
   _vctrl.addEventListener('change', e => {
     vControlMode = e.target.checked ? 'advanced' : 'base';
     localStorage.setItem('hax_vcontrol', vControlMode);
-    const hint = e.target.checked
+    // Comunica la modalità al server (per le partite online)
+    if (ws && ws.readyState === 1) {
+      wsSend({ type: 'vmode', payload: { advanced: vControlMode === 'advanced' } });
+    }
+    const hint = vControlMode === 'advanced'
       ? '🏐 Controlli avanzati: tieni AZIONE per caricare, rilascia per tirare'
-      : '🏐 Controlli base: avvicinati alla palla per colpirla';
+      : '🏐 Controlli base: avvicinati alla palla e tieni AZIONE per colpirla';
     sysMsg(hint);
   });
 }
