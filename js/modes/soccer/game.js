@@ -116,6 +116,7 @@ function buildPlayers(roster) {
 function mkBall() { return {x:W/2,y:H/2,vx:0,vy:0,r:BR,trail:[]}; }
 function reset(full) {
   ball=mkBall(); remoteInputs={}; remoteState=null; particles=[];
+  snapshotBuffer = []; // svuota buffer snapshot al reset
   if(players.length>0) {
     const byTeam=[[],[]];
     for(const p of players) if(p.team===0||p.team===1) byTeam[p.team].push(p);
@@ -136,14 +137,18 @@ function reset(full) {
 // ── LOOP ───────────────────────────────────────────────
 // Il loop di RENDER gira sempre (anche in background) per evitare il nero.
 // L'UPDATE (fisica/input) si ferma quando la scheda non è visibile.
+// interpolateRemotePlayers viene chiamato qui per aggiornare le posizioni
+// visive dei remoti prima di ogni draw, indipendentemente dall'accumulo fisico.
 let _rafId = null;
 function loop(ts) {
   if(!running) return;
   const visible = document.visibilityState === 'visible';
   const dt = (lastFrameTime && visible) ? Math.min(ts - lastFrameTime, 100) : 16.67;
   lastFrameTime = ts;
-  if(visible) update(dt); // aggiorna solo se visibile (evita accumulo di dt)
-  draw();                  // disegna sempre: evita il nero al ritorno scheda
+  if(visible) update(dt);
+  // Interpolazione player remoti ad ogni frame (anche in multiplayer fermo)
+  if(netMode !== 'train') interpolateRemotePlayers(performance.now());
+  draw();
   _rafId = requestAnimationFrame(loop);
 }
 

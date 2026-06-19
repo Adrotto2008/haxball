@@ -4,6 +4,24 @@ Questo file tiene traccia delle modifiche e delle nuove funzionalità introdotte
 
 ---
 
+## v2.12.0 — Fluidità player remoti: snapshot interpolation (calcio + pallavolo)
+
+### ✨ Novità
+- **Snapshot interpolation per i player remoti** (`js/modes/soccer/sync.js`, `js/modes/volley/sync.js`, `js/state.js`): i player remoti non vengono più mossi con dead reckoning + lerp correttivo aggressivo. Ogni pacchetto server viene inserito in un buffer (`snapshotBuffer` / `vSnapshotBuffer`, max 5 elementi, max 200ms). Ad ogni frame il renderer interpola linearmente tra i due snapshot adiacenti a `renderTime = now - INTERP_DELAY_MS` (default 50ms). Se il buffer non ha abbastanza dati la posizione viene congelata all'ultimo snapshot noto — nessuna estrapolazione. Questo elimina il ciclo overshoot → snap → overshoot causato dal lerp 0.6–0.9 frame-per-frame.
+- **`INTERP_DELAY_MS = 50`** (`js/state.js`): costante facilmente modificabile. Abbassare a 33ms su reti stabili, alzare a 80ms con molto jitter.
+- **`interpolateRemotePlayers(now)`** (`js/modes/soccer/sync.js`): nuova funzione chiamata ad ogni frame nel loop di render prima di `draw()`. Calcola il `renderTime`, cerca i due snapshot adiacenti, interpola `x, y`. Non tocca `vx, vy` (non usati per il rendering visivo).
+- **`vInterpolateRemotePlayers(now)`** (`js/modes/volley/sync.js`): equivalente per la pallavolo.
+- **Buffer svuotato al gol/respawn** (`applyRemoteState`, `vApplyRemoteState`): quando `gc` passa da 0 a un valore alto (gol), il buffer viene azzerato e i player remoti ricevono uno snap diretto alla posizione server, evitando interpolazioni attraverso il teleport di respawn.
+- **Buffer svuotato al reset** (`js/modes/soccer/game.js` → `reset`, `js/modes/volley/game.js` → `vReset`): `snapshotBuffer = []` / `vSnapshotBuffer = []` ad ogni reset partita.
+
+### 🔧 Modifiche
+- **`tickRemotePhysics` / `vTickRemotePhysics` ridotti** (`sync.js` soccer e volley): ora gestiscono solo (a) il player locale con prediction e (b) il dead reckoning della palla. I player remoti non vengono più spostati qui.
+- **`applyRemoteState` / `vApplyRemoteState` pulite**: rimosso il blocco `dist > 80 → snap` / `dist > 1 → lerp` per i player remoti. Rimane solo la correzione leggera per il player locale (prediction). La posizione visiva dei remoti è ora determinata esclusivamente da `interpolateRemotePlayers`.
+- **Loop soccer / volley** (`game.js`, `volley/game.js`): `interpolateRemotePlayers` / `vInterpolateRemotePlayers` chiamati ad ogni frame prima di `draw()` / `vDraw()`, solo in modalità multiplayer (`netMode !== 'train'`).
+- La palla mantiene il dead reckoning esistente (B_FRIC applicato correttamente, jitter meno percettibile e non dipende da input umani).
+
+---
+
 ## v2.11.0 — Pallavolo: fix tocchi avversario, modalità avanzata online, animazioni e comportamento base
 
 ### 🔧 Fix

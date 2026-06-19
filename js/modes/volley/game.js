@@ -68,7 +68,7 @@ function vUpdate(dt) {
     if (vTimeLeft <= 0 && !vGameOver) { vGameOver = true; vHandleGameOverLocal(); }
 
   } else {
-    // MULTIPLAYER: manda input, ricevi state dal server
+    // MULTIPLAYER: manda input, fisica palla + player locale via tickRemotePhysics
     sendGuestInput();
     vPhysAccum = Math.min(vPhysAccum + dt, V_PHYS_TICK * 4);
     while (vPhysAccum >= V_PHYS_TICK) { vTickRemotePhysics(); vPhysAccum -= V_PHYS_TICK; }
@@ -143,6 +143,7 @@ function vUpdateHUD() {
 function vReset(full) {
   vBall = vMkBall();
   vRemoteState = null; particles = [];
+  vSnapshotBuffer = []; // svuota buffer snapshot al reset
   vTouches = { 0: 0, 1: 0 }; vBallLastSide = null;
   if (vPlayers.length > 0) {
     const byTeam = [[], []];
@@ -191,12 +192,17 @@ function vMkBall() {
 }
 
 // ── LOOP ────────────────────────────────────────────────
+// Il loop di RENDER gira sempre per evitare il nero.
+// vInterpolateRemotePlayers viene chiamato ad ogni frame prima di vDraw
+// per aggiornare le posizioni visive dei remoti con snapshot interpolation.
 function vLoop(ts) {
   if (!vRunning) return;
   const visible = document.visibilityState === 'visible';
   const dt = (vLastFrameTime && visible) ? Math.min(ts - vLastFrameTime, 100) : 16.67;
   vLastFrameTime = ts;
   if (visible) vUpdate(dt);
+  // Interpolazione player remoti ad ogni frame in multiplayer
+  if (netMode !== 'train') vInterpolateRemotePlayers(performance.now());
   vDraw();
   _vRafId = requestAnimationFrame(vLoop);
 }

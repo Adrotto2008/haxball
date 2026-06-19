@@ -73,3 +73,17 @@ let useLocalPrediction = JSON.parse(localStorage.getItem('hax_prediction') ?? 't
 // 'base'     = contatto diretto spinge la palla con impulso bonus (default)
 // 'advanced' = tieni AZIONE per caricare, rilascia per tirare (come calcio)
 let vControlMode = localStorage.getItem('hax_vcontrol') || 'base';
+
+// ── SNAPSHOT INTERPOLATION ────────────────────────────
+// Ritardo di rendering dei player remoti in ms.
+// A 60Hz del server ogni pacchetto arriva ~16.67ms → 50ms ≈ 3 pacchetti di buffer.
+// Abbassare a 33ms se la latenza di rete è bassa e stabile.
+// Alzare a 80ms se il server Render ha molto jitter.
+const INTERP_DELAY_MS = 50;
+
+// Buffer snapshot per calcio — massimo 5 elementi, ogni elemento:
+// { p: [...], b: [...], gc: number, recvAt: number (performance.now()) }
+let snapshotBuffer = [];
+
+// Buffer snapshot per pallavolo — stesso formato + campo touches
+let vSnapshotBuffer = [];
