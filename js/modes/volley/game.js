@@ -27,7 +27,7 @@ function vUpdate(dt) {
       vApplyInput(p, inp);
     }
 
-    // Collisioni player↔player (nessuna collisione player↔palla)
+    // Collisioni player-player (nessuna collisione player-palla)
     for (let i = 0; i < vPlayers.length; i++)
       for (let j = i + 1; j < vPlayers.length; j++)
         if (vPlayers[i].team !== -1 && vPlayers[j].team !== -1)
@@ -36,9 +36,8 @@ function vUpdate(dt) {
     // Fisica palla
     vTickBall();
 
-    // CHECK POST-TICK (modalità base): se AZIONE è premuto e la palla
+    // CHECK POST-TICK (modalita base): se AZIONE e premuto e la palla
     // ha appena attraversato il player in questo frame, tirala via.
-    // Questo cattura le palle veloci che arrivano da fuori.
     if (vControlMode !== 'advanced') {
       for (const p of vPlayers) {
         if (p.team === -1 || !p.held) continue;
@@ -46,10 +45,10 @@ function vUpdate(dt) {
       }
     }
 
-    // Cambio lato → reset tocchi
+    // Cambio lato -> reset tocchi
     vCheckSideChange();
 
-    // Pavimento → punto
+    // Pavimento -> punto
     if (vBall.y + V_BR > V_FL.b) {
       const team = vBall.x < V_NET_X ? 1 : 0;
       vGoal(team);
@@ -68,10 +67,13 @@ function vUpdate(dt) {
     if (vTimeLeft <= 0 && !vGameOver) { vGameOver = true; vHandleGameOverLocal(); }
 
   } else {
-    // MULTIPLAYER: manda input, fisica palla + player locale via tickRemotePhysics
+    // MULTIPLAYER: manda input, dead reckoning palla + prediction locale
     sendGuestInput();
+    const _nowTs = performance.now();
     vPhysAccum = Math.min(vPhysAccum + dt, V_PHYS_TICK * 4);
     while (vPhysAccum >= V_PHYS_TICK) { vTickRemotePhysics(); vPhysAccum -= V_PHYS_TICK; }
+    // Interpolazione posizione visiva player remoti tramite snapshot buffer
+    vInterpolateRemotePlayers(_nowTs);
 
     // Trail
     if (!vBall.trail) vBall.trail = [];
@@ -90,7 +92,7 @@ function vUpdate(dt) {
 // ── GOL ──────────────────────────────────────────────────
 function vGoal(team) {
   vScore[team]++; vUpdateHUD();
-  setMsg(`🏐 PUNTO! ${team === 0 ? '🔴 ROSSI' : '🔵 BLU'}! (${vScore[0]}–${vScore[1]})`);
+  setMsg(`🏐 PUNTO! ${team === 0 ? '🔴 ROSSI' : '🔵 BLU'}! (${vScore[0]}\u2013${vScore[1]})`);
   goalBurst(team === 0 ? V_FL.l : V_FL.r, H / 2);
   const gf = $('goal-flash'); gf.style.opacity = '1'; setTimeout(() => gf.style.opacity = '0', 140);
   vGoalCD = V_GOAL_CD;
@@ -108,9 +110,9 @@ function vGoal(team) {
 }
 
 function vHandleGameOverLocal() {
-  const msg = vScore[0] > vScore[1] ? `🏆 Vincono i ROSSI! (${vScore[0]}–${vScore[1]})` :
-              vScore[1] > vScore[0] ? `🏆 Vincono i BLU! (${vScore[0]}–${vScore[1]})` :
-              `🤝 Pareggio! (${vScore[0]}–${vScore[1]})`;
+  const msg = vScore[0] > vScore[1] ? `🏆 Vincono i ROSSI! (${vScore[0]}\u2013${vScore[1]})` :
+              vScore[1] > vScore[0] ? `🏆 Vincono i BLU! (${vScore[0]}\u2013${vScore[1]})` :
+              `🤝 Pareggio! (${vScore[0]}\u2013${vScore[1]})`;
   setMsg(msg);
   setTimeout(() => {
     vScore = [0, 0]; vTimeLeft = V_MATCH_TIME; vGameOver = false; vSecondAccum = 0;
@@ -121,9 +123,9 @@ function vHandleGameOverLocal() {
 
 function vHandleGameOver() {
   vGameOver = true;
-  const msg = vScore[0] > vScore[1] ? `🏆 Vincono i ROSSI! (${vScore[0]}–${vScore[1]})` :
-              vScore[1] > vScore[0] ? `🏆 Vincono i BLU! (${vScore[0]}–${vScore[1]})` :
-              `🤝 Pareggio! (${vScore[0]}–${vScore[1]})`;
+  const msg = vScore[0] > vScore[1] ? `🏆 Vincono i ROSSI! (${vScore[0]}\u2013${vScore[1]})` :
+              vScore[1] > vScore[0] ? `🏆 Vincono i BLU! (${vScore[0]}\u2013${vScore[1]})` :
+              `🤝 Pareggio! (${vScore[0]}\u2013${vScore[1]})`;
   setMsg(msg);
   setTimeout(() => {
     vRunning = false;
@@ -143,7 +145,7 @@ function vUpdateHUD() {
 function vReset(full) {
   vBall = vMkBall();
   vRemoteState = null; particles = [];
-  vSnapshotBuffer = []; // svuota buffer snapshot al reset
+  vSnapshotBuffer = []; // svuota snapshot buffer al reset/inizio partita
   vTouches = { 0: 0, 1: 0 }; vBallLastSide = null;
   if (vPlayers.length > 0) {
     const byTeam = [[], []];
@@ -192,17 +194,12 @@ function vMkBall() {
 }
 
 // ── LOOP ────────────────────────────────────────────────
-// Il loop di RENDER gira sempre per evitare il nero.
-// vInterpolateRemotePlayers viene chiamato ad ogni frame prima di vDraw
-// per aggiornare le posizioni visive dei remoti con snapshot interpolation.
 function vLoop(ts) {
   if (!vRunning) return;
   const visible = document.visibilityState === 'visible';
   const dt = (vLastFrameTime && visible) ? Math.min(ts - vLastFrameTime, 100) : 16.67;
   vLastFrameTime = ts;
   if (visible) vUpdate(dt);
-  // Interpolazione player remoti ad ogni frame in multiplayer
-  if (netMode !== 'train') vInterpolateRemotePlayers(performance.now());
   vDraw();
   _vRafId = requestAnimationFrame(vLoop);
 }

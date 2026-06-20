@@ -1,29 +1,58 @@
-// ── SOCCER SYNC — snapshot interpolation (player remoti) + dead reckoning (palla) ──
+// ── SOCCER SYNC — snapshot interpolation + apply remote state ──
 
-// Chiamato ogni volta che arriva un pacchetto di stato dal server.
-// Per i player remoti: inserisce lo snapshot nel buffer invece di correggere subito.
-// Per la palla: applica dead reckoning (già funzionava bene, nessuna modifica).
-// Per il player locale: prediction + correzione lerp leggera invariata.
+// Chiamata alla ricezione di ogni pacchetto di stato dal server.
+// Per i player remoti: push nel buffer (niente lerp on-the-fly).
+// Per il player locale: correzione leggera sulla posizione (prediction).
+// Per la palla: dead reckoning con snap su velJump/distanza.
 function applyRemoteState() {
   const s = remoteState;
   if (!s || !s.p) return;
 
-  // ── Player locale: prediction + correzione leggera (invariata) ──
+  const now = performance.now();
+
+  // ── GOL / RESPAWN: svuota buffer e snap diretto ──────────
+  // Quando goalCD passa da 0 a valore positivo c'e stato un gol:
+  // i player vengono teletrasportati, non interpoliamo attraverso il salto.
+  const prevGoalCD = goalCD;
+  if (s.gc !== undefined) goalCD = s.gc;
+  if (s.gc > 0 && prevGoalCD === 0) {
+    snapshotBuffer = [];
+    for (let i = 0; i < s.p.length && i < players.length; i++) {
+      const sp = s.p[i], p = players[i];
+      p.x = sp[0]; p.y = sp[1]; p.vx = sp[2]; p.vy = sp[3];
+      p.charge = sp[4]; p.held = !!sp[5];
+    }
+    if (s.b) {
+      ball.x = s.b[0]; ball.y = s.b[1]; ball.vx = s.b[2]; ball.vy = s.b[3];
+    }
+    return;
+  }
+
+  // ── PLAYER LOCALE: correzione prediction ─────────────────
+  // Lerp leggero (0.12) quando la prediction diverge dal server.
+  // Snap diretto solo per divergenze > 80px (lag spike / respawn).
   for (let i = 0; i < s.p.length && i < players.length; i++) {
     const sp = s.p[i], p = players[i];
     if (p.id !== myPlayerId) continue;
+    if (!useLocalPrediction) {
+      // senza prediction: il server e autoritativo, ma usiamo il buffer
+      // per l'interpolazione (vedi interpolateRemotePlayers)
+      continue;
+    }
     const dx = sp[0] - p.x, dy = sp[1] - p.y;
     const dist = Math.hypot(dx, dy);
-    if (useLocalPrediction) {
-      if (dist > 80) { p.x = sp[0]; p.y = sp[1]; p.vx = sp[2]; p.vy = sp[3]; }
-      else if (dist > 3) { p.x += dx * 0.12; p.y += dy * 0.12; }
-    } else {
-      p.x = sp[0]; p.y = sp[1]; p.vx = sp[2]; p.vy = sp[3];
+    if (dist > 80) { p.x = sp[0]; p.y = sp[1]; p.vx = sp[2]; p.vy = sp[3]; }
+    else if (dist > 1) {
+      // Correzione morbida: max 12% per frame, dipende dalla distanza.
+      // Abbastanza lenta da non essere visibile, abbastanza veloce da
+      // non accumulare deriva.
+      const alpha = Math.min(0.12, dist * 0.015);
+      p.x += dx * alpha; p.y += dy * alpha;
     }
     p.charge = sp[4]; p.held = !!sp[5];
   }
 
-  // ── Palla: dead reckoning invariato (funzionava già bene) ──
+  // ── PALLA: dead reckoning (vx/vy immediati, x/y lerp leggero) ──
   if (s.b) {
     const b = s.b;
     const bdx = b[0] - ball.x, bdy = b[1] - ball.y;
@@ -34,45 +63,48 @@ function applyRemoteState() {
     ball.vx = b[2]; ball.vy = b[3];
   }
 
-  // ── goalCD: snap diretto + svuota buffer al respawn ──
-  const prevGC = goalCD;
-  if (s.gc !== undefined) goalCD = s.gc;
-  if (s.gc > 0 && prevGC === 0) {
-    // Gol/respawn: svuota buffer per non interpolare attraverso il teleport
-    snapshotBuffer = [];
-    // Snap diretto di tutti i remoti alla posizione server
-    for (let i = 0; i < s.p.length && i < players.length; i++) {
-      const sp = s.p[i], p = players[i];
-      if (p.id === myPlayerId) continue;
-      p.x = sp[0]; p.y = sp[1]; p.vx = sp[2]; p.vy = sp[3];
-      p.charge = sp[4]; p.held = !!sp[5];
-    }
-    return;
-  }
-
-  // ── Snapshot buffer per i player remoti ──
-  const now = performance.now();
-  snapshotBuffer.push({ p: s.p, gc: s.gc, recvAt: now });
-  // Rimuovi snapshot più vecchi di 200ms o oltre i 5 elementi
-  const cutoff = now - 200;
-  while (snapshotBuffer.length > 5 || (snapshotBuffer.length > 0 && snapshotBuffer[0].recvAt < cutoff)) {
+  // ── PUSH snapshot nel buffer per i player remoti ─────────
+  const MAX_SNAP = 5;
+  const MAX_AGE  = 200; // ms: piu vecchi di cosi non servono
+  snapshotBuffer.push({ p: s.p, recvAt: now });
+  while (snapshotBuffer.length > 0 && now - snapshotBuffer[0].recvAt > MAX_AGE) {
     snapshotBuffer.shift();
   }
+  if (snapshotBuffer.length > MAX_SNAP) snapshotBuffer.shift();
 }
 
-// Chiamato nel loop di render per interpolare la posizione visiva dei player remoti.
-// NON fa dead reckoning: se mancano due snapshot adiacenti, congela l'ultima posizione nota.
+// ── INTERPOLAZIONE player remoti ─────────────────────────
+// Chiamata una volta per frame nel loop update() in modalita guest.
+// Usa renderTime = now - INTERP_DELAY_MS per avere quasi sempre
+// due snapshot adiacenti disponibili anche con jitter moderato.
 function interpolateRemotePlayers(now) {
+  if (players.length === 0 || snapshotBuffer.length === 0) return;
   const renderTime = now - INTERP_DELAY_MS;
 
   for (let i = 0; i < players.length; i++) {
     const p = players[i];
-    if (p.id === myPlayerId) continue; // il locale è già gestito da applyRemoteState
     if (p.team === -1) continue;
+    // Il player locale con prediction viene gestito da applyInput,
+    // non dall'interpolazione snapshot.
+    if (p.id === myPlayerId && useLocalPrediction) continue;
 
-    if (snapshotBuffer.length === 0) continue; // nessun dato ancora
+    // Buffer non ancora riempito: usa snapshot piu vecchio disponibile
+    if (renderTime <= snapshotBuffer[0].recvAt) {
+      const snap = snapshotBuffer[0];
+      if (snap.p[i]) { p.x = snap.p[i][0]; p.y = snap.p[i][1]; p.charge = snap.p[i][4]; p.held = !!snap.p[i][5]; }
+      continue;
+    }
 
-    // Cerca i due snapshot adiacenti a renderTime
+    // renderTime e piu recente dell'ultimo snapshot (rete lenta / jitter):
+    // congela all'ultima posizione nota — meglio un player fermo di uno
+    // che scivola nella direzione sbagliata.
+    if (renderTime >= snapshotBuffer[snapshotBuffer.length - 1].recvAt) {
+      const snap = snapshotBuffer[snapshotBuffer.length - 1];
+      if (snap.p[i]) { p.x = snap.p[i][0]; p.y = snap.p[i][1]; p.charge = snap.p[i][4]; p.held = !!snap.p[i][5]; }
+      continue;
+    }
+
+    // Caso normale: trova la coppia (older, newer) e interpola
     let older = null, newer = null;
     for (let k = 0; k < snapshotBuffer.length - 1; k++) {
       if (snapshotBuffer[k].recvAt <= renderTime && snapshotBuffer[k + 1].recvAt >= renderTime) {
@@ -81,41 +113,35 @@ function interpolateRemotePlayers(now) {
         break;
       }
     }
+    if (!older || !newer || !older.p[i] || !newer.p[i]) continue;
 
-    if (older && newer) {
-      // Interpolazione lineare tra i due snapshot
-      const t = Math.max(0, Math.min(1,
-        (renderTime - older.recvAt) / (newer.recvAt - older.recvAt)
-      ));
-      const op = older.p[i], np = newer.p[i];
-      if (!op || !np) continue;
-      p.x = op[0] + (np[0] - op[0]) * t;
-      p.y = op[1] + (np[1] - op[1]) * t;
-      // charge e held presi dallo snapshot più recente
-      p.charge = np[4]; p.held = !!np[5];
-    } else if (snapshotBuffer.length > 0) {
-      // Buffer non abbastanza pieno (inizio partita) o renderTime oltre il buffer:
-      // congela all'ultimo snapshot disponibile senza estrapolis
-      const last = snapshotBuffer[snapshotBuffer.length - 1];
-      const sp = last.p[i];
-      if (!sp) continue;
-      p.x = sp[0]; p.y = sp[1];
-      p.charge = sp[4]; p.held = !!sp[5];
-    }
-    // Se nessun caso: congela posizione attuale (no dead reckoning)
+    const span = newer.recvAt - older.recvAt;
+    const t = span > 0 ? Math.max(0, Math.min(1, (renderTime - older.recvAt) / span)) : 1;
+    p.x = older.p[i][0] + (newer.p[i][0] - older.p[i][0]) * t;
+    p.y = older.p[i][1] + (newer.p[i][1] - older.p[i][1]) * t;
+    p.charge = newer.p[i][4];
+    p.held = !!newer.p[i][5];
+    // vx/vy non vengono interpolati: non servono per il rendering,
+    // il server e l'unica fonte di verita per la fisica.
   }
 }
 
-// Dead reckoning solo per la palla (invariato) + player locale in prediction.
-// I player remoti sono ora posizionati da interpolateRemotePlayers nel loop di render.
+// ── DEAD RECKONING palla + prediction locale ──────────────
+// I player REMOTI non vengono piu mossi qui: ci pensa interpolateRemotePlayers.
+// Qui gestiamo solo: palla (dead reckoning fisico) e player locale (prediction).
 function tickRemotePhysics() {
-  // Player locale con prediction
-  if (useLocalPrediction) {
-    const myP = players.find(p => p.id === myPlayerId);
-    if (myP) applyInput(myP, inpLocal());
+  // Player locale: prediction con applyInput
+  for (const p of players) {
+    if (p.team === -1) continue;
+    if (p.id === myPlayerId && useLocalPrediction) {
+      applyInput(p, inpLocal());
+    }
+    // remoti: niente — gestiti da interpolateRemotePlayers()
   }
 
-  // Palla: dead reckoning (come prima — B_FRIC applicato correttamente)
+  // Palla: dead reckoning con frizione corretta (identica al server).
+  // Non applicare P_FRIC ai player remoti: il server li muove con input
+  // continuo e non frenano davvero; applicarla localmente causava undershoot.
   ball.x += ball.vx; ball.y += ball.vy;
   ball.vx *= CONFIG.B_FRIC; ball.vy *= CONFIG.B_FRIC;
   if (ball.x - BR < FL.l) { ball.x = FL.l + BR; ball.vx *= -CONFIG.B_BOUNCE; }

@@ -22,7 +22,29 @@ Questo file tiene traccia delle modifiche e delle nuove funzionalità introdotte
 
 ---
 
-## v2.11.0 — Pallavolo: fix tocchi avversario, modalità avanzata online, animazioni e comportamento base
+## v2.12.0 — Fluidita player remoti e locali: snapshot interpolation + prediction migliorata
+
+### Problema risolto
+- **Micro-jitter sui player remoti**: il vecchio sistema estrapolava la posizione con `tickRemotePhysics` (senza `P_FRIC`, a differenza del server) e poi correggeva con lerp aggressivo (0.6-0.9/frame). Questo generava un ciclo overshoot → snap correttivo → overshoot continuo, peggiorato dal jitter di rete del server su Render free tier.
+- **Sensazione "scivolosa" del player locale**: la correzione server arrivava con un lerp fisso (12%) indipendente dalla distanza, dando una sensazione di input lag variabile.
+
+### Novita
+- **Snapshot interpolation per player remoti** (`js/state.js`, `js/modes/soccer/sync.js`, `js/modes/volley/sync.js`): sostituito dead reckoning + lerp correttivo con un buffer di snapshot a 5 elementi. I player remoti vengono posizionati interpolando linearmente tra due snapshot reali a `renderTime = now - 50ms`. Se mancano snapshot adiacenti il player viene congelato all'ultima posizione nota (niente estrapolazione).
+- **`INTERP_DELAY_MS = 50`** in `state.js`: costante facilmente modificabile (33ms su server veloci, 80ms con molto jitter).
+- **`snapshotBuffer` / `vSnapshotBuffer`** in `state.js`: buffer per calcio e pallavolo, max 5 elementi, purge automatico degli snapshot > 200ms.
+- **`interpolateRemotePlayers(now)`** in `soccer/sync.js`, **`vInterpolateRemotePlayers(now)`** in `volley/sync.js`: chiamate una volta per frame nel loop `update()`. Coprono anche il caso buffer vuoto (inizio partita) e buffer con un solo elemento.
+- **Correzione prediction locale piu morbida** (`soccer/sync.js`, `volley/sync.js`): il fattore alpha e ora `min(0.12, dist * 0.015)` invece di un fisso 0.12. Distanze piccole (< 1px) non producono correzione, distanze grandi convergono piu velocemente senza snap bruschi.
+- **Gol / respawn**: al passaggio `goalCD` da 0 a valore > 0 il buffer viene svuotato e si usa snap diretto per tutti i player, evitando interpolazione attraverso il teleport.
+- **`snapshotBuffer = []` nel `reset()`** di entrambe le modalita: il buffer viene ripulito a ogni reset/inizio partita.
+
+### Invariato
+- Palla: dead reckoning con `B_FRIC`/`V_B_GRAV` corretto + snap su velJump o distanza > 40px.
+- Server: nessuna modifica.
+- Input: nessuna modifica.
+
+---
+
+ — Pallavolo: fix tocchi avversario, modalità avanzata online, animazioni e comportamento base
 
 ### 🔧 Fix
 - **Tocchi avversario si azzerano correttamente** (`js/modes/volley/physics.js` → `vIncrementTouch`, `server.js` → `vTick`): quando una squadra tocca la palla, i tocchi dell'avversario tornano a 0 (recupera i suoi 3 tocchi). Prima si azzeravano solo al cambio lato fisico della palla.

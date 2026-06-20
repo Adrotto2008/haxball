@@ -19,8 +19,8 @@ let CONFIG = {
 
 // Descrizioni per il pannello Variabili nel menu
 const CONFIG_META = [
-  { key:'P_START',     label:'Velocità iniziale',     min:0,   max:5,     step:0.1  },
-  { key:'P_SPEED_MAX', label:'Velocità massima',      min:1,   max:30,    step:0.5  },
+  { key:'P_START',     label:'Velocita iniziale',     min:0,   max:5,     step:0.1  },
+  { key:'P_SPEED_MAX', label:'Velocita massima',      min:1,   max:30,    step:0.5  },
   { key:'P_ACCEL',     label:'Accelerazione',         min:0,   max:1,     step:0.005 },
   { key:'P_FRIC',      label:'Attrito player',        min:0.5, max:1,     step:0.01 },
   { key:'B_FRIC',      label:'Attrito palla',         min:0.9, max:1,     step:0.001 },
@@ -33,9 +33,20 @@ const CONFIG_META = [
   { key:'GOAL_CD',     label:'Pausa dopo gol (frame)', min:30, max:300,   step:10   },
 ];
 
+// ── SNAPSHOT INTERPOLATION ──────────────────────────────
+// Ritardo di render per i player remoti.
+// 50ms = ~3 pacchetti a 60Hz. Abbassa a 33ms su server veloci,
+// alza a 80ms se c'e molto jitter di rete.
+const INTERP_DELAY_MS = 50;
+
+// Buffer snapshot calcio: array di { p, b, gc, recvAt }
+// max 5 elementi, purge automatico degli snapshot > 200ms.
+let snapshotBuffer = [];
+
+// Buffer snapshot pallavolo: array di { p, b, gc, touches, recvAt }
+let vSnapshotBuffer = [];
+
 // ── STATO — variabili condivise + init canvas ───────────
-// Le variabili della partita di calcio (score/ball/players/timeLeft/…)
-// stanno in js/modes/soccer/game.js, non qui.
 const canvas = document.getElementById('c');
 const ctx    = canvas.getContext('2d');
 canvas.width  = W * DPR; canvas.height = H * DPR;
@@ -50,9 +61,9 @@ let remoteInputs = {}, remoteState = null, lastSent = 0;
 // roster / sala
 let pmRoster = [], isHost = false, pmSelectedId = null, hostId = null;
 let myNickname = 'Giocatore';
-let mySkin = '';            // lettera/emoji da mostrare nel cerchio
-let playerSkins = {};       // pid → skin string
-let afkPlayers = new Set(); // pid dei giocatori AFK
+let mySkin = '';
+let playerSkins = {};
+let afkPlayers = new Set();
 
 // chat
 let chatOpen = false, chatMessages = [];
@@ -65,25 +76,7 @@ let currentView = 8;
 // ── IMPOSTAZIONE: prediction locale ───────────────────
 // Se abilitata: il tuo player viene predetto con applyInput
 // (risponde all'input immediatamente) e corretto dal server.
-// Migliora la fluidità su reti buone, peggiora su reti instabili.
-// Ogni giocatore può cambiarla nelle impostazioni.
 let useLocalPrediction = JSON.parse(localStorage.getItem('hax_prediction') ?? 'true');
 
-// ── IMPOSTAZIONE: modalità controlli volley ────────────────
-// 'base'     = contatto diretto spinge la palla con impulso bonus (default)
-// 'advanced' = tieni AZIONE per caricare, rilascia per tirare (come calcio)
+// ── IMPOSTAZIONE: modalita controlli volley ────────────────
 let vControlMode = localStorage.getItem('hax_vcontrol') || 'base';
-
-// ── SNAPSHOT INTERPOLATION ────────────────────────────
-// Ritardo di rendering dei player remoti in ms.
-// A 60Hz del server ogni pacchetto arriva ~16.67ms → 50ms ≈ 3 pacchetti di buffer.
-// Abbassare a 33ms se la latenza di rete è bassa e stabile.
-// Alzare a 80ms se il server Render ha molto jitter.
-const INTERP_DELAY_MS = 50;
-
-// Buffer snapshot per calcio — massimo 5 elementi, ogni elemento:
-// { p: [...], b: [...], gc: number, recvAt: number (performance.now()) }
-let snapshotBuffer = [];
-
-// Buffer snapshot per pallavolo — stesso formato + campo touches
-let vSnapshotBuffer = [];

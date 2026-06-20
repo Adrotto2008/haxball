@@ -1,32 +1,45 @@
-// ── VOLLEY SYNC — snapshot interpolation (player remoti) + dead reckoning (palla) ──
-// Versione pulita: nessun riferimento a capturedBy/offset (rimossi in v2.8).
-// La palla non ha stato "catturato" — solo posizione, velocità e gravità.
+// ── VOLLEY SYNC — snapshot interpolation + apply remote state ──
 
-// Chiamato ogni volta che arriva un pacchetto di stato dal server.
-// Per i player remoti: inserisce lo snapshot nel buffer invece di correggere subito.
-// Per la palla: dead reckoning invariato (funzionava già bene).
-// Per il player locale: prediction + correzione lerp leggera invariata.
 function vApplyRemoteState() {
   const s = vRemoteState;
   if (!s || !s.p) return;
 
-  // ── Player locale: prediction + correzione leggera (invariata) ──
+  const now = performance.now();
+
+  // ── GOL / RESPAWN: svuota buffer e snap diretto ──────────
+  const prevGoalCD = vGoalCD;
+  if (s.gc !== undefined) vGoalCD = s.gc;
+  if (s.gc > 0 && prevGoalCD === 0) {
+    vSnapshotBuffer = [];
+    for (let i = 0; i < s.p.length && i < vPlayers.length; i++) {
+      const sp = s.p[i], p = vPlayers[i];
+      p.x = sp[0]; p.y = sp[1]; p.vx = sp[2]; p.vy = sp[3];
+      p.charge = sp[4] || 0; p.held = !!sp[5];
+    }
+    if (s.b) {
+      vBall.x = s.b[0]; vBall.y = s.b[1]; vBall.vx = s.b[2]; vBall.vy = s.b[3];
+      vBall.grav = s.b[4] !== undefined ? s.b[4] : V_B_GRAV_BASE;
+    }
+    if (s.touches) { vTouches[0] = s.touches[0]; vTouches[1] = s.touches[1]; }
+    return;
+  }
+
+  // ── PLAYER LOCALE: correzione prediction ─────────────────
   for (let i = 0; i < s.p.length && i < vPlayers.length; i++) {
     const sp = s.p[i], p = vPlayers[i];
     if (p.id !== myPlayerId) continue;
+    if (!useLocalPrediction) continue;
     const dx = sp[0] - p.x, dy = sp[1] - p.y;
     const dist = Math.hypot(dx, dy);
-    if (useLocalPrediction) {
-      if (dist > 80) { p.x = sp[0]; p.y = sp[1]; p.vx = sp[2]; p.vy = sp[3]; }
-      else if (dist > 3) { p.x += dx * 0.12; p.y += dy * 0.12; }
-    } else {
-      p.x = sp[0]; p.y = sp[1]; p.vx = sp[2]; p.vy = sp[3];
+    if (dist > 80) { p.x = sp[0]; p.y = sp[1]; p.vx = sp[2]; p.vy = sp[3]; }
+    else if (dist > 1) {
+      const alpha = Math.min(0.12, dist * 0.015);
+      p.x += dx * alpha; p.y += dy * alpha;
     }
-    p.charge = sp[4] || 0;
-    p.held   = !!sp[5];
+    p.charge = sp[4] || 0; p.held = !!sp[5];
   }
 
-  // ── Palla: dead reckoning invariato ──
+  // ── PALLA: dead reckoning ─────────────────────────────────
   if (s.b) {
     const b = s.b;
     const bdx = b[0] - vBall.x, bdy = b[1] - vBall.y;
@@ -41,45 +54,38 @@ function vApplyRemoteState() {
 
   if (s.touches) { vTouches[0] = s.touches[0]; vTouches[1] = s.touches[1]; }
 
-  // ── goalCD: snap diretto + svuota buffer al respawn ──
-  const prevGC = vGoalCD;
-  if (s.gc !== undefined) vGoalCD = s.gc;
-  if (s.gc > 0 && prevGC === 0) {
-    // Gol/respawn: svuota buffer per non interpolare attraverso il teleport
-    vSnapshotBuffer = [];
-    // Snap diretto di tutti i remoti alla posizione server
-    for (let i = 0; i < s.p.length && i < vPlayers.length; i++) {
-      const sp = s.p[i], p = vPlayers[i];
-      if (p.id === myPlayerId) continue;
-      p.x = sp[0]; p.y = sp[1]; p.vx = sp[2]; p.vy = sp[3];
-      p.charge = sp[4] || 0; p.held = !!sp[5];
-    }
-    return;
-  }
-
-  // ── Snapshot buffer per i player remoti ──
-  const now = performance.now();
-  vSnapshotBuffer.push({ p: s.p, gc: s.gc, recvAt: now });
-  // Rimuovi snapshot più vecchi di 200ms o oltre i 5 elementi
-  const cutoff = now - 200;
-  while (vSnapshotBuffer.length > 5 || (vSnapshotBuffer.length > 0 && vSnapshotBuffer[0].recvAt < cutoff)) {
+  // ── PUSH snapshot nel buffer per i player remoti ─────────
+  const MAX_SNAP = 5;
+  const MAX_AGE  = 200;
+  vSnapshotBuffer.push({ p: s.p, recvAt: now });
+  while (vSnapshotBuffer.length > 0 && now - vSnapshotBuffer[0].recvAt > MAX_AGE) {
     vSnapshotBuffer.shift();
   }
+  if (vSnapshotBuffer.length > MAX_SNAP) vSnapshotBuffer.shift();
 }
 
-// Chiamato nel loop di render per interpolare la posizione visiva dei player remoti volley.
-// NON fa dead reckoning: se mancano due snapshot adiacenti, congela l'ultima posizione nota.
+// ── INTERPOLAZIONE player remoti pallavolo ────────────────
 function vInterpolateRemotePlayers(now) {
+  if (vPlayers.length === 0 || vSnapshotBuffer.length === 0) return;
   const renderTime = now - INTERP_DELAY_MS;
 
   for (let i = 0; i < vPlayers.length; i++) {
     const p = vPlayers[i];
-    if (p.id === myPlayerId) continue;
     if (p.team === -1) continue;
+    if (p.id === myPlayerId && useLocalPrediction) continue;
 
-    if (vSnapshotBuffer.length === 0) continue;
+    if (renderTime <= vSnapshotBuffer[0].recvAt) {
+      const snap = vSnapshotBuffer[0];
+      if (snap.p[i]) { p.x = snap.p[i][0]; p.y = snap.p[i][1]; p.charge = snap.p[i][4] || 0; p.held = !!snap.p[i][5]; }
+      continue;
+    }
 
-    // Cerca i due snapshot adiacenti a renderTime
+    if (renderTime >= vSnapshotBuffer[vSnapshotBuffer.length - 1].recvAt) {
+      const snap = vSnapshotBuffer[vSnapshotBuffer.length - 1];
+      if (snap.p[i]) { p.x = snap.p[i][0]; p.y = snap.p[i][1]; p.charge = snap.p[i][4] || 0; p.held = !!snap.p[i][5]; }
+      continue;
+    }
+
     let older = null, newer = null;
     for (let k = 0; k < vSnapshotBuffer.length - 1; k++) {
       if (vSnapshotBuffer[k].recvAt <= renderTime && vSnapshotBuffer[k + 1].recvAt >= renderTime) {
@@ -88,38 +94,28 @@ function vInterpolateRemotePlayers(now) {
         break;
       }
     }
+    if (!older || !newer || !older.p[i] || !newer.p[i]) continue;
 
-    if (older && newer) {
-      const t = Math.max(0, Math.min(1,
-        (renderTime - older.recvAt) / (newer.recvAt - older.recvAt)
-      ));
-      const op = older.p[i], np = newer.p[i];
-      if (!op || !np) continue;
-      p.x = op[0] + (np[0] - op[0]) * t;
-      p.y = op[1] + (np[1] - op[1]) * t;
-      p.charge = np[4] || 0; p.held = !!np[5];
-    } else if (vSnapshotBuffer.length > 0) {
-      // Congela all'ultimo snapshot disponibile (inizio partita o buffer corto)
-      const last = vSnapshotBuffer[vSnapshotBuffer.length - 1];
-      const sp = last.p[i];
-      if (!sp) continue;
-      p.x = sp[0]; p.y = sp[1];
-      p.charge = sp[4] || 0; p.held = !!sp[5];
-    }
-    // Nessun dead reckoning: se il buffer è vuoto, congela la posizione attuale
+    const span = newer.recvAt - older.recvAt;
+    const t = span > 0 ? Math.max(0, Math.min(1, (renderTime - older.recvAt) / span)) : 1;
+    p.x = older.p[i][0] + (newer.p[i][0] - older.p[i][0]) * t;
+    p.y = older.p[i][1] + (newer.p[i][1] - older.p[i][1]) * t;
+    p.charge = newer.p[i][4] || 0;
+    p.held = !!newer.p[i][5];
   }
 }
 
-// Dead reckoning solo per la palla (invariato) + player locale in prediction.
-// I player remoti sono ora posizionati da vInterpolateRemotePlayers nel loop di render.
+// ── DEAD RECKONING palla pallavolo + prediction locale ─────
 function vTickRemotePhysics() {
-  // Player locale con prediction
-  if (useLocalPrediction) {
-    const myP = vPlayers.find(p => p.id === myPlayerId);
-    if (myP) vApplyInput(myP, inpLocal());
+  for (const p of vPlayers) {
+    if (p.team === -1) continue;
+    if (p.id === myPlayerId && useLocalPrediction) {
+      vApplyInput(p, inpLocal());
+    }
+    // remoti: gestiti da vInterpolateRemotePlayers()
   }
 
-  // Palla: dead reckoning con gravità (come prima)
+  // Palla: dead reckoning con gravita (identico al server)
   vBall.grav = (vBall.grav || V_B_GRAV_BASE);
   vBall.vy += vBall.grav;
   vBall.grav = Math.min(vBall.grav + V_B_GRAV_RAMP, V_B_GRAV_MAX);

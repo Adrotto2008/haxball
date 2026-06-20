@@ -31,8 +31,10 @@ function update(dt) {
     if(timeLeft<=0 && !gameOver){ gameOver=true; handleGameOverLocal(); }
   } else {
     sendGuestInput();
+    const _nowTs = performance.now();
     physAccum = Math.min(physAccum + dt, PHYS_TICK * 4);
     while(physAccum >= PHYS_TICK) { tickRemotePhysics(); physAccum -= PHYS_TICK; }
+    interpolateRemotePlayers(_nowTs);
     if(timeLeft>0){ secondAccum+=dt; if(secondAccum>=1000){secondAccum-=1000;timeLeft--;updateHUD();} }
   }
 
@@ -115,8 +117,7 @@ function buildPlayers(roster) {
 }
 function mkBall() { return {x:W/2,y:H/2,vx:0,vy:0,r:BR,trail:[]}; }
 function reset(full) {
-  ball=mkBall(); remoteInputs={}; remoteState=null; particles=[];
-  snapshotBuffer = []; // svuota buffer snapshot al reset
+  ball=mkBall(); remoteInputs={}; remoteState=null; particles=[]; snapshotBuffer=[];
   if(players.length>0) {
     const byTeam=[[],[]];
     for(const p of players) if(p.team===0||p.team===1) byTeam[p.team].push(p);
