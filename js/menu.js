@@ -91,6 +91,8 @@ function renderConfigPanel() {
       if (isNaN(val)) return;
       if (isVolley) {
         V_CONFIG[key] = val;
+        // Sync al server (e da lì a tutti i client)
+        wsSend({ type: 'set_vconfig', payload: { patch: { [key]: val } } });
       } else {
         CONFIG[key] = val;
         wsSend({ type: 'set_config', payload: { patch: { [key]: val } } });

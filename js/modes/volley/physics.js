@@ -3,14 +3,16 @@
 // L'unico modo per muoverla è AZIONE mentre la palla è dentro il player.
 //
 //   BASE     — tieni AZIONE premuto → tira ogni frame che la palla è dentro
-//              (se tieni premuto e la palla ci entra, parte subito)
-//              Rallentamento durante la pressione. Cerchio pieno attorno al player.
-//   AVANZATA — tieni AZIONE per caricare, rilascia → tira (se palla dentro).
-//              Animazione freccia carica sul player (come calcio).
+//   AVANZATA — tieni AZIONE per caricare, rilascia → tira (se palla dentro)
+//
+// vControlMode è PER-PLAYER (p.vAdvanced), non globale di room.
+// Ogni client invia il proprio vmode; il server lo salva su p.vAdvanced.
 
 // ── MOVIMENTO PLAYER ────────────────────────────────────
 function vApplyInput(p, inp) {
   const cfg = V_CONFIG;
+  // Legge la modalità dal player stesso (non dalla variabile globale condivisa)
+  // In training usa vControlMode locale; online sarà sync dal server via p.held/charge
   const advanced = (vControlMode === 'advanced');
   const pressing = inp.kick;
 
@@ -20,16 +22,15 @@ function vApplyInput(p, inp) {
       if (!p.held) { p.vx *= 0.3; p.vy *= 0.3; }
       p.charge = Math.min((p.charge || 0) + 1, cfg.V_KICK_CHG_F);
     } else {
-      if (p.held && (p.charge || 0) > 0) vDoKick(p);
+      if (p.held && (p.charge || 0) > 0) vDoKick(p, true);
       p.charge = 0;
     }
     p.held = pressing;
   } else {
     // BASE: tira ogni frame che AZIONE è premuto E la palla è dentro
-    // (rallentamento durante la pressione come avanzata)
     if (pressing) {
-      if (!p.held) { p.vx *= 0.3; p.vy *= 0.3; } // kick-start lento
-      vDoKick(p); // tenta ogni frame, vDoKick verifica se palla è dentro
+      if (!p.held) { p.vx *= 0.3; p.vy *= 0.3; }
+      vDoKick(p, false);
     }
     p.held = pressing;
     p.charge = 0;
@@ -38,7 +39,6 @@ function vApplyInput(p, inp) {
   // Velocità ridotta mentre si tiene AZIONE (base o avanzata)
   const topSpd = pressing ? cfg.V_P_SPEED_MAX * 0.45 : cfg.V_P_SPEED_MAX;
 
-  // Movimento
   if (inp.up) { if (p.vy > -cfg.V_P_START) p.vy = -cfg.V_P_START; p.vy -= cfg.V_P_ACCEL; }
   if (inp.dn) { if (p.vy <  cfg.V_P_START) p.vy =  cfg.V_P_START; p.vy += cfg.V_P_ACCEL; }
   if (inp.lt) { if (p.vx > -cfg.V_P_START) p.vx = -cfg.V_P_START; p.vx -= cfg.V_P_ACCEL; }
@@ -59,9 +59,9 @@ function vApplyInput(p, inp) {
 
 // ── TIRO (AZIONE) ───────────────────────────────────────
 // Tira solo se la palla è DENTRO il player (dist < p.r + V_BR).
-// BASE: forza fissa (chiamato ogni frame con AZIONE premuta).
-// AVANZATA: forza proporzionale alla carica (chiamato al rilascio).
-function vDoKick(p) {
+// advanced=true: forza proporzionale alla carica (avanzata).
+// advanced=false: forza fissa media (base).
+function vDoKick(p, advanced) {
   const cfg = V_CONFIG;
   const dx = vBall.x - p.x, dy = vBall.y - p.y;
   const d = Math.hypot(dx, dy);
@@ -71,7 +71,7 @@ function vDoKick(p) {
   const ny = d > 0.01 ? dy / d : -1;
 
   let force;
-  if (vControlMode === 'advanced') {
+  if (advanced) {
     const t = Math.min((p.charge || 0) / cfg.V_KICK_CHG_F, 1);
     force = cfg.V_KICK_MIN + t * (cfg.V_KICK_MAX - cfg.V_KICK_MIN);
   } else {
@@ -80,7 +80,7 @@ function vDoKick(p) {
 
   vBall.vx = nx * force + p.vx * 0.28;
   vBall.vy = ny * force + p.vy * 0.28;
-  vBall.grav = V_B_GRAV_BASE;
+  vBall.grav = cfg.V_B_GRAV_BASE !== undefined ? cfg.V_B_GRAV_BASE : V_B_GRAV_BASE;
 
   vIncrementTouch(p.team);
   spawnP(vBall.x, vBall.y, 6, V_TEAM_COLS[p.team], force * 0.4, 12);
@@ -88,19 +88,24 @@ function vDoKick(p) {
 }
 
 // ── FISICA PALLA ────────────────────────────────────────
+// Usa V_CONFIG per tutte le costanti (modificabili live)
 function vTickBall() {
-  vBall.grav = (vBall.grav !== undefined) ? vBall.grav : V_B_GRAV_BASE;
+  const cfg = V_CONFIG;
+  const gravBase = V_B_GRAV_BASE; // costante fissa (non in V_CONFIG)
+  const gravMax  = V_B_GRAV_MAX;
+  const gravRamp = V_B_GRAV_RAMP;
+  if (vBall.grav === undefined) vBall.grav = gravBase;
   vBall.vy  += vBall.grav;
-  vBall.grav = Math.min(vBall.grav + V_B_GRAV_RAMP, V_B_GRAV_MAX);
-  vBall.vx  *= V_CONFIG.V_B_FRIC;
-  vBall.vy  *= V_CONFIG.V_B_FRIC;
+  vBall.grav = Math.min(vBall.grav + gravRamp, gravMax);
+  vBall.vx  *= cfg.V_B_FRIC;
+  vBall.vy  *= cfg.V_B_FRIC;
   vBall.x   += vBall.vx;
   vBall.y   += vBall.vy;
   vBallCollidePost();
-  const bw = V_CONFIG.V_B_BOUNCE;
+  const bw = cfg.V_B_BOUNCE;
   if (vBall.x - V_BR < V_FL.l) { vBall.x = V_FL.l + V_BR; vBall.vx *= -bw; }
   if (vBall.x + V_BR > V_FL.r) { vBall.x = V_FL.r - V_BR; vBall.vx *= -bw; }
-  if (vBall.y - V_BR < V_FL.t) { vBall.y = V_FL.t + V_BR; vBall.vy *= -bw; vBall.grav = V_B_GRAV_BASE; }
+  if (vBall.y - V_BR < V_FL.t) { vBall.y = V_FL.t + V_BR; vBall.vy *= -bw; vBall.grav = gravBase; }
 }
 
 // ── COLLISIONE PALLA ↔ MURETTO CENTRALE ─────────────────
@@ -136,11 +141,9 @@ function vCircleCollide(a, b) {
 }
 
 // ── TOCCHI ──────────────────────────────────────────────
-// Quando una squadra tocca la palla, i tocchi dell'avversario si azzerano
-// (l'avversario recupera i suoi 3 tocchi) e i propri aumentano.
 function vIncrementTouch(team) {
   const opp = team === 0 ? 1 : 0;
-  vTouches[opp] = 0;          // avversario recupera 3 tocchi
+  vTouches[opp] = 0;
   vTouches[team]++;
   if (vTouches[team] > V_TEAM_MAX_TOUCHES) {
     vGoal(opp);
@@ -148,9 +151,6 @@ function vIncrementTouch(team) {
 }
 
 // ── CAMBIO LATO ──────────────────────────────────────────
-// Ulteriore reset tocchi quando la palla attraversa la rete
-// (ridondante rispetto a vIncrementTouch ma utile per la palla
-//  che rimbalza da sola senza essere toccata).
 function vCheckSideChange() {
   const side = vBall.x < V_NET_X ? 0 : 1;
   if (vBallLastSide !== null && side !== vBallLastSide) {

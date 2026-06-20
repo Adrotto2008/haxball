@@ -28,15 +28,21 @@ function handleServerMsg(msg) {
   switch (msg.type) {
 
     case 'config':
-      // aggiornamento live delle variabili fisiche dall'host
       Object.assign(CONFIG, msg.config);
+      if ($('game-menu').classList.contains('open')) renderConfigPanel();
+      break;
+
+    case 'vconfig':
+      // aggiornamento live variabili pallavolo
+      Object.assign(V_CONFIG, msg.vconfig);
       if ($('game-menu').classList.contains('open')) renderConfigPanel();
       break;
 
     case 'created':
       hostId = myPlayerId; isHost = true;
       pmRoster = [{ id: myPlayerId, name: myNickname, team: 0, skin: mySkin, afk: false }];
-      if (msg.config) Object.assign(CONFIG, msg.config);
+      if (msg.config)  Object.assign(CONFIG,   msg.config);
+      if (msg.vconfig) Object.assign(V_CONFIG, msg.vconfig);
       if (msg.mode) currentGameMode = msg.mode;
       $('card-create').style.display = 'none';
       $('card-join').style.display = 'none';
@@ -48,10 +54,11 @@ function handleServerMsg(msg) {
       break;
 
     case 'joined':
-      // guest: entra nella sala
       pmRoster = msg.roster;
       hostId   = msg.hostId;
-      if (msg.config) Object.assign(CONFIG, msg.config);
+      if (msg.config)  Object.assign(CONFIG,   msg.config);
+      if (msg.vconfig) Object.assign(V_CONFIG, msg.vconfig);
+      if (msg.mode) currentGameMode = msg.mode;
       setStatus('');
       $('card-join').style.display  = 'none';
       $('lobby').style.display      = 'none';
@@ -98,7 +105,8 @@ function handleServerMsg(msg) {
       pmRoster = msg.roster;
       hostId   = msg.hostId;
       isHost   = (msg.hostId === myPlayerId);
-      if (msg.config) Object.assign(CONFIG, msg.config);
+      if (msg.config)  Object.assign(CONFIG,   msg.config);
+      if (msg.vconfig) Object.assign(V_CONFIG, msg.vconfig);
       if (msg.mode) currentGameMode = msg.mode;
       closeMenu();
       if (msg.lateJoin) {

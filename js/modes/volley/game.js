@@ -36,12 +36,13 @@ function vUpdate(dt) {
     // Fisica palla
     vTickBall();
 
-    // CHECK POST-TICK (modalita base): se AZIONE e premuto e la palla
+    // CHECK POST-TICK (modalità base): se AZIONE è premuto e la palla
     // ha appena attraversato il player in questo frame, tirala via.
+    // Non serve in avanzata: il tiro avviene solo al rilascio.
     if (vControlMode !== 'advanced') {
       for (const p of vPlayers) {
         if (p.team === -1 || !p.held) continue;
-        vDoKick(p);
+        vDoKick(p, false);
       }
     }
 
@@ -220,6 +221,10 @@ function startVolleyGame(mode, roster) {
   stopLoop();
   currentGameMode = 'volley';
   netMode = mode; vPlayers = vBuildPlayers(roster);
+  // Comunica subito la propria modalità controllo al server
+  if (mode !== 'train' && ws && ws.readyState === 1) {
+    wsSend({ type: 'vmode', payload: { advanced: vControlMode === 'advanced' } });
+  }
   if (mySkin && myPlayerId) playerSkins[myPlayerId] = mySkin;
   $('game-menu').classList.remove('open');
   $('lobby').style.display = 'none'; $('game').style.display = 'flex';

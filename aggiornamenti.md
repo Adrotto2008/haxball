@@ -4,6 +4,20 @@ Questo file tiene traccia delle modifiche e delle nuove funzionalità introdotte
 
 ---
 
+## v2.13.0 — Pallavolo: vAdvanced per-player, V_CONFIG live server-side, fix variabili
+
+### 🔧 Fix critici
+- **`vAdvanced` per-player** (`server.js`): la modalità controllo pallavolo (base/avanzata) è ora salvata su `p.vAdvanced` per ogni singolo player, non più su `room.vAdvanced`. Con due dispositivi collegati con modalità diverse non si sovrascrivono più a vicenda. Il server aggiorna `p.vAdvanced` solo per il player che ha inviato il messaggio `vmode`.
+- **Modalità avanzata ripristinata** (`js/modes/volley/physics.js`): `vDoKick` ora riceve `advanced` come parametro esplicito invece di leggere `vControlMode` globale. `vApplyInput` passa `true`/`false` correttamente in base alla modalità locale.
+- **`vmode` inviato all'avvio partita** (`js/modes/volley/game.js` → `startVolleyGame`): il client comunica subito la propria modalità al server quando entra in partita, evitando che rimanga `false` se il toggle era già attivo prima dell'ingresso.
+
+### ✨ Novità
+- **`V_CONFIG` live server-side** (`server.js`, `js/state.js`, `js/menu.js`, `js/network-core.js`): le variabili fisiche pallavolo sono ora sincronizzate con il server esattamente come quelle calcio. Nuovo oggetto `V_CONFIG_DEFAULT` nel server, `room.vconfig` per-room, handler `set_vconfig` (solo host), broadcast `vconfig` a tutti i client. Il pannello Variabili ora invia `set_vconfig` quando si sposta uno slider pallavolo.
+- **`V_CONFIG` e `V_CONFIG_META`** aggiunte a `js/state.js`: 11 variabili pallavolo (velocità player, attrito, rimbalzo, forza tiro, durata partita, pausa dopo punto) con range e step per il pannello slider.
+- **`vconfig` applicato su `created`/`joined`/`start`** (`js/network-core.js`): i guest ricevono la configurazione corrente al momento dell'ingresso, come già accadeva per il calcio.
+
+---
+
 ## v2.12.0 — Fluidità player remoti: snapshot interpolation (calcio + pallavolo)
 
 ### ✨ Novità

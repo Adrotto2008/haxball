@@ -33,6 +33,37 @@ const CONFIG_META = [
   { key:'GOAL_CD',     label:'Pausa dopo gol (frame)', min:30, max:300,   step:10   },
 ];
 
+// ── V_CONFIG LIVE client-side (pallavolo) ─────────────
+// Specchio del vconfig server — aggiornato via msg 'vconfig'.
+// physics.js pallavolo legge da V_CONFIG.xxx.
+let V_CONFIG = {
+  V_P_START:     1.4,
+  V_P_SPEED_MAX: 10.0,
+  V_P_ACCEL:     0.01,
+  V_P_FRIC:      0.78,
+  V_B_FRIC:      0.99,
+  V_B_BOUNCE:    0.35,
+  V_KICK_MIN:    4.0,
+  V_KICK_MAX:    14.0,
+  V_KICK_CHG_F:  50,
+  V_MATCH_TIME:  180,
+  V_GOAL_CD:     120,
+};
+
+const V_CONFIG_META = [
+  { key:'V_P_START',     label:'Velocità iniziale',       min:0,   max:5,   step:0.1  },
+  { key:'V_P_SPEED_MAX', label:'Velocità massima',       min:1,   max:30,  step:0.5  },
+  { key:'V_P_ACCEL',     label:'Accelerazione',          min:0,   max:1,   step:0.005 },
+  { key:'V_P_FRIC',      label:'Attrito player',         min:0.5, max:1,   step:0.01 },
+  { key:'V_B_FRIC',      label:'Attrito palla',          min:0.9, max:1,   step:0.001 },
+  { key:'V_B_BOUNCE',    label:'Rimbalzo palla',         min:0,   max:1,   step:0.05 },
+  { key:'V_KICK_MIN',    label:'Tiro minimo',            min:1,   max:20,  step:0.5  },
+  { key:'V_KICK_MAX',    label:'Tiro massimo',           min:5,   max:40,  step:0.5  },
+  { key:'V_KICK_CHG_F',  label:'Frame carica tiro',      min:10,  max:120, step:5    },
+  { key:'V_MATCH_TIME',  label:'Durata partita (sec)',   min:30,  max:600, step:30   },
+  { key:'V_GOAL_CD',     label:'Pausa dopo punto (frame)',min:30, max:300, step:10   },
+];
+
 // ── SNAPSHOT INTERPOLATION ──────────────────────────────
 // Ritardo di render per i player remoti.
 // 50ms = ~3 pacchetti a 60Hz. Abbassa a 33ms su server veloci,
