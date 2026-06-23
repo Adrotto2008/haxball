@@ -296,11 +296,13 @@ function vTick(room){
 
   const ball=room.ball, players=room.players;
 
-  // 1. Input player (modalità per-player: p.vAdvanced)
+  // 1. Input player — kickedThisTick previene doppio conteggio nel check post-tick
+  const kickedThisTick = new Set();
   for(const p of players){
     if(p.team===-1)continue;
     const kicked=vApplyInputSrv(p, room.inputs[p.id]||{}, ball, vcfg);
     if(kicked){
+      kickedThisTick.add(p.id);
       const opp=p.team===0?1:0;
       room.vTouches[opp]=0;
       room.vTouches[p.team]++;
@@ -326,8 +328,10 @@ function vTick(room){
   vTickBallSrv(ball, vcfg);
 
   // 4. Check post-tick base: palle veloci che attraversano il player
+  // Salta chi ha già tirato in step 1 (evita doppio tocco)
   for(const p of players){
-    if(p.team===-1||!p.held||p.vAdvanced)continue; // solo modalità base
+    if(p.team===-1||!p.held||p.vAdvanced)continue;
+    if(kickedThisTick.has(p.id))continue;
     const kicked2=vDoKickSrv(p,ball,false,vcfg);
     if(kicked2){
       const opp2=p.team===0?1:0;

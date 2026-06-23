@@ -20,14 +20,17 @@ function vUpdate(dt) {
   if (vGoalCD > 0) { vGoalCD--; return; }
 
   if (netMode === 'train') {
-    // INPUT + TIRO locale (AZIONE tira se palla dentro il player)
+    // INPUT + TIRO locale
     const inp = inpLocal();
+    const kickedThisTick = new Set();
     for (const p of vPlayers) {
       if (p.team === -1) continue;
+      const prevVx = vBall.vx, prevVy = vBall.vy;
       vApplyInput(p, inp);
+      if (vBall.vx !== prevVx || vBall.vy !== prevVy) kickedThisTick.add(p.id);
     }
 
-    // Collisioni player-player (nessuna collisione player-palla)
+    // Collisioni player-player
     for (let i = 0; i < vPlayers.length; i++)
       for (let j = i + 1; j < vPlayers.length; j++)
         if (vPlayers[i].team !== -1 && vPlayers[j].team !== -1)
@@ -36,12 +39,11 @@ function vUpdate(dt) {
     // Fisica palla
     vTickBall();
 
-    // CHECK POST-TICK (modalità base): se AZIONE è premuto e la palla
-    // ha appena attraversato il player in questo frame, tirala via.
-    // Non serve in avanzata: il tiro avviene solo al rilascio.
+    // CHECK POST-TICK base: palle veloci — salta chi ha già tirato
     if (vControlMode !== 'advanced') {
       for (const p of vPlayers) {
         if (p.team === -1 || !p.held) continue;
+        if (kickedThisTick.has(p.id)) continue;
         vDoKick(p, false);
       }
     }

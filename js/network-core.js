@@ -110,37 +110,40 @@ function handleServerMsg(msg) {
       if (msg.mode) currentGameMode = msg.mode;
       closeMenu();
       if (msg.lateJoin) {
-        // Inizializza lo stato minimo per non crashare il draw
+        wsRoom = wsRoom || msg.code || '';
         if (currentGameMode === 'volley') {
           if (!vBall) vBall = vMkBall();
           if (!vPlayers.length) vPlayers = vBuildPlayers(msg.roster);
-          if(mySkin && myPlayerId) playerSkins[myPlayerId] = mySkin;
+          if (mySkin && myPlayerId) playerSkins[myPlayerId] = mySkin;
+          netMode = 'guest';
           $('game-menu').classList.remove('open');
           $('lobby').style.display = 'none';
           $('game').style.display  = 'flex';
+          hidePrematch();
           const badgeV = $('net-badge'); badgeV.textContent='GUEST'; badgeV.className='badge-guest';
           $('btn-restart').style.display = 'none';
-          $('hud').style.display = 'flex';
-          if(isTouchDev()) positionTouchLayer(); else hideTouchLayer();
+          if (isTouchDev()) positionTouchLayer(); else hideTouchLayer();
           applyView();
-          netMode = 'guest';
+          vReset(false);
+          vUpdateHUD();
           vStartLoop();
         } else {
           if (!ball) ball = mkBall();
           if (!players.length) players = buildPlayers(msg.roster);
-          if(mySkin && myPlayerId) playerSkins[myPlayerId] = mySkin;
+          if (mySkin && myPlayerId) playerSkins[myPlayerId] = mySkin;
+          netMode = 'guest';
           $('game-menu').classList.remove('open');
           $('lobby').style.display = 'none';
           $('game').style.display  = 'flex';
+          hidePrematch();
           const badge2 = $('net-badge'); badge2.textContent='GUEST'; badge2.className='badge-guest';
           $('btn-restart').style.display = 'none';
-          $('hud').style.display = 'flex';
-          if(isTouchDev()) positionTouchLayer(); else hideTouchLayer();
+          if (isTouchDev()) positionTouchLayer(); else hideTouchLayer();
           applyView();
-          netMode = 'guest';
+          updateHUD();
           startLoop();
         }
-        sysMsg('👋 Sei entrato come spettatore. L\'host può spostarti in una squadra.');
+        sysMsg('\uD83D\uDC4B Sei entrato come spettatore. L\'host pu\u00F2 spostarti in una squadra.');
       } else {
         if (currentGameMode === 'volley') startVolleyGame('guest', pmRoster);
         else startGame('guest', pmRoster);
