@@ -75,7 +75,10 @@ function applyInput(p,inp,ball,cfg){
 
 function vDoKickSrv(p, ball, advanced, vcfg) {
   const dx=ball.x-p.x, dy=ball.y-p.y, d=Math.hypot(dx,dy);
-  if(d >= p.r+V_BR) return false;
+  // Palla fuori: azzera cooldown
+  if(d >= p.r+V_BR) { p.kickCooldown=false; return false; }
+  // Palla dentro ma cooldown attivo: ignora
+  if(p.kickCooldown) return false;
   const nx=d>0.01?dx/d:0, ny=d>0.01?dy/d:-1;
   let force;
   if(advanced){
@@ -87,6 +90,7 @@ function vDoKickSrv(p, ball, advanced, vcfg) {
   ball.vx=nx*force+p.vx*0.28;
   ball.vy=ny*force+p.vy*0.28;
   ball.grav=V_B_GRAV_BASE;
+  p.kickCooldown=true; // un solo tiro per ingresso della palla
   return true;
 }
 
@@ -200,7 +204,7 @@ function buildPlayers(roster,mode){
     grp.forEach((r,i)=>result.push({id:r.id,team,col:TEAM_COLS[team],
       x:fl.l+(fl.r-fl.l)*(team===0?.22:.78),y:fl.t+(fl.b-fl.t)*(i+1)/(n+1),
       vx:0,vy:0,r:pr,charge:0,held:false,
-      vAdvanced:false}));  // per-player: modalità controllo volley
+      vAdvanced:false,kickCooldown:false}));  // per-player
   }
   for(const r of roster)
     if(r.team===-1||r.afk)
@@ -225,7 +229,7 @@ function vResetPositions(room,full){
   room.goalCD=vcfg.V_GOAL_CD;
   const bt=[[],[]];
   for(const p of room.players)if(p.team===0||p.team===1)bt[p.team].push(p);
-  for(const t of[0,1]){const g=bt[t],n=g.length;g.forEach((p,i)=>{p.x=V_FL.l+(V_FL.r-V_FL.l)*(t===0?.22:.78);p.y=V_FL.t+(V_FL.b-V_FL.t)*(i+1)/(n+1);p.vx=0;p.vy=0;p.charge=0;p.held=false;});}
+  for(const t of[0,1]){const g=bt[t],n=g.length;g.forEach((p,i)=>{p.x=V_FL.l+(V_FL.r-V_FL.l)*(t===0?.22:.78);p.y=V_FL.t+(V_FL.b-V_FL.t)*(i+1)/(n+1);p.vx=0;p.vy=0;p.charge=0;p.held=false;p.kickCooldown=false;});}}
 }
 
 function serializeState(room){
@@ -327,18 +331,12 @@ function vTick(room){
   // 3. Fisica palla
   vTickBallSrv(ball, vcfg);
 
-  // 4. Check post-tick base: palle veloci che attraversano il player
-  // Salta chi ha già tirato in step 1 (evita doppio tocco)
+  // 4. Aggiorna kickCooldown per chi non sta premendo AZIONE
+  // (azzera il cooldown quando la palla esce dal raggio)
   for(const p of players){
-    if(p.team===-1||!p.held||p.vAdvanced)continue;
-    if(kickedThisTick.has(p.id))continue;
-    const kicked2=vDoKickSrv(p,ball,false,vcfg);
-    if(kicked2){
-      const opp2=p.team===0?1:0;
-      room.vTouches[opp2]=0;
-      room.vTouches[p.team]++;
-      if(room.vTouches[p.team]>V_TEAM_MAX_TOUCHES){vHandlePoint(room,opp2);return;}
-    }
+    if(p.team===-1||p.kickCooldown===false||p.kickCooldown===undefined)continue;
+    const dx=ball.x-p.x, dy=ball.y-p.y;
+    if(Math.hypot(dx,dy) >= p.r+V_BR) p.kickCooldown=false;
   }
 
   // 5. Cambio lato → reset tocchi

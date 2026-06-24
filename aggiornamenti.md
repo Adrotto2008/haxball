@@ -4,7 +4,18 @@ Versione più recente sempre in cima. Ad ogni modifica aggiornare `VERSION` in `
 
 ---
 
-## v2.18.0 — Fix doppio tocco pallavolo (definitivo)
+## v2.19.0 — Fix definitivo doppio tocco: kickCooldown per-player
+
+### 🔧 Fix
+- **Doppio (o triplo) tocco mentre la palla attraversa il player** (`js/modes/volley/physics.js`, `server.js`): la causa reale non era il check post-tick ma il fatto che in modalità base, ogni frame in cui la palla rimane dentro il raggio del player con AZIONE premuta, `vDoKick` veniva chiamata e contava un tocco. Se la palla ci metteva 3 frame ad attraversare → 3 tocchi.
+- **Soluzione**: aggiunto `p.kickCooldown` (bool) su ogni player. `vDoKick`/`vDoKickSrv` impostano `kickCooldown = true` dopo aver tirato. Il flag si azzera solo quando la distanza `player↔palla` torna sopra `p.r + V_BR` (palla uscita dal raggio). Finché la palla è dentro e ha già tirato, ignora qualsiasi altra chiamata. Garantisce esattamente **un tocco per ogni ingresso della palla nel player**.
+- Rimosso il check post-tick per palle veloci (era un palliativo che introduceva altri edge case). Il cooldown gestisce correttamente anche le palle veloci: se la palla entra ed esce in un singolo frame, al frame successivo il cooldown è già azzerato.
+- `kickCooldown: false` inizializzato in `buildPlayers`, `vBuildPlayers`, `vResetPositions` e `vGoal`.
+- `vUpdateKickCooldown(p)` aggiornato ogni frame nel loop training per i player che non stanno premendo AZIONE.
+
+---
+
+## v2.18.0 — Fix doppio tocco pallavolo (kickedThisTick)
 
 ### 🔧 Fix
 - **Doppio tocco** (`server.js` → `vTick`, `js/modes/volley/game.js` → `vUpdate`): il Set `kickedThisTick` era stato perso durante i rewrite successivi alla v2.14. Riaggiunto in entrambi i posti. Il check post-tick (per palle veloci che attraversano il player) ora salta esplicitamente i player che hanno già tirato nello step 1 dello stesso tick, eliminando il doppio conteggio.

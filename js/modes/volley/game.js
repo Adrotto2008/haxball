@@ -22,12 +22,14 @@ function vUpdate(dt) {
   if (netMode === 'train') {
     // INPUT + TIRO locale
     const inp = inpLocal();
-    const kickedThisTick = new Set();
     for (const p of vPlayers) {
       if (p.team === -1) continue;
-      const prevVx = vBall.vx, prevVy = vBall.vy;
       vApplyInput(p, inp);
-      if (vBall.vx !== prevVx || vBall.vy !== prevVy) kickedThisTick.add(p.id);
+    }
+    // Aggiorna cooldown anche per chi non sta premendo
+    for (const p of vPlayers) {
+      if (p.team === -1) continue;
+      vUpdateKickCooldown(p);
     }
 
     // Collisioni player-player
@@ -38,15 +40,6 @@ function vUpdate(dt) {
 
     // Fisica palla
     vTickBall();
-
-    // CHECK POST-TICK base: palle veloci — salta chi ha già tirato
-    if (vControlMode !== 'advanced') {
-      for (const p of vPlayers) {
-        if (p.team === -1 || !p.held) continue;
-        if (kickedThisTick.has(p.id)) continue;
-        vDoKick(p, false);
-      }
-    }
 
     // Cambio lato -> reset tocchi
     vCheckSideChange();
@@ -180,7 +173,7 @@ function vBuildPlayers(roster) {
         id: r.id, team, col: V_TEAM_COLS[team],
         x: V_FL.l + (V_FL.r - V_FL.l) * (team === 0 ? .22 : .78),
         y: V_FL.t + (V_FL.b - V_FL.t) * (i + 1) / (n + 1),
-        vx: 0, vy: 0, r: V_PR, held: false, charge: 0
+        vx: 0, vy: 0, r: V_PR, held: false, charge: 0, kickCooldown: false
       });
     });
   }

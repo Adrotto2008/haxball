@@ -1,23 +1,21 @@
 // ── VOLLEY PHYSICS ─────────────────────────────────────
-// Player e palla NON hanno collisioni tra loro: la palla passa liberamente.
+// Player e palla NON hanno collisioni: la palla passa liberamente.
 // L'unico modo per muoverla è AZIONE mentre la palla è dentro il player.
 //
-//   BASE     — tieni AZIONE premuto → tira ogni frame che la palla è dentro
+//   BASE     — tieni AZIONE premuto → tira quando la palla entra nel raggio
 //   AVANZATA — tieni AZIONE per caricare, rilascia → tira (se palla dentro)
 //
-// vControlMode è PER-PLAYER (p.vAdvanced), non globale di room.
-// Ogni client invia il proprio vmode; il server lo salva su p.vAdvanced.
+// kickCooldown: dopo ogni tiro, blocca ulteriori tiri finché la palla
+// non esce dal raggio del player. Impedisce tocchi multipli mentre la
+// palla attraversa lentamente il player (causa principale del doppio tocco).
 
 // ── MOVIMENTO PLAYER ────────────────────────────────────
 function vApplyInput(p, inp) {
   const cfg = V_CONFIG;
-  // Legge la modalità dal player stesso (non dalla variabile globale condivisa)
-  // In training usa vControlMode locale; online sarà sync dal server via p.held/charge
   const advanced = (vControlMode === 'advanced');
   const pressing = inp.kick;
 
   if (advanced) {
-    // AVANZATA: carica tenendo AZIONE, tira al rilascio (se palla dentro)
     if (pressing) {
       if (!p.held) { p.vx *= 0.3; p.vy *= 0.3; }
       p.charge = Math.min((p.charge || 0) + 1, cfg.V_KICK_CHG_F);
@@ -27,7 +25,6 @@ function vApplyInput(p, inp) {
     }
     p.held = pressing;
   } else {
-    // BASE: tira ogni frame che AZIONE è premuto E la palla è dentro
     if (pressing) {
       if (!p.held) { p.vx *= 0.3; p.vy *= 0.3; }
       vDoKick(p, false);
@@ -36,19 +33,14 @@ function vApplyInput(p, inp) {
     p.charge = 0;
   }
 
-  // Velocità ridotta mentre si tiene AZIONE (base o avanzata)
   const topSpd = pressing ? cfg.V_P_SPEED_MAX * 0.45 : cfg.V_P_SPEED_MAX;
-
   if (inp.up) { if (p.vy > -cfg.V_P_START) p.vy = -cfg.V_P_START; p.vy -= cfg.V_P_ACCEL; }
   if (inp.dn) { if (p.vy <  cfg.V_P_START) p.vy =  cfg.V_P_START; p.vy += cfg.V_P_ACCEL; }
   if (inp.lt) { if (p.vx > -cfg.V_P_START) p.vx = -cfg.V_P_START; p.vx -= cfg.V_P_ACCEL; }
   if (inp.rt) { if (p.vx <  cfg.V_P_START) p.vx =  cfg.V_P_START; p.vx += cfg.V_P_ACCEL; }
-
   const spd = Math.hypot(p.vx, p.vy);
   if (spd > topSpd) { p.vx = p.vx/spd*topSpd; p.vy = p.vy/spd*topSpd; }
-
   p.x += p.vx; p.y += p.vy; p.vx *= cfg.V_P_FRIC; p.vy *= cfg.V_P_FRIC;
-
   if (p.x < V_FL.l + p.r) { p.x = V_FL.l + p.r; p.vx *= -.4; }
   if (p.x > V_FL.r - p.r) { p.x = V_FL.r - p.r; p.vx *= -.4; }
   if (p.y < V_FL.t + p.r) { p.y = V_FL.t + p.r; p.vy *= -.4; }
@@ -58,14 +50,23 @@ function vApplyInput(p, inp) {
 }
 
 // ── TIRO (AZIONE) ───────────────────────────────────────
-// Tira solo se la palla è DENTRO il player (dist < p.r + V_BR).
-// advanced=true: forza proporzionale alla carica (avanzata).
-// advanced=false: forza fissa media (base).
+// Tira solo se la palla è DENTRO il player (dist < p.r + V_BR)
+// e kickCooldown è false.
+// kickCooldown si azzera solo quando la palla esce dal raggio —
+// garantisce UN SOLO tocco per ogni volta che la palla entra nel player.
 function vDoKick(p, advanced) {
   const cfg = V_CONFIG;
   const dx = vBall.x - p.x, dy = vBall.y - p.y;
   const d = Math.hypot(dx, dy);
-  if (d >= p.r + V_BR) return false; // palla fuori: niente tiro
+
+  // Palla fuori: azzera cooldown (pronto per il prossimo ingresso)
+  if (d >= p.r + V_BR) {
+    p.kickCooldown = false;
+    return false;
+  }
+
+  // Palla dentro ma ha già tirato su questo ingresso: ignora
+  if (p.kickCooldown) return false;
 
   const nx = d > 0.01 ? dx / d : 0;
   const ny = d > 0.01 ? dy / d : -1;
@@ -80,23 +81,31 @@ function vDoKick(p, advanced) {
 
   vBall.vx = nx * force + p.vx * 0.28;
   vBall.vy = ny * force + p.vy * 0.28;
-  vBall.grav = cfg.V_B_GRAV_BASE !== undefined ? cfg.V_B_GRAV_BASE : V_B_GRAV_BASE;
+  vBall.grav = V_B_GRAV_BASE;
+
+  p.kickCooldown = true; // un solo tiro per ingresso della palla
 
   vIncrementTouch(p.team);
   spawnP(vBall.x, vBall.y, 6, V_TEAM_COLS[p.team], force * 0.4, 12);
   return true;
 }
 
+// ── AGGIORNAMENTO COOLDOWN ───────────────────────────────
+// Chiamato ogni frame per i player che NON stanno premendo AZIONE,
+// così il cooldown si azzera anche senza tirare.
+function vUpdateKickCooldown(p) {
+  if (!p.kickCooldown) return;
+  const dx = vBall.x - p.x, dy = vBall.y - p.y;
+  const d = Math.hypot(dx, dy);
+  if (d >= p.r + V_BR) p.kickCooldown = false;
+}
+
 // ── FISICA PALLA ────────────────────────────────────────
-// Usa V_CONFIG per tutte le costanti (modificabili live)
 function vTickBall() {
   const cfg = V_CONFIG;
-  const gravBase = V_B_GRAV_BASE; // costante fissa (non in V_CONFIG)
-  const gravMax  = V_B_GRAV_MAX;
-  const gravRamp = V_B_GRAV_RAMP;
-  if (vBall.grav === undefined) vBall.grav = gravBase;
+  if (vBall.grav === undefined) vBall.grav = V_B_GRAV_BASE;
   vBall.vy  += vBall.grav;
-  vBall.grav = Math.min(vBall.grav + gravRamp, gravMax);
+  vBall.grav = Math.min(vBall.grav + V_B_GRAV_RAMP, V_B_GRAV_MAX);
   vBall.vx  *= cfg.V_B_FRIC;
   vBall.vy  *= cfg.V_B_FRIC;
   vBall.x   += vBall.vx;
@@ -105,7 +114,7 @@ function vTickBall() {
   const bw = cfg.V_B_BOUNCE;
   if (vBall.x - V_BR < V_FL.l) { vBall.x = V_FL.l + V_BR; vBall.vx *= -bw; }
   if (vBall.x + V_BR > V_FL.r) { vBall.x = V_FL.r - V_BR; vBall.vx *= -bw; }
-  if (vBall.y - V_BR < V_FL.t) { vBall.y = V_FL.t + V_BR; vBall.vy *= -bw; vBall.grav = gravBase; }
+  if (vBall.y - V_BR < V_FL.t) { vBall.y = V_FL.t + V_BR; vBall.vy *= -bw; vBall.grav = V_B_GRAV_BASE; }
 }
 
 // ── COLLISIONE PALLA ↔ MURETTO CENTRALE ─────────────────
@@ -145,17 +154,14 @@ function vIncrementTouch(team) {
   const opp = team === 0 ? 1 : 0;
   vTouches[opp] = 0;
   vTouches[team]++;
-  if (vTouches[team] > V_TEAM_MAX_TOUCHES) {
-    vGoal(opp);
-  }
+  if (vTouches[team] > V_TEAM_MAX_TOUCHES) vGoal(opp);
 }
 
 // ── CAMBIO LATO ──────────────────────────────────────────
 function vCheckSideChange() {
   const side = vBall.x < V_NET_X ? 0 : 1;
   if (vBallLastSide !== null && side !== vBallLastSide) {
-    vTouches[0] = 0;
-    vTouches[1] = 0;
+    vTouches[0] = 0; vTouches[1] = 0;
   }
   vBallLastSide = side;
 }
