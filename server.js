@@ -229,7 +229,7 @@ function vResetPositions(room,full){
   room.goalCD=vcfg.V_GOAL_CD;
   const bt=[[],[]];
   for(const p of room.players)if(p.team===0||p.team===1)bt[p.team].push(p);
-  for(const t of[0,1]){const g=bt[t],n=g.length;g.forEach((p,i)=>{p.x=V_FL.l+(V_FL.r-V_FL.l)*(t===0?.22:.78);p.y=V_FL.t+(V_FL.b-V_FL.t)*(i+1)/(n+1);p.vx=0;p.vy=0;p.charge=0;p.held=false;p.kickCooldown=false;});}}
+  for(const t of[0,1]){const g=bt[t],n=g.length;g.forEach((p,i)=>{p.x=V_FL.l+(V_FL.r-V_FL.l)*(t===0?.22:.78);p.y=V_FL.t+(V_FL.b-V_FL.t)*(i+1)/(n+1);p.vx=0;p.vy=0;p.charge=0;p.held=false;p.kickCooldown=false;});}
 }
 
 function serializeState(room){
