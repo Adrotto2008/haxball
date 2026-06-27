@@ -6,7 +6,8 @@ const CONFIG_DEFAULT = {
   P_START:1.4, P_SPEED_MAX:10.0, P_ACCEL:0.01, P_FRIC:0.78,
   B_FRIC:0.984, B_BOUNCE:0.80, B_HIT_R:0.82,
   KICK_MIN:3.8, KICK_MAX:14.0, KICK_CHG_F:50, KICK_DIST_X:12,
-  GOAL_CD:140, MATCH_TIME:180
+  GOAL_CD:140, MATCH_TIME:180,
+  P_RADIUS:18, B_RADIUS:11
 };
 
 // Costanti pallavolo — modificabili per room tramite set_vconfig
@@ -15,6 +16,7 @@ const V_CONFIG_DEFAULT = {
   V_B_FRIC:0.99, V_B_BOUNCE:0.35,
   V_KICK_MIN:4.0, V_KICK_MAX:14.0, V_KICK_CHG_F:50,
   V_MATCH_TIME:180, V_GOAL_CD:120,
+  V_PR:20, V_BR:10,
 };
 
 const ADMIN_TOKEN = process.env.ADMIN_TOKEN || 'hax-admin-dev';
@@ -74,9 +76,10 @@ function applyInput(p,inp,ball,cfg){
 // Ogni client comunica la propria modalità via 'vmode' → aggiorna p.vAdvanced.
 
 function vDoKickSrv(p, ball, advanced, vcfg) {
+  const vBR=ball.r;
   const dx=ball.x-p.x, dy=ball.y-p.y, d=Math.hypot(dx,dy);
   // Palla fuori: azzera cooldown
-  if(d >= p.r+V_BR) { p.kickCooldown=false; return false; }
+  if(d >= p.r+vBR) { p.kickCooldown=false; return false; }
   // Palla dentro ma cooldown attivo: ignora
   if(p.kickCooldown) return false;
   const nx=d>0.01?dx/d:0, ny=d>0.01?dy/d:-1;
@@ -142,7 +145,8 @@ function vApplyInputSrv(p, inp, ball, vcfg) {
 }
 
 function vBallCollidePostSrv(ball, vcfg){
-  const bx=ball.x,by=ball.y,br=V_BR;
+  const br=ball.r;
+  const bx=ball.x,by=ball.y;
   if(bx<V_POST_X1-br||bx>V_POST_X2+br||by<V_POST_Y1-br||by>V_POST_Y2+br) return;
   const cx=Math.max(V_POST_X1,Math.min(V_POST_X2,bx));
   const cy=Math.max(V_POST_Y1,Math.min(V_POST_Y2,by));
@@ -156,29 +160,32 @@ function vBallCollidePostSrv(ball, vcfg){
 }
 
 function vTickBallSrv(ball, vcfg){
+  const vBR=ball.r;
   ball.grav=(ball.grav!==undefined)?ball.grav:V_B_GRAV_BASE;
   ball.vy+=ball.grav;
   ball.grav=Math.min(ball.grav+V_B_GRAV_RAMP,V_B_GRAV_MAX);
   ball.vx*=vcfg.V_B_FRIC;ball.vy*=vcfg.V_B_FRIC;
   ball.x+=ball.vx;ball.y+=ball.vy;
   vBallCollidePostSrv(ball, vcfg);
-  if(ball.x-V_BR<V_FL.l){ball.x=V_FL.l+V_BR;ball.vx*=-vcfg.V_B_BOUNCE;}
-  if(ball.x+V_BR>V_FL.r){ball.x=V_FL.r-V_BR;ball.vx*=-vcfg.V_B_BOUNCE;}
-  if(ball.y-V_BR<V_FL.t){ball.y=V_FL.t+V_BR;ball.vy*=-vcfg.V_B_BOUNCE;ball.grav=V_B_GRAV_BASE;}
+  if(ball.x-vBR<V_FL.l){ball.x=V_FL.l+vBR;ball.vx*=-vcfg.V_B_BOUNCE;}
+  if(ball.x+vBR>V_FL.r){ball.x=V_FL.r-vBR;ball.vx*=-vcfg.V_B_BOUNCE;}
+  if(ball.y-vBR<V_FL.t){ball.y=V_FL.t+vBR;ball.vy*=-vcfg.V_B_BOUNCE;ball.grav=V_B_GRAV_BASE;}
 }
 
 // ── ROOM ─────────────────────────────────────────────────
-function mkBall(){ return {x:W/2,y:H/2,vx:0,vy:0,r:BR}; }
-function mkVolleyBall(){ return {x:W/2,y:H/2-60,vx:0,vy:0,r:V_BR,grav:V_B_GRAV_BASE}; }
+function mkBall(cfg){ return {x:W/2,y:H/2,vx:0,vy:0,r:cfg?cfg.B_RADIUS:BR}; }
+function mkVolleyBall(vcfg){ return {x:W/2,y:H/2-60,vx:0,vy:0,r:vcfg?vcfg.V_BR:V_BR,grav:V_B_GRAV_BASE}; }
 
 function mkRoom(code,name,password,mode){
   const isVolley=(mode==='volley');
+  const cfg={...CONFIG_DEFAULT};
+  const vcfg={...V_CONFIG_DEFAULT};
   return {
     code,name:name||`Stanza ${code}`,password:password||'',
-    mode:mode||'soccer',config:{...CONFIG_DEFAULT},
-    vconfig:{...V_CONFIG_DEFAULT},   // config pallavolo per-room
+    mode:mode||'soccer',config:cfg,
+    vconfig:vcfg,
     clients:new Map(),players:[],
-    ball:isVolley?mkVolleyBall():mkBall(),
+    ball:isVolley?mkVolleyBall(vcfg):mkBall(cfg),
     score:[0,0],timeLeft:isVolley?V_CONFIG_DEFAULT.V_MATCH_TIME:CONFIG_DEFAULT.MATCH_TIME,
     gameOver:false,goalCD:0,started:false,hostPid:null,roster:[],
     inputs:{},afkSet:new Set(),skins:{},
@@ -195,8 +202,8 @@ function bcastAll(room,obj){for(const[ws] of room.clients)send(ws,obj);}
 function buildRoster(room){return[...room.clients.values()].map(c=>({id:c.pid,name:c.name,team:c.team,skin:c.skin||'',afk:c.afk||false}));}
 function syncRoster(room){room.roster=buildRoster(room);bcastAll(room,{type:'pm_update',roster:room.roster,hostId:room.hostPid});}
 
-function buildPlayers(roster,mode){
-  const isV=(mode==='volley'),pr=isV?V_PR:PR,fl=isV?V_FL:FL;
+function buildPlayers(roster,mode,cfg,vcfg){
+  const isV=(mode==='volley'),pr=isV?(vcfg?vcfg.V_PR:V_PR):(cfg?cfg.P_RADIUS:PR),fl=isV?V_FL:FL;
   const result=[],byTeam=[[],[]];
   for(const r of roster)if(r.team===0||r.team===1)byTeam[r.team].push(r);
   for(const team of[0,1]){
@@ -208,12 +215,12 @@ function buildPlayers(roster,mode){
   }
   for(const r of roster)
     if(r.team===-1||r.afk)
-      result.push({id:r.id,team:-1,col:'#555',x:-9999,y:-9999,vx:0,vy:0,r:isV?V_PR:PR,charge:0,held:false,vAdvanced:false});
+      result.push({id:r.id,team:-1,col:'#555',x:-9999,y:-9999,vx:0,vy:0,r:isV?(vcfg?vcfg.V_PR:V_PR):(cfg?cfg.P_RADIUS:PR),charge:0,held:false,vAdvanced:false});
   return result;
 }
 
 function resetPositions(room,full){
-  room.ball=mkBall();
+  room.ball=mkBall(room.config);
   if(full){room.score=[0,0];room.timeLeft=room.config.MATCH_TIME;room.gameOver=false;room.secondAccum=0;}
   room.goalCD=90;
   const bt=[[],[]];
@@ -222,7 +229,7 @@ function resetPositions(room,full){
 }
 
 function vResetPositions(room,full){
-  room.ball=mkVolleyBall();
+  room.ball=mkVolleyBall(room.vconfig);
   room.vTouches={0:0,1:0};room.vBallLastSide=null;
   const vcfg=room.vconfig;
   if(full){room.score=[0,0];room.timeLeft=vcfg.V_MATCH_TIME;room.gameOver=false;room.secondAccum=0;}
@@ -277,11 +284,12 @@ function tick(room){
   const ball=room.ball;
   ball.x+=ball.vx;ball.y+=ball.vy;ball.vx*=cfg.B_FRIC;ball.vy*=cfg.B_FRIC;
   for(const p of room.players){if(p.team!==-1)circleCollide(p,ball,cfg.B_HIT_R);}
+  const bR=ball.r;
   const inGoal=ball.y>GY&&ball.y<GY+GH;
-  if(ball.x-ball.r<FL.l){if(inGoal){handleGoal(room,1);return;}ball.x=FL.l+ball.r;ball.vx*=-cfg.B_BOUNCE;}
-  if(ball.x+ball.r>FL.r){if(inGoal){handleGoal(room,0);return;}ball.x=FL.r-ball.r;ball.vx*=-cfg.B_BOUNCE;}
-  if(ball.y-ball.r<FL.t){ball.y=FL.t+ball.r;ball.vy*=-cfg.B_BOUNCE;}
-  if(ball.y+ball.r>FL.b){ball.y=FL.b-ball.r;ball.vy*=-cfg.B_BOUNCE;}
+  if(ball.x-bR<FL.l){if(inGoal){handleGoal(room,1);return;}ball.x=FL.l+bR;ball.vx*=-cfg.B_BOUNCE;}
+  if(ball.x+bR>FL.r){if(inGoal){handleGoal(room,0);return;}ball.x=FL.r-bR;ball.vx*=-cfg.B_BOUNCE;}
+  if(ball.y-bR<FL.t){ball.y=FL.t+bR;ball.vy*=-cfg.B_BOUNCE;}
+  if(ball.y+bR>FL.b){ball.y=FL.b-bR;ball.vy*=-cfg.B_BOUNCE;}
   const now=Date.now();
   if(now-room.lastBcast>=BCAST_MS){room.lastBcast=now;bcastAll(room,serializeState(room));broadcastMeta(room);}
 }
@@ -332,11 +340,10 @@ function vTick(room){
   vTickBallSrv(ball, vcfg);
 
   // 4. Aggiorna kickCooldown per chi non sta premendo AZIONE
-  // (azzera il cooldown quando la palla esce dal raggio)
   for(const p of players){
     if(p.team===-1||p.kickCooldown===false||p.kickCooldown===undefined)continue;
     const dx=ball.x-p.x, dy=ball.y-p.y;
-    if(Math.hypot(dx,dy) >= p.r+V_BR) p.kickCooldown=false;
+    if(Math.hypot(dx,dy) >= p.r+ball.r) p.kickCooldown=false;
   }
 
   // 5. Cambio lato → reset tocchi
@@ -345,7 +352,7 @@ function vTick(room){
   room.vBallLastSide=side;
 
   // 6. Pavimento → punto
-  if(ball.y+V_BR>V_FL.b){vHandlePoint(room,ball.x<V_NET_X?1:0);return;}
+  if(ball.y+ball.r>V_FL.b){vHandlePoint(room,ball.x<V_NET_X?1:0);return;}
 
   const now=Date.now();
   if(now-room.lastBcast>=BCAST_MS){room.lastBcast=now;bcastAll(room,vSerializeState(room));broadcastMeta(room);}
@@ -354,7 +361,7 @@ function vTick(room){
 // ── AVVIA MATCH ───────────────────────────────────────────
 function startMatch(room){
   room.roster=buildRoster(room);
-  room.players=buildPlayers(room.roster,room.mode);
+  room.players=buildPlayers(room.roster,room.mode,room.config,room.vconfig);
   if(room.mode==='volley')vResetPositions(room,true);else resetPositions(room,true);
   room.started=true;
   bcastAll(room,{type:'start',roster:room.roster,hostId:room.hostPid,config:room.config,vconfig:room.vconfig,mode:room.mode});
@@ -364,11 +371,17 @@ function startMatch(room){
 function applyConfigPatch(patch,room){
   const ok=new Set(Object.keys(CONFIG_DEFAULT));
   for(const[k,v] of Object.entries(patch)){if(!ok.has(k))continue;const n=parseFloat(v);if(!isNaN(n)&&n>=0&&n<=10000)room.config[k]=n;}
+  // aggiorna raggi player e palla live
+  if(patch.P_RADIUS!==undefined){const r=room.config.P_RADIUS;for(const p of room.players)if(p.team!==-1)p.r=r;}
+  if(patch.B_RADIUS!==undefined&&room.ball)room.ball.r=room.config.B_RADIUS;
   bcastAll(room,{type:'config',config:room.config});
 }
 function applyVConfigPatch(patch,room){
   const ok=new Set(Object.keys(V_CONFIG_DEFAULT));
   for(const[k,v] of Object.entries(patch)){if(!ok.has(k))continue;const n=parseFloat(v);if(!isNaN(n)&&n>=0&&n<=10000)room.vconfig[k]=n;}
+  // aggiorna raggi player e palla live
+  if(patch.V_PR!==undefined){const r=room.vconfig.V_PR;for(const p of room.players)if(p.team!==-1)p.r=r;}
+  if(patch.V_BR!==undefined&&room.ball)room.ball.r=room.vconfig.V_BR;
   bcastAll(room,{type:'vconfig',vconfig:room.vconfig});
 }
 

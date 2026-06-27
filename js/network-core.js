@@ -29,12 +29,17 @@ function handleServerMsg(msg) {
 
     case 'config':
       Object.assign(CONFIG, msg.config);
+      // aggiorna raggi live
+      if (msg.config.P_RADIUS !== undefined) { const r = msg.config.P_RADIUS; for (const p of players) if (p.team !== -1) p.r = r; }
+      if (msg.config.B_RADIUS !== undefined && ball) ball.r = msg.config.B_RADIUS;
       if ($('game-menu').classList.contains('open')) renderConfigPanel();
       break;
 
     case 'vconfig':
-      // aggiornamento live variabili pallavolo
       Object.assign(V_CONFIG, msg.vconfig);
+      // aggiorna raggi live
+      if (msg.vconfig.V_PR !== undefined) { const r = msg.vconfig.V_PR; for (const p of vPlayers) if (p.team !== -1) p.r = r; }
+      if (msg.vconfig.V_BR !== undefined && vBall) vBall.r = msg.vconfig.V_BR;
       if ($('game-menu').classList.contains('open')) renderConfigPanel();
       break;
 
@@ -74,7 +79,7 @@ function handleServerMsg(msg) {
           for (const r of msg.roster) {
             if (!vPlayers.find(p => p.id === r.id)) {
               const col = r.team === 0 ? V_TEAM_COLS[0] : r.team === 1 ? V_TEAM_COLS[1] : '#555';
-              vPlayers.push({ id: r.id, team: r.team, col, x: -9999, y: -9999, vx: 0, vy: 0, r: V_PR, held: false });
+              vPlayers.push({ id: r.id, team: r.team, col, x: -9999, y: -9999, vx: 0, vy: 0, r: V_CONFIG.V_PR || V_PR, held: false });
             }
           }
           vPlayers = vPlayers.filter(p => msg.roster.find(r => r.id === p.id));
@@ -86,7 +91,7 @@ function handleServerMsg(msg) {
           for (const r of msg.roster) {
             if (!players.find(p => p.id === r.id)) {
               const col = r.team === 0 ? TEAM_COLS[0] : r.team === 1 ? TEAM_COLS[1] : '#555';
-              players.push({ id: r.id, team: r.team, col, x: -9999, y: -9999, vx: 0, vy: 0, r: PR, charge: 0, held: false });
+              players.push({ id: r.id, team: r.team, col, x: -9999, y: -9999, vx: 0, vy: 0, r: CONFIG.P_RADIUS || PR, charge: 0, held: false });
             }
           }
           players = players.filter(p => msg.roster.find(r => r.id === p.id));

@@ -23,10 +23,9 @@ async function authRegister(email, password, nickname) {
   const { data, error } = await supabase.auth.signUp({ email, password });
   if (error) throw error;
   authUser = data.user;
-  // inserisci riga profilo
   const { error: pe } = await supabase.from('profiles').insert({
     id: authUser.id,
-    nickname: nickname.slice(0, 16) || 'Giocatore',
+    nickname: (nickname || 'Giocatore').slice(0, 16),
     avatar: ''
   });
   if (pe) throw pe;
@@ -47,14 +46,12 @@ async function authGetProfile() {
   return authProfile;
 }
 
-function authCurrent() {
-  return authUser;
-}
+function authCurrent() { return authUser; }
 
 async function authSaveAvatar(avatar) {
   if (!authUser) return;
   avatar = avatar.slice(0, 2);
-  authProfile.avatar = avatar;
+  if (authProfile) authProfile.avatar = avatar;
   await supabase.from('profiles').update({ avatar }).eq('id', authUser.id);
   mySkin = avatar;
   localStorage.setItem('hax_skin', avatar);
@@ -71,14 +68,14 @@ async function _loadProfile() {
   }
 }
 
-// ── render card auth ────────────────────────────────────
+// ── render card auth ─────────────────────────────────────
 function _renderAuthCard() {
   const card = document.getElementById('auth-card');
   if (!card) return;
 
   if (authUser && authProfile) {
-    // loggato
     card.innerHTML = `
+      <div class="card-title">🔐 Account</div>
       <div class="auth-logged-row">
         <span class="auth-logged-info">
           <span class="auth-avatar-badge" id="auth-avatar-show">${authProfile.avatar || '👤'}</span>
@@ -89,10 +86,11 @@ function _renderAuthCard() {
       <div class="auth-avatar-row">
         <label class="auth-avatar-label">Avatar (emoji / 2 car.)</label>
         <input type="text" id="auth-avatar-input" class="auth-avatar-input" maxlength="2"
-          placeholder="es. 🐉" value="${escHtml(authProfile.avatar || '')}">
+          placeholder="🐉" value="${escHtml(authProfile.avatar || '')}">
         <button class="btn btn-ghost btn-sm" id="auth-avatar-save">Salva</button>
       </div>
     `;
+
     // blocca nickname
     const ni = document.getElementById('nickname-input');
     if (ni) { ni.value = authProfile.nickname; ni.readOnly = true; ni.classList.add('auth-readonly'); }
@@ -107,9 +105,10 @@ function _renderAuthCard() {
       await authSaveAvatar(v);
       document.getElementById('auth-avatar-show').textContent = v || '👤';
     };
+
   } else {
-    // non loggato
     card.innerHTML = `
+      <div class="card-title">🔐 Account <span class="auth-optional">(opzionale)</span></div>
       <div class="auth-form">
         <input type="email"    id="auth-email-input"    class="auth-input" placeholder="Email" autocomplete="email">
         <input type="password" id="auth-password-input" class="auth-input" placeholder="Password (min 6 car.)" autocomplete="current-password">
@@ -120,12 +119,13 @@ function _renderAuthCard() {
         <div class="auth-msg" id="auth-msg"></div>
       </div>
     `;
+
     document.getElementById('auth-login-btn').onclick    = _handleLogin;
     document.getElementById('auth-register-btn').onclick = _handleRegister;
     document.getElementById('auth-password-input').addEventListener('keydown', e => {
       if (e.key === 'Enter') _handleLogin();
     });
-    // assicura nickname editabile
+
     const ni = document.getElementById('nickname-input');
     if (ni) { ni.readOnly = false; ni.classList.remove('auth-readonly'); }
   }
@@ -143,13 +143,13 @@ async function _handleLogin() {
   const pw    = (document.getElementById('auth-password-input')?.value || '');
   if (!email || !pw) { _authMsg('Compila email e password.'); return; }
   const btn = document.getElementById('auth-login-btn');
-  if (btn) btn.disabled = true;
+  if (btn) { btn.disabled = true; btn.textContent = '…'; }
   try {
     await authLogin(email, pw);
     _renderAuthCard();
   } catch(e) {
     _authMsg(e.message || 'Errore di accesso.');
-    if (btn) btn.disabled = false;
+    if (btn) { btn.disabled = false; btn.textContent = 'Accedi'; }
   }
 }
 
@@ -161,24 +161,28 @@ async function _handleRegister() {
   if (pw.length < 6) { _authMsg('Password: almeno 6 caratteri.'); return; }
   if (/\s/.test(email) || /\s/.test(pw)) { _authMsg('Niente spazi in email o password.'); return; }
   const btn = document.getElementById('auth-register-btn');
-  if (btn) btn.disabled = true;
+  if (btn) { btn.disabled = true; btn.textContent = '…'; }
   try {
     await authRegister(email, pw, nick);
     _renderAuthCard();
   } catch(e) {
     _authMsg(e.message || 'Errore di registrazione.');
-    if (btn) btn.disabled = false;
+    if (btn) { btn.disabled = false; btn.textContent = 'Registrati'; }
   }
 }
 
-// ── init al caricamento pagina ───────────────────────────
-(async () => {
-  const { data } = await supabase.auth.getSession();
-  if (data?.session?.user) {
-    authUser = data.session.user;
-    await _loadProfile();
+// ── init al DOMContentLoaded ─────────────────────────────
+// Aspetta che il DOM sia pronto, poi controlla la sessione esistente
+// e renderizza la card. Questo garantisce che #auth-card esista già.
+document.addEventListener('DOMContentLoaded', async () => {
+  try {
+    const { data } = await supabase.auth.getSession();
+    if (data?.session?.user) {
+      authUser = data.session.user;
+      await _loadProfile();
+    }
+  } catch(e) {
+    console.warn('Auth init error:', e);
   }
-  // la card viene renderizzata da lobby.js dopo che il DOM è pronto
-  // ma per sicurezza proviamo anche qui con un piccolo ritardo
-  setTimeout(_renderAuthCard, 50);
-})();
+  _renderAuthCard();
+});

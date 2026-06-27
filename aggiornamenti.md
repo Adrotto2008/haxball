@@ -4,6 +4,21 @@ Versione più recente sempre in cima. Ad ogni modifica aggiornare `VERSION` in `
 
 ---
 
+## v2.21.0 — Raggio player e palla modificabile in-game + fix auth card
+
+### ✨ Novità
+- **Raggio player e palla nelle Variabili** (calcio e pallavolo): l'host può cambiare la dimensione dei player (`P_RADIUS` / `V_PR`) e della palla (`B_RADIUS` / `V_BR`) dal pannello 🎛️ Variabili. Il cambio si propaga in tempo reale a tutti i client e al server — i `p.r` e `ball.r` vengono aggiornati live in `applyConfigPatch`/`applyVConfigPatch` (server) e nei `case 'config'`/`'vconfig'` di `network-core.js` (client). La fisica server (bounds, kick, kickCooldown) usa `ball.r` e `p.r` invece delle costanti hardcoded `BR`/`V_BR`.
+- `CONFIG_DEFAULT` e `V_CONFIG_DEFAULT` nel server includono ora `P_RADIUS:18`, `B_RADIUS:11`, `V_PR:20`, `V_BR:10`.
+- `buildPlayers` nel server accetta `cfg`/`vcfg` e usa il raggio dalla config della room.
+- `mkBall(cfg)` e `mkVolleyBall(vcfg)` usano il raggio dalla config.
+
+### 🔧 Fix
+- **Auth card invisibile**: l'IIFE asincrona in `auth.js` terminava dopo che `lobby.js` aveva già chiamato `_renderAuthCard()`, quindi la card rimaneva vuota. Sostituito con `document.addEventListener('DOMContentLoaded', async () => {...})` — garantisce che il DOM sia pronto E che la sessione sia stata verificata prima di renderizzare. La card ora compare sempre correttamente al caricamento.
+- Aggiunto `card-title` mancante nella card auth (stato non loggato: `🔐 Account (opzionale)`, stato loggato: `🔐 Account`).
+- Feedback visivo su bottoni Accedi/Registrati durante la richiesta (`…` + `disabled`).
+
+---
+
 ## v2.20.0 — Autenticazione opzionale Supabase
 
 ### ✨ Novità

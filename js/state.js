@@ -14,11 +14,15 @@ let CONFIG = {
   KICK_CHG_F:  50,
   KICK_DIST_X: 12,
   GOAL_CD:     140,
-  MATCH_TIME:  180
+  MATCH_TIME:  180,
+  P_RADIUS:    18,
+  B_RADIUS:    11
 };
 
 // Descrizioni per il pannello Variabili nel menu
 const CONFIG_META = [
+  { key:'P_RADIUS',    label:'Raggio player',         min:8,   max:40,    step:1    },
+  { key:'B_RADIUS',   label:'Raggio palla',           min:5,   max:30,    step:1    },
   { key:'P_START',     label:'Velocita iniziale',     min:0,   max:5,     step:0.1  },
   { key:'P_SPEED_MAX', label:'Velocita massima',      min:1,   max:30,    step:0.5  },
   { key:'P_ACCEL',     label:'Accelerazione',         min:0,   max:1,     step:0.005 },

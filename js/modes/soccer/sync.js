@@ -144,8 +144,9 @@ function tickRemotePhysics() {
   // continuo e non frenano davvero; applicarla localmente causava undershoot.
   ball.x += ball.vx; ball.y += ball.vy;
   ball.vx *= CONFIG.B_FRIC; ball.vy *= CONFIG.B_FRIC;
-  if (ball.x - BR < FL.l) { ball.x = FL.l + BR; ball.vx *= -CONFIG.B_BOUNCE; }
-  if (ball.x + BR > FL.r) { ball.x = FL.r - BR; ball.vx *= -CONFIG.B_BOUNCE; }
-  if (ball.y - BR < FL.t) { ball.y = FL.t + BR; ball.vy *= -CONFIG.B_BOUNCE; }
-  if (ball.y + BR > FL.b) { ball.y = FL.b - BR; ball.vy *= -CONFIG.B_BOUNCE; }
+  const bR = ball.r;
+  if (ball.x - bR < FL.l) { ball.x = FL.l + bR; ball.vx *= -CONFIG.B_BOUNCE; }
+  if (ball.x + bR > FL.r) { ball.x = FL.r - bR; ball.vx *= -CONFIG.B_BOUNCE; }
+  if (ball.y - bR < FL.t) { ball.y = FL.t + bR; ball.vy *= -CONFIG.B_BOUNCE; }
+  if (ball.y + bR > FL.b) { ball.y = FL.b - bR; ball.vy *= -CONFIG.B_BOUNCE; }
 }

@@ -69,9 +69,13 @@ let V_CONFIG = {
   V_KICK_CHG_F: 50,
   V_MATCH_TIME: 180,
   V_GOAL_CD:    120,
+  V_PR:         20,
+  V_BR:         10,
 };
 
 const V_CONFIG_META = [
+  { key:'V_PR',        label:'Raggio player',          min:8,   max:40,  step:1    },
+  { key:'V_BR',        label:'Raggio palla',            min:4,   max:25,  step:1    },
   { key:'V_P_START',    label:'Velocità iniziale',      min:0,   max:5,   step:0.1  },
   { key:'V_P_SPEED_MAX',label:'Velocità massima',       min:1,   max:30,  step:0.5  },
   { key:'V_P_ACCEL',    label:'Accelerazione',          min:0,   max:1,   step:0.005},
