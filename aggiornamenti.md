@@ -4,6 +4,13 @@ Versione più recente sempre in cima. Ad ogni modifica aggiornare `VERSION` in `
 
 ---
 
+## v2.21.1 — Fix definitivo auth card vuota
+
+### 🔧 Fix
+- **Auth card sempre vuota**: `auth.js` era caricato prima di `state.js` e `lobby.js`, quindi quando tentava di renderizzare la card, né `mySkin` né `escHtml` esistevano ancora, causando un errore silenzioso che lasciava la card grigia/vuota. Soluzione: `auth.js` spostato come **ultimissimo script** (dopo `lobby.js`), eseguito a fine `<body>` quando DOM e tutte le variabili sono già definiti. Rimosso `DOMContentLoaded` (inutile a fine body). Rimossa la chiamata ridondante a `_renderAuthCard()` in `lobby.js`.
+
+---
+
 ## v2.21.0 — Raggio player e palla modificabile in-game + fix auth card
 
 ### ✨ Novità

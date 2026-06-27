@@ -171,10 +171,9 @@ async function _handleRegister() {
   }
 }
 
-// ── init al DOMContentLoaded ─────────────────────────────
-// Aspetta che il DOM sia pronto, poi controlla la sessione esistente
-// e renderizza la card. Questo garantisce che #auth-card esista già.
-document.addEventListener('DOMContentLoaded', async () => {
+// ── init (a fine body: DOM pronto, tutte le variabili definite) ──
+// Controlla sessione esistente e renderizza la card auth.
+(async () => {
   try {
     const { data } = await supabase.auth.getSession();
     if (data?.session?.user) {
@@ -185,4 +184,4 @@ document.addEventListener('DOMContentLoaded', async () => {
     console.warn('Auth init error:', e);
   }
   _renderAuthCard();
-});
+})();

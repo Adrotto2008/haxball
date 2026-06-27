@@ -208,6 +208,4 @@ $('nickname-input').addEventListener('input', () => {
 
 const savedSkin = localStorage.getItem('hax_skin');
 if (savedSkin) mySkin = savedSkin;
-
-// renderizza card auth (authUser potrebbe essere già settato da auth.js)
-if (typeof _renderAuthCard === 'function') _renderAuthCard();
+// Nota: _renderAuthCard() viene chiamata da auth.js (caricato dopo lobby.js)
