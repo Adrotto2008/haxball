@@ -4,6 +4,10 @@ function genCode() {
   return Array.from({length:6}, () => c[~~(Math.random()*c.length)]).join('');
 }
 function getNick() {
+  // se loggato usa il nickname dal profilo Supabase
+  if (typeof authProfile !== 'undefined' && authProfile?.nickname) {
+    return authProfile.nickname.slice(0, 16);
+  }
   return ($('nickname-input').value.trim() || 'Giocatore').slice(0, 16);
 }
 function showLobby() {
@@ -204,3 +208,6 @@ $('nickname-input').addEventListener('input', () => {
 
 const savedSkin = localStorage.getItem('hax_skin');
 if (savedSkin) mySkin = savedSkin;
+
+// renderizza card auth (authUser potrebbe essere già settato da auth.js)
+if (typeof _renderAuthCard === 'function') _renderAuthCard();

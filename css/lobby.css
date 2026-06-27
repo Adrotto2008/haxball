@@ -84,3 +84,38 @@ input[type=text]::placeholder{font-family:'Inter',sans-serif;letter-spacing:1px;
 }
 #nickname-input:focus{border-color:rgba(80,200,100,.45)}
 #nickname-input::placeholder{color:rgba(255,255,255,.2);font-weight:400}
+#nickname-input.auth-readonly{
+  opacity:.55;cursor:default;border-color:rgba(255,255,255,.08);
+}
+
+/* ── AUTH CARD ──────────────────────────────────────────── */
+.auth-form { display:flex; flex-direction:column; gap:8px; }
+.auth-input {
+  background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.12);
+  border-radius:8px; padding:9px 12px; color:#fff; width:100%; outline:none;
+  font-family:'Inter',sans-serif; font-size:13px; font-weight:500;
+  letter-spacing:.2px; transition:border-color .15s; box-sizing:border-box;
+}
+.auth-input:focus { border-color:rgba(80,150,255,.5); }
+.auth-input::placeholder { color:rgba(255,255,255,.25); font-weight:400; }
+.auth-btn-row { display:flex; gap:8px; }
+.auth-msg { font-size:11px; min-height:14px; padding-top:2px; }
+.auth-logged-row {
+  display:flex; align-items:center; justify-content:space-between; gap:8px;
+}
+.auth-logged-info { display:flex; align-items:center; gap:8px; }
+.auth-avatar-badge {
+  font-size:22px; line-height:1; min-width:28px; text-align:center;
+}
+.auth-logged-name { font-size:13px; font-weight:700; color:#fff; }
+.auth-avatar-row {
+  display:flex; align-items:center; gap:8px; margin-top:6px;
+  padding-top:8px; border-top:1px solid rgba(255,255,255,.07);
+}
+.auth-avatar-label { font-size:11px; color:rgba(255,255,255,.35); white-space:nowrap; }
+.auth-avatar-input {
+  background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.12);
+  border-radius:7px; padding:6px 9px; color:#fff; width:60px; outline:none;
+  font-size:16px; text-align:center; transition:border-color .15s;
+}
+.auth-avatar-input:focus { border-color:rgba(80,150,255,.5); }

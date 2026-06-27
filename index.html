@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>HaxBall 2</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/base.css">
@@ -21,6 +22,11 @@
     <div class="logo">⚽ HAXBALL 2</div>
     <span class="logo-sub">BROWSER FOOTBALL</span>
     <div class="lobby-version" id="lobby-version"></div>
+  </div>
+
+  <!-- auth card -->
+  <div class="card" id="auth-card">
+    <!-- popolata da auth.js -->
   </div>
 
   <!-- nickname -->
@@ -236,6 +242,7 @@
 <!-- core (mode-agnostici) -->
 <script src="js/config.js"></script>
 <script src="js/helpers.js"></script>
+<script src="js/auth.js"></script>
 <script src="js/state.js"></script>
 <script src="js/input.js"></script>
 <script src="js/particles.js"></script>

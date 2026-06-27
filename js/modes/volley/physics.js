@@ -114,7 +114,6 @@ function vTickBall() {
   const bw = cfg.V_B_BOUNCE;
   if (vBall.x - V_BR < V_FL.l) { vBall.x = V_FL.l + V_BR; vBall.vx *= -bw; }
   if (vBall.x + V_BR > V_FL.r) { vBall.x = V_FL.r - V_BR; vBall.vx *= -bw; }
-  if (vBall.y - V_BR < V_FL.t) { vBall.y = V_FL.t + V_BR; vBall.vy *= -bw; vBall.grav = V_B_GRAV_BASE; }
 }
 
 // ── COLLISIONE PALLA ↔ MURETTO CENTRALE ─────────────────

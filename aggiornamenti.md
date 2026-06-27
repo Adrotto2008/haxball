@@ -4,6 +4,22 @@ Versione più recente sempre in cima. Ad ogni modifica aggiornare `VERSION` in `
 
 ---
 
+## v2.20.0 — Autenticazione opzionale Supabase
+
+### ✨ Novità
+- **`js/auth.js`**: client Supabase inizializzato con URL e anon key. Espone `authLogin`, `authRegister`, `authLogout`, `authGetProfile`, `authCurrent`, `authSaveAvatar`. Al caricamento pagina verifica la sessione esistente (`getSession`) e ripristina profilo/avatar automaticamente.
+- **Card auth in lobby** (`index.html` + `css/lobby.css`): card compatta sopra quella del nickname con due stati:
+  - *Non loggato*: input email + password, bottoni "Accedi" / "Registrati" (la registrazione usa il nickname già inserito).
+  - *Loggato*: mostra avatar emoji + nickname + tasto "Esci", più campo per cambiare avatar (max 2 char) con salvataggio su `profiles.avatar`.
+- **Nickname bloccato (readonly)** quando loggato — viene preso dal profilo Supabase, non dall'input.
+- **Avatar come `mySkin`**: l'emoji/stringa avatar viene usata automaticamente come skin del player (`mySkin`) e salvata in `localStorage`.
+- **`getNick()` aggiornato** (`js/lobby.js`): se `authProfile` è presente restituisce `authProfile.nickname`, altrimenti usa l'input come sempre. Nessuna modifica al flusso di rete.
+- **Compatibilità totale**: chi non si logga non nota alcuna differenza. `myPlayerId` rimane `uid()`, `server.js` e `network-core.js` invariati.
+- SDK Supabase caricato via CDN (`@supabase/supabase-js@2` da jsdelivr) nell'`<head>` prima di tutti gli altri script.
+- Tabella Supabase usata: `profiles` (`id` uuid FK auth.users, `nickname` text, `avatar` text, `created_at`).
+
+---
+
 ## v2.19.0 — Fix definitivo doppio tocco: kickCooldown per-player
 
 ### 🔧 Fix
