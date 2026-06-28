@@ -4,6 +4,16 @@ Versione più recente sempre in cima. Ad ogni modifica aggiornare `VERSION` in `
 
 ---
 
+## v2.21.2 — Fix auth card: form visibile immediatamente
+
+### 🔧 Fix
+- **Causa reale della card vuota**: se `window.supabase.createClient(...)` al top-level di `auth.js` lancia un errore (CDN lento, blocco AdBlock, rete), **l'intera esecuzione del file si blocca silenziosamente** — nessuna funzione viene definita, `_renderAuthCard()` non esiste, la card resta vuota.
+- **Soluzione**: init di Supabase racchiuso in `try/catch` con fallback `_supabase = null`. `_renderAuthCard()` viene chiamata **in modo sincrono** come primo statement eseguito — non dipende da Supabase, mostra il form immediatamente. Il check sessione avviene dopo, in background con `.then()` (niente `async/await` a top-level che potrebbe sospendere l'esecuzione).
+- Handler dei bottoni convertiti da `async function` a funzioni sincrone con `.then().catch()` — più robusti contro errori asincroni non catturati.
+- Rimosse tutte le dipendenze da `async` a top-level.
+
+---
+
 ## v2.21.1 — Fix definitivo auth card vuota
 
 ### 🔧 Fix
@@ -20,9 +30,7 @@ Versione più recente sempre in cima. Ad ogni modifica aggiornare `VERSION` in `
 - `mkBall(cfg)` e `mkVolleyBall(vcfg)` usano il raggio dalla config.
 
 ### 🔧 Fix
-- **Auth card invisibile**: l'IIFE asincrona in `auth.js` terminava dopo che `lobby.js` aveva già chiamato `_renderAuthCard()`, quindi la card rimaneva vuota. Sostituito con `document.addEventListener('DOMContentLoaded', async () => {...})` — garantisce che il DOM sia pronto E che la sessione sia stata verificata prima di renderizzare. La card ora compare sempre correttamente al caricamento.
-- Aggiunto `card-title` mancante nella card auth (stato non loggato: `🔐 Account (opzionale)`, stato loggato: `🔐 Account`).
-- Feedback visivo su bottoni Accedi/Registrati durante la richiesta (`…` + `disabled`).
+- **Auth card invisibile**: prima correzione tentata (non sufficiente).
 
 ---
 
@@ -30,15 +38,11 @@ Versione più recente sempre in cima. Ad ogni modifica aggiornare `VERSION` in `
 
 ### ✨ Novità
 - **`js/auth.js`**: client Supabase inizializzato con URL e anon key. Espone `authLogin`, `authRegister`, `authLogout`, `authGetProfile`, `authCurrent`, `authSaveAvatar`. Al caricamento pagina verifica la sessione esistente (`getSession`) e ripristina profilo/avatar automaticamente.
-- **Card auth in lobby** (`index.html` + `css/lobby.css`): card compatta sopra quella del nickname con due stati:
-  - *Non loggato*: input email + password, bottoni "Accedi" / "Registrati" (la registrazione usa il nickname già inserito).
-  - *Loggato*: mostra avatar emoji + nickname + tasto "Esci", più campo per cambiare avatar (max 2 char) con salvataggio su `profiles.avatar`.
-- **Nickname bloccato (readonly)** quando loggato — viene preso dal profilo Supabase, non dall'input.
-- **Avatar come `mySkin`**: l'emoji/stringa avatar viene usata automaticamente come skin del player (`mySkin`) e salvata in `localStorage`.
-- **`getNick()` aggiornato** (`js/lobby.js`): se `authProfile` è presente restituisce `authProfile.nickname`, altrimenti usa l'input come sempre. Nessuna modifica al flusso di rete.
-- **Compatibilità totale**: chi non si logga non nota alcuna differenza. `myPlayerId` rimane `uid()`, `server.js` e `network-core.js` invariati.
-- SDK Supabase caricato via CDN (`@supabase/supabase-js@2` da jsdelivr) nell'`<head>` prima di tutti gli altri script.
-- Tabella Supabase usata: `profiles` (`id` uuid FK auth.users, `nickname` text, `avatar` text, `created_at`).
+- **Card auth in lobby** (`index.html` + `css/lobby.css`): card compatta sopra quella del nickname con due stati: non loggato (form email+password) e loggato (avatar + nome + esci).
+- **Nickname bloccato (readonly)** quando loggato.
+- **Avatar come `mySkin`**: emoji/stringa salvata in `profiles.avatar` e usata come skin.
+- **`getNick()` aggiornato** (`js/lobby.js`): usa `authProfile.nickname` se loggato.
+- SDK Supabase via CDN (`@supabase/supabase-js@2` da jsdelivr).
 
 ---
 
