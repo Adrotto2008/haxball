@@ -4,7 +4,6 @@
 const SUPABASE_URL  = 'https://sjodxonntzqiserdpdfv.supabase.co';
 const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNqb2R4b25udHpxaXNlcmRwZGZ2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI1MDk2NDIsImV4cCI6MjA5ODA4NTY0Mn0.BJHYfb0mBSlGiBow0K4qHJy7NWlOCmgyr3_fDEvi0ZQ';
 
-// Init difensivo: se il CDN non carica, _supabase = null e il form si vede lo stesso.
 let _supabase = null;
 try {
   if (window.supabase && typeof window.supabase.createClient === 'function') {
@@ -15,16 +14,20 @@ try {
 }
 
 // ── stato pubblico ────────────────────────────────────────
-let authUser    = null;
-let authProfile = null;
-let _presets    = [];   // cache preset utente
+let authUser    = null;   // oggetto User Supabase (null = non loggato)
+let authProfile = null;   // riga profiles (può essere null anche se loggato, se RLS manca)
+let _presets    = [];
 
-// ── Nickname → email (Supabase Auth richiede email) ──────
-// Usiamo un indirizzo fake derivato dal nickname.
-// Due utenti con lo stesso nickname (normalizzato) avrebbero la stessa email
-// → Supabase restituisce errore "User already registered" → nickname unico.
+// ── Nickname → email fake ────────────────────────────────
 function _nickToEmail(nickname) {
   return nickname.toLowerCase().replace(/[^a-z0-9.]/g, '').slice(0, 30) + '@haxball2.local';
+}
+
+// Ricava il nickname da mostrare anche senza profilo
+function _displayNick() {
+  if (authProfile && authProfile.nickname) return authProfile.nickname;
+  if (authUser && authUser.email) return authUser.email.replace('@haxball2.local', '') || 'Utente';
+  return 'Utente';
 }
 
 // ── API auth ──────────────────────────────────────────────
@@ -46,12 +49,15 @@ async function authRegister(nickname, password) {
   const { data, error } = await _supabase.auth.signUp({ email, password });
   if (error) throw error;
   authUser = data.user;
-  const { error: pe } = await _supabase.from('profiles').insert({
+  // upsert invece di insert: più robusto, non fallisce se la riga esiste già
+  const { error: pe } = await _supabase.from('profiles').upsert({
     id: authUser.id,
     nickname: nickname.slice(0, 16),
     avatar: ''
   });
-  if (pe) throw pe;
+  // Non blocchiamo su errore profilo: l'utente è già autenticato.
+  // L'errore più comune è mancanza di RLS policy → istruire l'utente.
+  if (pe) console.warn('[Auth] Profilo non creato (controlla RLS su profiles):', pe.message);
   await _loadProfile();
   return authProfile;
 }
@@ -59,9 +65,6 @@ async function authRegister(nickname, password) {
 async function authLogout() {
   if (_supabase) await _supabase.auth.signOut();
   authUser = null; authProfile = null; _presets = [];
-  // Mostra di nuovo la card nickname
-  var nc = document.getElementById('card-nickname');
-  if (nc) nc.style.display = '';
   _renderAuthCard();
 }
 
@@ -105,7 +108,6 @@ async function authDeletePreset(id) {
 
 function authGetPresetsCache() { return _presets; }
 
-// Popola il <select id="preset-select"> nella card "Crea stanza"
 function _populatePresetSelect() {
   var sel = document.getElementById('preset-select');
   var row = document.getElementById('preset-row');
@@ -131,44 +133,55 @@ async function _loadProfile() {
 }
 
 // ── render card ───────────────────────────────────────────
+// REGOLA: nasconde card-nickname se authUser è settato (indipendentemente dal profilo)
 function _renderAuthCard() {
   var card = document.getElementById('auth-card');
   if (!card) return;
 
-  if (authUser && authProfile) {
-    // ── LOGGATO ──────────────────────────────────────────
-    // Nascondi card nickname (il nome viene dal profilo)
-    var nc = document.getElementById('card-nickname');
-    if (nc) nc.style.display = 'none';
+  var nickCard = document.getElementById('card-nickname');
+
+  if (authUser) {
+    // ── LOGGATO (anche senza profilo) ────────────────────
+    if (nickCard) nickCard.style.display = 'none';
+
+    var nick    = _displayNick();
+    var avatar  = (authProfile && authProfile.avatar) ? authProfile.avatar : '\uD83D\uDC64';
+    var noProfile = !authProfile;
 
     card.innerHTML =
       '<div class="card-title">\uD83D\uDD10 Account</div>' +
+      '<div class="auth-status-badge">\u2705 Login effettuato</div>' +
       '<div class="auth-logged-row">' +
         '<span class="auth-logged-info">' +
-          '<span class="auth-avatar-badge" id="auth-avatar-show">' + (authProfile.avatar || '\uD83D\uDC64') + '</span>' +
-          '<span class="auth-logged-name">' + escHtml(authProfile.nickname) + '</span>' +
+          '<span class="auth-avatar-badge" id="auth-avatar-show">' + escHtml(avatar) + '</span>' +
+          '<span class="auth-logged-name">' + escHtml(nick) + '</span>' +
         '</span>' +
         '<button class="btn btn-ghost btn-sm" id="auth-logout-btn">Esci</button>' +
       '</div>' +
-      '<div class="auth-avatar-row">' +
-        '<label class="auth-avatar-label">Avatar (emoji, max 2)</label>' +
-        '<input type="text" id="auth-avatar-input" class="auth-avatar-input" maxlength="2" placeholder="\uD83D\uDC09" value="' + escHtml(authProfile.avatar || '') + '">' +
-        '<button class="btn btn-ghost btn-sm" id="auth-avatar-save">Salva</button>' +
-      '</div>';
+      (noProfile
+        ? '<div class="auth-msg" style="color:#ffaa44;margin-top:6px">\u26a0\ufe0f Profilo non trovato. Controlla le RLS policy su Supabase (profiles).</div>'
+        : '<div class="auth-avatar-row">' +
+            '<label class="auth-avatar-label">Avatar (emoji, max 2)</label>' +
+            '<input type="text" id="auth-avatar-input" class="auth-avatar-input" maxlength="2" placeholder="\uD83D\uDC09" value="' + escHtml(authProfile.avatar || '') + '">' +
+            '<button class="btn btn-ghost btn-sm" id="auth-avatar-save">Salva</button>' +
+          '</div>'
+      );
 
     document.getElementById('auth-logout-btn').onclick = function() { authLogout(); };
-    document.getElementById('auth-avatar-save').onclick = function() {
-      var v = document.getElementById('auth-avatar-input').value.trim();
-      authSaveAvatar(v).then(function() {
-        var show = document.getElementById('auth-avatar-show');
-        if (show) show.textContent = v || '\uD83D\uDC64';
-      });
-    };
+    var saveBtn = document.getElementById('auth-avatar-save');
+    if (saveBtn) {
+      saveBtn.onclick = function() {
+        var v = document.getElementById('auth-avatar-input').value.trim();
+        authSaveAvatar(v).then(function() {
+          var show = document.getElementById('auth-avatar-show');
+          if (show) show.textContent = v || '\uD83D\uDC64';
+        });
+      };
+    }
 
   } else {
     // ── NON LOGGATO ──────────────────────────────────────
-    var nc2 = document.getElementById('card-nickname');
-    if (nc2) nc2.style.display = '';
+    if (nickCard) nickCard.style.display = '';
 
     card.innerHTML =
       '<div class="card-title">\uD83D\uDD10 Account <span class="auth-optional">(opzionale)</span></div>' +
@@ -230,10 +243,8 @@ function _handleRegister() {
 }
 
 // ── INIT ─────────────────────────────────────────────────
-// Renderizza subito (sincrono) → form visibile immediatamente.
-_renderAuthCard();
+_renderAuthCard();   // sincrono: mostra form subito
 
-// Controlla sessione esistente in background.
 if (_supabase) {
   _supabase.auth.getSession().then(function(result) {
     var session = result && result.data && result.data.session;
@@ -241,7 +252,7 @@ if (_supabase) {
       authUser = session.user;
       _loadProfile().then(function() {
         _renderAuthCard();
-        authLoadPresets(); // carica preset in background
+        authLoadPresets();
       });
     }
   }).catch(function(e) {

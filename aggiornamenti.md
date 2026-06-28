@@ -4,6 +4,27 @@ Versione più recente sempre in cima. Ad ogni modifica aggiornare `VERSION` in `
 
 ---
 
+## v2.22.1 — Fix auth: nickname card, stato login chiaro, RLS profili
+
+### 🔧 Fix
+- **Card nickname ancora visibile dopo login**: causa radice era doppia. Primo: `_renderAuthCard()` nascondeva `card-nickname` solo se `authUser && authProfile`; se il profilo non esisteva (RLS mancante), la condizione era falsa e la card restava. Secondo: il timing async del check sessione arrivava dopo il render iniziale. Entrambi risolti: la condizione è ora solo `authUser` (senza richiedere profilo), e `_renderAuthCard()` gestisce il caso "utente loggato senza profilo" con un avviso.
+- **Registrazione: violazione policy su insert profiles**: la tabella `profiles` non aveva RLS policies per INSERT/SELECT/UPDATE. `authRegister` ora usa `upsert` invece di `insert` (meno fragile) e non blocca sul fallimento del profilo (solo warn in console), così l'utente risulta comunque autenticato. Aggiunte istruzioni SQL per creare le policy mancanti.
+- **Partita con nome "Giocatore"**: `getNick()` in `lobby.js` ora controlla `authUser` (non solo `authProfile`) come condizione; usa il nickname dal profilo, o in fallback ricava il nome dall'email fittizia (`nick@haxball2.local → nick`). Non torna più a "Giocatore" se loggato.
+- **UI stato login non chiaro**: aggiunto badge verde `✅ Login effettuato` sopra nome e avatar quando loggato; campi email/password completamente assenti; solo nome, avatar e bottone Esci visibili.
+
+### ⚠️ Richiede azione su Supabase
+Eseguire nel SQL editor di Supabase:
+```sql
+create policy "profiles_insert" on public.profiles
+  for insert with check (auth.uid() = id);
+create policy "profiles_select" on public.profiles
+  for select using (auth.uid() = id);
+create policy "profiles_update" on public.profiles
+  for update using (auth.uid() = id);
+```
+
+---
+
 ## v2.22.0 — Login con nickname, sicurezza password, preset stanze, fix palla volley
 
 ### ✨ Novità

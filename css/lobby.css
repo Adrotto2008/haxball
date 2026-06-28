@@ -127,6 +127,17 @@ input[type=text]::placeholder{font-family:'Inter',sans-serif;letter-spacing:1px;
 }
 .auth-optional { font-size:11px; font-weight:400; color:rgba(255,255,255,.35); }
 
+.auth-status-badge {
+  display:inline-block;
+  font-size:11px; font-weight:700; letter-spacing:.04em;
+  color:#6ddc7e;
+  background:rgba(109,220,126,.12);
+  border:1px solid rgba(109,220,126,.25);
+  border-radius:20px;
+  padding:3px 10px;
+  margin-bottom:8px;
+}
+
 /* ── PRESET in card-create ───────────────────────────────── */
 #preset-row {
   margin-bottom:10px; padding-bottom:10px;

@@ -4,8 +4,16 @@ function genCode() {
   return Array.from({length:6}, () => c[~~(Math.random()*c.length)]).join('');
 }
 function getNick() {
-  if (typeof authProfile !== 'undefined' && authProfile && authProfile.nickname) {
-    return authProfile.nickname.slice(0, 16);
+  // Se loggato, usa sempre il profilo Supabase (o fallback dal email fake)
+  if (typeof authUser !== 'undefined' && authUser) {
+    if (typeof authProfile !== 'undefined' && authProfile && authProfile.nickname) {
+      return authProfile.nickname.slice(0, 16);
+    }
+    // fallback senza profilo: ricava il nome dall'email fittizia
+    if (authUser.email) {
+      var n = authUser.email.replace('@haxball2.local', '').slice(0, 16);
+      if (n) return n;
+    }
   }
   return ($('nickname-input').value.trim() || 'Giocatore').slice(0, 16);
 }
