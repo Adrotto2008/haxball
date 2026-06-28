@@ -4,8 +4,7 @@ function genCode() {
   return Array.from({length:6}, () => c[~~(Math.random()*c.length)]).join('');
 }
 function getNick() {
-  // se loggato usa il nickname dal profilo Supabase
-  if (typeof authProfile !== 'undefined' && authProfile?.nickname) {
+  if (typeof authProfile !== 'undefined' && authProfile && authProfile.nickname) {
     return authProfile.nickname.slice(0, 16);
   }
   return ($('nickname-input').value.trim() || 'Giocatore').slice(0, 16);
@@ -22,9 +21,9 @@ function showLobby() {
   $('card-train-mode').style.display = 'none';
   const codeEl = $('gm-room-code');
   if (codeEl) { codeEl.textContent = ''; codeEl.style.display = 'none'; }
-  stopLoop();   // ferma loop calcio
-  vStopLoop();  // ferma loop pallavolo
-  currentGameMode = 'soccer'; // reset a default per la prossima partita
+  stopLoop();
+  vStopLoop();
+  currentGameMode = 'soccer';
   isHost = false; pmRoster = []; hostId = null;
   chatMessages = []; chatOpen = false; afkPlayers = new Set(); playerSkins = {};
   _lastInputMask = -1;
@@ -54,6 +53,41 @@ function getSelectedMode(pickerId) {
 initModePicker('mode-picker-create');
 initModePicker('mode-picker-train');
 
+// ── PRESET ───────────────────────────────────────────────
+// Preset pending: config da applicare subito dopo la creazione della stanza.
+let _pendingPreset = null;
+
+function _loadPresetsForCreate() {
+  if (typeof authLoadPresets !== 'function' || typeof authUser === 'undefined' || !authUser) return;
+  authLoadPresets().then(function() {
+    if (typeof _populatePresetSelect === 'function') _populatePresetSelect();
+  });
+}
+
+// Listener change sul select preset: aggiorna mode picker in automatico
+document.getElementById('preset-select').addEventListener('change', function() {
+  var opt = this.options[this.selectedIndex];
+  if (!opt || !opt.value) return;
+  var mode = opt.dataset.mode || 'soccer';
+  var picker = document.getElementById('mode-picker-create');
+  if (picker) {
+    picker.querySelectorAll('.mode-btn').forEach(function(b) {
+      b.classList.toggle('active', b.dataset.mode === mode);
+    });
+  }
+});
+
+// Bottone elimina preset selezionato
+document.getElementById('btn-preset-delete').addEventListener('click', function() {
+  var sel = document.getElementById('preset-select');
+  if (!sel || !sel.value) return;
+  var id = sel.value;
+  if (typeof authDeletePreset !== 'function') return;
+  authDeletePreset(id).then(function() {
+    if (typeof _populatePresetSelect === 'function') _populatePresetSelect();
+  });
+});
+
 // ── CREA STANZA ──────────────────────────────────────────
 function createRoom() {
   const roomName = ($('room-name-input').value.trim() || 'Partita').slice(0, 24);
@@ -63,6 +97,15 @@ function createRoom() {
   myPlayerId = uid();
   const code = genCode();
   wsRoom = code;
+
+  // salva preset pending (applicato dopo 'created')
+  _pendingPreset = null;
+  var presetSel = document.getElementById('preset-select');
+  if (presetSel && presetSel.value && typeof authGetPresetsCache === 'function') {
+    var cache = authGetPresetsCache();
+    _pendingPreset = cache.find(function(x) { return x.id === presetSel.value; }) || null;
+  }
+
   setStatus('Connessione al server…');
   wsConnect(() => {
     wsSend({ type: 'create', payload: { pid: myPlayerId, name: myNickname, code, roomName, password, mode, skin: mySkin } });
@@ -91,7 +134,6 @@ function openRoomsList() {
   $('card-create').style.display = 'none';
   $('card-join').style.display = 'none';
   $('rooms-list-content').innerHTML = '<div class="rooms-loading">Caricamento…</div>';
-  // apri connessione temporanea solo per list_rooms, poi chiudi
   const tmpWs = new WebSocket(WS_URL);
   tmpWs.onopen = () => tmpWs.send(JSON.stringify({ type: 'list_rooms', payload: {} }));
   tmpWs.onmessage = e => {
@@ -146,12 +188,13 @@ function leaveGame() {
 }
 
 // ── BUTTONS ──────────────────────────────────────────────
-$('btn-create').onclick     = () => {
+$('btn-create').onclick = () => {
   $('card-join').style.display       = 'none';
   $('card-rooms').style.display      = 'none';
   $('card-train-mode').style.display = 'none';
   $('card-create').style.display     = 'block';
   $('room-name-input').focus();
+  _loadPresetsForCreate(); // carica/aggiorna preset se loggato
 };
 $('btn-create-go').onclick     = () => createRoom();
 $('btn-create-cancel').onclick = () => { $('card-create').style.display = 'none'; };
@@ -171,7 +214,6 @@ $('btn-rooms').onclick         = openRoomsList;
 $('btn-rooms-close').onclick   = () => { $('card-rooms').style.display = 'none'; };
 $('btn-rooms-refresh').onclick = () => openRoomsList();
 
-// allenamento: mostra selezione modalità
 $('btn-train').onclick = () => {
   $('card-create').style.display     = 'none';
   $('card-join').style.display       = 'none';

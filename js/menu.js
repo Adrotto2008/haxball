@@ -16,7 +16,6 @@ function openMenu(context) {
   $('gm-close-btn').style.display  = menuContext === 'ingame' ? '' : 'none';
   const chk = $('toggle-prediction');
   if (chk) chk.checked = useLocalPrediction;
-  // mostra/nascondi toggle controlli avanzati volley
   const vctrlRow = $('vcontrol-row');
   if (vctrlRow) {
     vctrlRow.style.display = (currentGameMode === 'volley') ? '' : 'none';
@@ -49,9 +48,6 @@ function switchTab(tab) {
 }
 
 // ── PANNELLO VARIABILI ──────────────────────────────────
-// Mostra variabili calcio o pallavolo in base a currentGameMode.
-// Modificabile solo dall'host. Per il volley le patch sono solo locali
-// (il server usa le costanti fisse compilate in server.js).
 function renderConfigPanel() {
   const el   = $('config-panel-content');
   const hint = $('config-hint');
@@ -65,7 +61,6 @@ function renderConfigPanel() {
   const isVolley = (currentGameMode === 'volley');
   const meta   = isVolley ? V_CONFIG_META : CONFIG_META;
   const source = isVolley ? V_CONFIG      : CONFIG;
-
   const modeLabel = isVolley ? '🏐 Variabili Pallavolo' : '⚽ Variabili Calcio';
 
   let html = '<div class="cfg-mode-label">' + modeLabel + '</div>';
@@ -91,7 +86,6 @@ function renderConfigPanel() {
       if (isNaN(val)) return;
       if (isVolley) {
         V_CONFIG[key] = val;
-        // Sync al server (e da lì a tutti i client)
         wsSend({ type: 'set_vconfig', payload: { patch: { [key]: val } } });
       } else {
         CONFIG[key] = val;
@@ -100,6 +94,37 @@ function renderConfigPanel() {
       el.querySelectorAll('[data-key="' + key + '"]').forEach(x => { if (x !== inp) x.value = val; });
     });
   });
+
+  // ── Salva Preset (solo host loggato) ─────────────────
+  if (isHost && typeof authUser !== 'undefined' && authUser && typeof authSavePreset === 'function') {
+    const presetRow = document.createElement('div');
+    presetRow.className = 'cfg-preset-row';
+    presetRow.innerHTML =
+      '<div class="cfg-preset-label">Salva la configurazione corrente come preset:</div>' +
+      '<div class="cfg-preset-controls">' +
+        '<input type="text" id="cfg-preset-name" class="cfg-preset-input" placeholder="Nome preset…" maxlength="32">' +
+        '<button class="btn btn-ghost btn-sm" id="cfg-preset-save">⭐ Salva</button>' +
+      '</div>' +
+      '<div class="cfg-preset-msg" id="cfg-preset-msg"></div>';
+    el.appendChild(presetRow);
+
+    document.getElementById('cfg-preset-save').onclick = function() {
+      var nameEl = document.getElementById('cfg-preset-name');
+      var name = (nameEl && nameEl.value.trim()) || 'Preset';
+      var config = isVolley ? Object.assign({}, V_CONFIG) : Object.assign({}, CONFIG);
+      authSavePreset(name, isVolley ? 'volley' : 'soccer', config).then(function() {
+        var msgEl = document.getElementById('cfg-preset-msg');
+        if (msgEl) { msgEl.textContent = '✓ Salvato!'; msgEl.style.color = '#6ddc7e'; }
+        setTimeout(function() {
+          var msgEl2 = document.getElementById('cfg-preset-msg');
+          if (msgEl2) msgEl2.textContent = '';
+        }, 2500);
+      }).catch(function(e) {
+        var msgEl = document.getElementById('cfg-preset-msg');
+        if (msgEl) { msgEl.textContent = '✗ ' + (e.message || 'Errore'); msgEl.style.color = '#ff6666'; }
+      });
+    };
+  }
 }
 
 function toggleEscMenu(forceOpen) {
@@ -118,7 +143,7 @@ function showPrematch() {
 }
 
 function hidePrematch() {
-  // no-op: mantenuta per compatibilità con le chiamate in game.js e lobby.js
+  // no-op: mantenuta per compatibilità
 }
 
 // ── AVVIO / RITORNO PARTITA ────────────────────────────
@@ -153,14 +178,11 @@ document.getElementById('toggle-prediction').addEventListener('change', e => {
 });
 
 // ── TOGGLE: controlli avanzati volley ─────────────────
-// Il toggle è nell'HTML con id="toggle-vcontrol" dentro id="vcontrol-row".
-// La riga è mostrata solo quando currentGameMode === 'volley'.
 const _vctrl = document.getElementById('toggle-vcontrol');
 if (_vctrl) {
   _vctrl.addEventListener('change', e => {
     vControlMode = e.target.checked ? 'advanced' : 'base';
     localStorage.setItem('hax_vcontrol', vControlMode);
-    // Comunica la modalità al server (per le partite online)
     if (ws && ws.readyState === 1) {
       wsSend({ type: 'vmode', payload: { advanced: vControlMode === 'advanced' } });
     }

@@ -4,8 +4,7 @@
 const SUPABASE_URL  = 'https://sjodxonntzqiserdpdfv.supabase.co';
 const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNqb2R4b25udHpxaXNlcmRwZGZ2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI1MDk2NDIsImV4cCI6MjA5ODA4NTY0Mn0.BJHYfb0mBSlGiBow0K4qHJy7NWlOCmgyr3_fDEvi0ZQ';
 
-// Init difensivo: se il CDN Supabase non è caricato, _supabase = null
-// e il form viene comunque mostrato (non funzionale fino a reload).
+// Init difensivo: se il CDN non carica, _supabase = null e il form si vede lo stesso.
 let _supabase = null;
 try {
   if (window.supabase && typeof window.supabase.createClient === 'function') {
@@ -15,13 +14,23 @@ try {
   console.warn('[Auth] Supabase init failed:', e);
 }
 
-// ── stato auth pubblico ─────────────────────────────────
+// ── stato pubblico ────────────────────────────────────────
 let authUser    = null;
 let authProfile = null;
+let _presets    = [];   // cache preset utente
 
-// ── API ─────────────────────────────────────────────────
-async function authLogin(email, password) {
+// ── Nickname → email (Supabase Auth richiede email) ──────
+// Usiamo un indirizzo fake derivato dal nickname.
+// Due utenti con lo stesso nickname (normalizzato) avrebbero la stessa email
+// → Supabase restituisce errore "User already registered" → nickname unico.
+function _nickToEmail(nickname) {
+  return nickname.toLowerCase().replace(/[^a-z0-9.]/g, '').slice(0, 30) + '@haxball2.local';
+}
+
+// ── API auth ──────────────────────────────────────────────
+async function authLogin(nickname, password) {
   if (!_supabase) throw new Error('Supabase non disponibile, ricarica la pagina.');
+  const email = _nickToEmail(nickname);
   const { data, error } = await _supabase.auth.signInWithPassword({ email, password });
   if (error) throw error;
   authUser = data.user;
@@ -29,14 +38,17 @@ async function authLogin(email, password) {
   return authProfile;
 }
 
-async function authRegister(email, password, nickname) {
+async function authRegister(nickname, password) {
   if (!_supabase) throw new Error('Supabase non disponibile, ricarica la pagina.');
+  const san = nickname.toLowerCase().replace(/[^a-z0-9.]/g, '');
+  if (san.length < 3) throw new Error('Il nickname deve contenere almeno 3 lettere/numeri.');
+  const email = _nickToEmail(nickname);
   const { data, error } = await _supabase.auth.signUp({ email, password });
   if (error) throw error;
   authUser = data.user;
   const { error: pe } = await _supabase.from('profiles').insert({
     id: authUser.id,
-    nickname: (nickname || 'Giocatore').slice(0, 16),
+    nickname: nickname.slice(0, 16),
     avatar: ''
   });
   if (pe) throw pe;
@@ -46,10 +58,10 @@ async function authRegister(email, password, nickname) {
 
 async function authLogout() {
   if (_supabase) await _supabase.auth.signOut();
-  authUser    = null;
-  authProfile = null;
-  const ni = document.getElementById('nickname-input');
-  if (ni) { ni.readOnly = false; ni.classList.remove('auth-readonly'); }
+  authUser = null; authProfile = null; _presets = [];
+  // Mostra di nuovo la card nickname
+  var nc = document.getElementById('card-nickname');
+  if (nc) nc.style.display = '';
   _renderAuthCard();
 }
 
@@ -62,6 +74,52 @@ async function authSaveAvatar(avatar) {
   localStorage.setItem('hax_skin', avatar);
 }
 
+// ── API preset ────────────────────────────────────────────
+async function authLoadPresets() {
+  if (!_supabase || !authUser) return [];
+  const { data } = await _supabase
+    .from('presets').select('*')
+    .eq('user_id', authUser.id)
+    .order('created_at', { ascending: false });
+  _presets = data || [];
+  return _presets;
+}
+
+async function authSavePreset(name, mode, config) {
+  if (!_supabase || !authUser) throw new Error('Non loggato.');
+  const { error } = await _supabase.from('presets').insert({
+    user_id: authUser.id,
+    name:    (name || 'Preset').slice(0, 32),
+    mode:    mode || 'soccer',
+    config:  config || {}
+  });
+  if (error) throw error;
+  await authLoadPresets();
+}
+
+async function authDeletePreset(id) {
+  if (!_supabase || !authUser) return;
+  await _supabase.from('presets').delete().eq('id', id).eq('user_id', authUser.id);
+  _presets = _presets.filter(function(p) { return p.id !== id; });
+}
+
+function authGetPresetsCache() { return _presets; }
+
+// Popola il <select id="preset-select"> nella card "Crea stanza"
+function _populatePresetSelect() {
+  var sel = document.getElementById('preset-select');
+  var row = document.getElementById('preset-row');
+  if (!sel || !row) return;
+  if (!authUser || !_presets.length) { row.style.display = 'none'; return; }
+  row.style.display = '';
+  sel.innerHTML = '<option value="">— Nessun preset (stanza vuota) —</option>' +
+    _presets.map(function(p) {
+      return '<option value="' + p.id + '" data-mode="' + escHtml(p.mode) + '">' +
+             escHtml(p.name) + ' (' + (p.mode === 'volley' ? '\uD83C\uDFD0' : '\u26BD') + ')</option>';
+    }).join('');
+}
+
+// ── interno ───────────────────────────────────────────────
 async function _loadProfile() {
   if (!_supabase || !authUser) return;
   const { data } = await _supabase.from('profiles').select('*').eq('id', authUser.id).single();
@@ -72,13 +130,17 @@ async function _loadProfile() {
   }
 }
 
-// ── render card ──────────────────────────────────────────
+// ── render card ───────────────────────────────────────────
 function _renderAuthCard() {
-  const card = document.getElementById('auth-card');
+  var card = document.getElementById('auth-card');
   if (!card) return;
 
   if (authUser && authProfile) {
-    // STATO LOGGATO
+    // ── LOGGATO ──────────────────────────────────────────
+    // Nascondi card nickname (il nome viene dal profilo)
+    var nc = document.getElementById('card-nickname');
+    if (nc) nc.style.display = 'none';
+
     card.innerHTML =
       '<div class="card-title">\uD83D\uDD10 Account</div>' +
       '<div class="auth-logged-row">' +
@@ -94,24 +156,26 @@ function _renderAuthCard() {
         '<button class="btn btn-ghost btn-sm" id="auth-avatar-save">Salva</button>' +
       '</div>';
 
-    const ni = document.getElementById('nickname-input');
-    if (ni) { ni.value = authProfile.nickname; ni.readOnly = true; ni.classList.add('auth-readonly'); }
-
     document.getElementById('auth-logout-btn').onclick = function() { authLogout(); };
-    document.getElementById('auth-avatar-save').onclick = async function() {
-      const v = document.getElementById('auth-avatar-input').value.trim();
-      await authSaveAvatar(v);
-      const show = document.getElementById('auth-avatar-show');
-      if (show) show.textContent = v || '\uD83D\uDC64';
+    document.getElementById('auth-avatar-save').onclick = function() {
+      var v = document.getElementById('auth-avatar-input').value.trim();
+      authSaveAvatar(v).then(function() {
+        var show = document.getElementById('auth-avatar-show');
+        if (show) show.textContent = v || '\uD83D\uDC64';
+      });
     };
 
   } else {
-    // STATO NON LOGGATO — form email + password
+    // ── NON LOGGATO ──────────────────────────────────────
+    var nc2 = document.getElementById('card-nickname');
+    if (nc2) nc2.style.display = '';
+
     card.innerHTML =
       '<div class="card-title">\uD83D\uDD10 Account <span class="auth-optional">(opzionale)</span></div>' +
       '<div class="auth-form">' +
-        '<input type="email" id="auth-email-input" class="auth-input" placeholder="Email" autocomplete="email">' +
+        '<input type="text" id="auth-nick-input" class="auth-input" placeholder="Nickname" autocomplete="username" maxlength="16">' +
         '<input type="password" id="auth-password-input" class="auth-input" placeholder="Password (min 6 car.)" autocomplete="current-password">' +
+        '<div class="auth-security-note">\uD83D\uDD12 La password \u00e8 cifrata con bcrypt \u2014 non viene mai salvata in chiaro</div>' +
         '<div class="auth-btn-row">' +
           '<button class="btn btn-blue btn-sm" id="auth-login-btn">Accedi</button>' +
           '<button class="btn btn-ghost btn-sm" id="auth-register-btn">Registrati</button>' +
@@ -124,43 +188,40 @@ function _renderAuthCard() {
     document.getElementById('auth-password-input').onkeydown = function(e) {
       if (e.key === 'Enter') _handleLogin();
     };
-
-    const ni = document.getElementById('nickname-input');
-    if (ni) { ni.readOnly = false; ni.classList.remove('auth-readonly'); }
   }
 }
 
 function _authMsg(msg, ok) {
-  const el = document.getElementById('auth-msg');
+  var el = document.getElementById('auth-msg');
   if (!el) return;
   el.textContent = msg;
   el.style.color = ok ? '#6ddc7e' : '#ff6666';
 }
 
 function _handleLogin() {
-  const email = (document.getElementById('auth-email-input') && document.getElementById('auth-email-input').value || '').trim();
-  const pw    = (document.getElementById('auth-password-input') && document.getElementById('auth-password-input').value || '');
-  if (!email || !pw) { _authMsg('Compila email e password.'); return; }
-  const btn = document.getElementById('auth-login-btn');
+  var nick = ((document.getElementById('auth-nick-input') || {}).value || '').trim();
+  var pw   = ((document.getElementById('auth-password-input') || {}).value || '');
+  if (!nick || !pw) { _authMsg('Compila nickname e password.'); return; }
+  var btn = document.getElementById('auth-login-btn');
   if (btn) { btn.disabled = true; btn.textContent = '\u2026'; }
-  authLogin(email, pw).then(function() {
+  authLogin(nick, pw).then(function() {
     _renderAuthCard();
   }).catch(function(e) {
-    _authMsg(e.message || 'Errore di accesso.');
+    _authMsg(e.message || 'Nickname o password errati.');
     if (btn) { btn.disabled = false; btn.textContent = 'Accedi'; }
   });
 }
 
 function _handleRegister() {
-  const email = (document.getElementById('auth-email-input') && document.getElementById('auth-email-input').value || '').trim();
-  const pw    = (document.getElementById('auth-password-input') && document.getElementById('auth-password-input').value || '');
-  const nick  = (document.getElementById('nickname-input') && document.getElementById('nickname-input').value || '').trim() || 'Giocatore';
-  if (!email || !pw) { _authMsg('Compila email e password.'); return; }
-  if (pw.length < 6) { _authMsg('Password: almeno 6 caratteri.'); return; }
-  if (/\s/.test(email) || /\s/.test(pw)) { _authMsg('Niente spazi.'); return; }
-  const btn = document.getElementById('auth-register-btn');
+  var nick = ((document.getElementById('auth-nick-input') || {}).value || '').trim();
+  var pw   = ((document.getElementById('auth-password-input') || {}).value || '');
+  if (!nick || !pw)    { _authMsg('Compila nickname e password.'); return; }
+  if (nick.length < 2) { _authMsg('Nickname: almeno 2 caratteri.'); return; }
+  if (pw.length < 6)   { _authMsg('Password: almeno 6 caratteri.'); return; }
+  if (/\s/.test(pw))   { _authMsg('Niente spazi nella password.'); return; }
+  var btn = document.getElementById('auth-register-btn');
   if (btn) { btn.disabled = true; btn.textContent = '\u2026'; }
-  authRegister(email, pw, nick).then(function() {
+  authRegister(nick, pw).then(function() {
     _renderAuthCard();
   }).catch(function(e) {
     _authMsg(e.message || 'Errore di registrazione.');
@@ -169,12 +230,10 @@ function _handleRegister() {
 }
 
 // ── INIT ─────────────────────────────────────────────────
-// STEP 1: renderizza il form subito, in modo sincrono.
-// Non dipende da Supabase — il form è visibile immediatamente.
+// Renderizza subito (sincrono) → form visibile immediatamente.
 _renderAuthCard();
 
-// STEP 2: controlla sessione esistente in background (async).
-// Se l'utente era già loggato, aggiorna la card.
+// Controlla sessione esistente in background.
 if (_supabase) {
   _supabase.auth.getSession().then(function(result) {
     var session = result && result.data && result.data.session;
@@ -182,6 +241,7 @@ if (_supabase) {
       authUser = session.user;
       _loadProfile().then(function() {
         _renderAuthCard();
+        authLoadPresets(); // carica preset in background
       });
     }
   }).catch(function(e) {

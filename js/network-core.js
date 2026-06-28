@@ -56,6 +56,20 @@ function handleServerMsg(msg) {
       { const codeEl = $('gm-room-code');
         codeEl.textContent = `🏠 ${msg.roomName || msg.code}  ·  ${msg.code}${msg.hasPassword ? '  🔒' : ''}`;
         codeEl.style.display = ''; }
+      // ── Applica preset selezionato dall'host (se presente) ──
+      if (typeof _pendingPreset !== 'undefined' && _pendingPreset) {
+        var _pp = _pendingPreset;
+        _pendingPreset = null;
+        setTimeout(function() {
+          if (_pp.config && Object.keys(_pp.config).length > 0) {
+            if (_pp.mode === 'volley') {
+              wsSend({ type: 'set_vconfig', payload: { patch: _pp.config } });
+            } else {
+              wsSend({ type: 'set_config', payload: { patch: _pp.config } });
+            }
+          }
+        }, 400);
+      }
       break;
 
     case 'joined':
@@ -171,7 +185,6 @@ function handleServerMsg(msg) {
       break;
 
     case 'meta':
-      // score/timer/gameOver arrivano solo quando cambiano
       if (currentGameMode === 'volley') {
         vScore = msg.s; vTimeLeft = msg.t; vUpdateHUD();
         if (msg.g && !vGameOver) { vGameOver = true; }
@@ -233,7 +246,6 @@ function handleServerMsg(msg) {
       break;
 
     case 'team_change':
-      // delta minimale: aggiorna solo il giocatore interessato nel roster locale
       {
         const r = pmRoster.find(x => x.id === msg.pid);
         if (r) r.team = msg.team;
@@ -281,22 +293,20 @@ let _lastInputMask = -1;
 function sendGuestInput() {
   if (!ws || ws.readyState !== 1 || !myPlayerId) return;
   const me = pmRoster.find(r => r.id === myPlayerId);
-  if (me && me.team === -1) return; // spettatori non mandano input
+  if (me && me.team === -1) return;
   const inp = inpLocal();
   const mask = (inp.up?1:0)|(inp.dn?2:0)|(inp.lt?4:0)|(inp.rt?8:0)|(inp.kick?16:0);
-  if (mask === _lastInputMask) return; // invia solo sui cambi
+  if (mask === _lastInputMask) return;
   _lastInputMask = mask;
   wsSend({ type: 'input', payload: { b: mask } });
 }
 
-// Ping separato ogni 2s (non più agganciato all'input)
 setInterval(() => {
   if (ws && ws.readyState === 1) wsSend({ type: 'ping', payload: { ts: Date.now() } });
 }, 2000);
 
 // ── DISCONNECT / LEAVE ───────────────────────────────────
 function handleWsClose() {
-  // se era in-game torna alla lobby
   if ($('game').style.display !== 'none' || $('game-menu').classList.contains('open')) {
     setStatus('Connessione persa.');
     showLobby();

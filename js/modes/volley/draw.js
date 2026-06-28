@@ -74,7 +74,8 @@ function _vDrawTouchIndicators() {
 
 // ── PALLA PALLAVOLO ─────────────────────────────────────
 function vDrawBall() {
-  const bx = vBall.x, by = vBall.y, br = V_BR;
+  // ← usa vBall.r invece di V_BR costante: rispetta il raggio corrente
+  const bx = vBall.x, by = vBall.y, br = vBall.r;
 
   // scia
   if (vBall.trail) {
@@ -110,7 +111,7 @@ function vDrawBall() {
 
   // highlight
   ctx.fillStyle = 'rgba(255,255,255,0.45)';
-  ctx.beginPath(); ctx.arc(bx - 3, by - 3, br * 0.28, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(bx - br * 0.3, by - br * 0.3, br * 0.28, 0, Math.PI * 2); ctx.fill();
 }
 
 // ── PLAYER VOLLEY ────────────────────────────────────────
@@ -118,7 +119,6 @@ function vDrawPlayer(p) {
   if (p.team === -1) return;
   const isAfk = afkPlayers.has(p.id);
   const pressing = p.held;
-  const advanced = (vControlMode === 'advanced');
 
   // alone
   const ga = isAfk ? 0.06 : (pressing ? 0.22 : 0.04);
@@ -153,19 +153,15 @@ function vDrawPlayer(p) {
   }
 
   // ── ANIMAZIONI AZIONE ────────────────────────────────
-  // Entrambe le modalità: cerchio giallo attorno al player quando AZIONE è premuto.
-  // In avanzata il cerchio cresce con la carica.
   if (!isAfk && pressing) {
     const t = (vControlMode === 'advanced')
       ? Math.min((p.charge || 0) / V_CONFIG.V_KICK_CHG_F, 1)
-      : 1; // base: sempre pieno
-    // cerchio interno fisso
+      : 1;
     ctx.beginPath();
     ctx.arc(p.x, p.y, p.r + 6, 0, Math.PI * 2);
     ctx.strokeStyle = `rgba(255,220,80,${0.6 + t * 0.3})`;
     ctx.lineWidth = 2 + t * 2;
     ctx.stroke();
-    // cerchio esterno pulsante
     const pulse = 0.5 + 0.5 * Math.sin(Date.now() * 0.025);
     ctx.beginPath();
     ctx.arc(p.x, p.y, p.r + 10 + t * 6 + pulse * 3, 0, Math.PI * 2);
@@ -180,10 +176,12 @@ function vDrawPlayer(p) {
     ctx.beginPath(); ctx.arc(p.x, p.y + p.r + 5, 2.5, 0, Math.PI * 2); ctx.fill();
   }
 
-  // testo nel cerchio
+  // testo nel cerchio — font proporzionale al raggio del player
   const skinEntry = playerSkins[p.id];
   const label = isAfk ? '👻' : (skinEntry || (p.team === 0 ? 'R' : 'B'));
-  const fontSize = isAfk ? 14 : (skinEntry && skinEntry.length > 1 ? 13 : 11);
+  const isEmoji = skinEntry && skinEntry.length > 1;
+  // scala il font con p.r: a raggio default (20) → 12–14px; cresce/diminuisce proporzionalmente
+  const fontSize = Math.max(8, Math.round(p.r * (isAfk ? 0.75 : (isEmoji ? 0.65 : 0.60))));
   ctx.globalAlpha = isAfk ? 0.6 : 1;
   ctx.fillStyle = isAfk ? '#aaa' : '#fff';
   ctx.font = `700 ${fontSize}px Inter,sans-serif`;
@@ -194,8 +192,6 @@ function vDrawPlayer(p) {
 }
 
 // ── FRECCIA CARICA (modalità avanzata) ───────────────────
-// Replica drawShotArrow del calcio: freccia verso la palla con lunghezza
-// proporzionale alla carica.
 function _vDrawShotArrow(p, t) {
   const dx = vBall.x - p.x, dy = vBall.y - p.y;
   const d = Math.hypot(dx, dy);
@@ -212,7 +208,6 @@ function _vDrawShotArrow(p, t) {
   ctx.lineWidth = 2 + t * 2;
   ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by2); ctx.stroke();
 
-  // punta freccia
   const headLen = 7 + t * 5;
   const angle = Math.atan2(ny, nx);
   ctx.fillStyle = `rgba(255,220,80,${alpha})`;
@@ -222,7 +217,6 @@ function _vDrawShotArrow(p, t) {
   ctx.lineTo(bx - headLen * Math.cos(angle + 0.45), by2 - headLen * Math.sin(angle + 0.45));
   ctx.closePath(); ctx.fill();
 
-  // anello carica attorno al player
   ctx.beginPath();
   ctx.arc(p.x, p.y, p.r + 6 + t * 4, 0, Math.PI * 2);
   ctx.strokeStyle = `rgba(255,220,80,${0.3 + t * 0.5})`;

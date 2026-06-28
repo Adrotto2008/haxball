@@ -29,8 +29,8 @@
     <!-- popolata da auth.js -->
   </div>
 
-  <!-- nickname -->
-  <div class="card">
+  <!-- nickname — nascosta quando loggato (auth.js imposta display:none) -->
+  <div class="card" id="card-nickname">
     <div class="card-title">👤 Il tuo nome</div>
     <input type="text" id="nickname-input" maxlength="16" placeholder="Nickname…" autocomplete="off" spellcheck="false">
   </div>
@@ -51,6 +51,16 @@
   <!-- card: crea stanza -->
   <div class="card" id="card-create" style="display:none">
     <div class="card-title">Crea nuova stanza</div>
+
+    <!-- preset selector (visibile solo se loggato e con almeno 1 preset) -->
+    <div id="preset-row" style="display:none">
+      <div class="preset-row-label">⭐ I tuoi preset</div>
+      <div class="preset-row-controls">
+        <select id="preset-select" class="auth-input preset-select"></select>
+        <button class="btn btn-ghost btn-sm" id="btn-preset-delete" title="Elimina preset selezionato">🗑️</button>
+      </div>
+    </div>
+
     <input type="text" id="room-name-input" maxlength="24" placeholder="Nome stanza (es. Partita di Marco)" autocomplete="off">
     <input type="text" id="room-pw-input" maxlength="20" placeholder="Password (lascia vuoto per pubblica)" autocomplete="off" style="margin-top:8px">
     <div class="gm-section-label" style="margin-top:12px">Modalità di gioco</div>

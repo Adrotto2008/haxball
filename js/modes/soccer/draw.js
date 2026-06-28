@@ -100,9 +100,7 @@ function lerpHex(h1, h2, t) {
 }
 
 function drawPlayer(p) {
-  // spettatori: non disegnare il corpo (solo in partita)
   if(p.team === -1) return;
-  // AFK: cerchio grigio semitrasparente
   const isAfk = afkPlayers.has(p.id);
   const cr=p.charge/KICK_CHG_F, charging=p.held;
   const ga = isAfk ? 0.06 : (charging ? 0.07+cr*.18 : 0.04);
@@ -121,7 +119,6 @@ function drawPlayer(p) {
   }
   ctx.fillStyle='rgba(0,0,0,.22)'; ctx.beginPath(); ctx.ellipse(p.x+2,p.y+5,p.r,p.r*.5,0,0,Math.PI*2); ctx.fill();
   if(isAfk) {
-    // corpo grigio
     ctx.globalAlpha = 0.45;
     ctx.fillStyle = '#555';
     ctx.beginPath(); ctx.arc(p.x,p.y,p.r,0,Math.PI*2); ctx.fill();
@@ -138,10 +135,13 @@ function drawPlayer(p) {
     ctx.lineWidth = charging ? 2+cr*1.5 : 1.5; ctx.beginPath(); ctx.arc(p.x,p.y,p.r,0,Math.PI*2); ctx.stroke();
   }
   if(p.id === myPlayerId) { ctx.fillStyle='rgba(255,255,255,.9)'; ctx.beginPath(); ctx.arc(p.x,p.y+p.r+5,2.5,0,Math.PI*2); ctx.fill(); }
-  // testo nel cerchio: skin personalizzata > 👻 se AFK > R/B
+
+  // testo nel cerchio — font proporzionale al raggio del player
   const skinEntry = playerSkins[p.id];
   const label = isAfk ? '👻' : (skinEntry || (p.team===0?'R':'B'));
-  const fontSize = isAfk ? 14 : (skinEntry && skinEntry.length > 1 ? 13 : 11);
+  const isEmoji = skinEntry && skinEntry.length > 1;
+  // a raggio default (18) → circa 11–14px; scala proporzionalmente
+  const fontSize = Math.max(8, Math.round(p.r * (isAfk ? 0.78 : (isEmoji ? 0.68 : 0.60))));
   ctx.globalAlpha = isAfk ? 0.6 : 1;
   ctx.fillStyle = isAfk ? '#aaa' : '#fff';
   ctx.font = `700 ${fontSize}px Inter,sans-serif`;

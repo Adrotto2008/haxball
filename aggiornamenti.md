@@ -4,6 +4,24 @@ Versione più recente sempre in cima. Ad ogni modifica aggiornare `VERSION` in `
 
 ---
 
+## v2.22.0 — Login con nickname, sicurezza password, preset stanze, fix palla volley
+
+### ✨ Novità
+- **Login/Registrazione con nickname** (non email): il form mostra solo Nickname + Password. Internamente viene derivata un'email fittizia `nickname_sanitized@haxball2.local` per soddisfare il requisito email di Supabase Auth. Il nickname funge quindi da username unico: se due utenti scelgono lo stesso nickname (normalizzato), Supabase restituisce "User already registered".
+- **Nota sicurezza password** nel form di auth: `🔒 La password è cifrata con bcrypt — non viene mai salvata in chiaro`. Supabase usa bcrypt tramite GoTrue/pgcrypto. Le password non sono mai leggibili nel database.
+- **Card nickname nascosta quando loggato**: `#card-nickname` viene messa `display:none` in `_renderAuthCard()` quando l'utente è loggato; riappare al logout. Il nome proviene dal profilo.
+- **Sistema Preset**: salva/carica/elimina configurazioni di gioco.
+  - **Salva** (in-game): tab Variabili del menu → sezione gialla "Salva preset" con input nome + bottone ⭐ (visibile solo host loggato).
+  - **Carica** (lobby): alla apertura "Crea stanza", se loggato e con preset salvati, appare un selector giallo con i preset. Selezionandone uno, il mode picker si aggiorna automaticamente. Al click "Crea", la config del preset viene applicata alla stanza appena creata via `set_config`/`set_vconfig` (con 400ms di ritardo per garantire che la stanza esista).
+  - **Elimina**: bottone 🗑️ accanto al selector nella card "Crea stanza".
+  - Richiede tabella `presets` su Supabase (SQL fornito nella documentazione): `id`, `user_id`, `name`, `mode`, `config` (jsonb), `created_at`. RLS abilitata: ogni utente vede solo i propri preset.
+
+### 🔧 Fix
+- **Palla pallavolo non cambiava visivamente** con `V_BR` modificato: `vDrawBall()` usava la costante `V_BR` invece di `vBall.r`. Ora usa `vBall.r` che viene aggiornato live da `applyVConfigPatch`.
+- **Font avatar proporzionale al raggio player** (calcio e pallavolo): la dimensione del font del testo/emoji nel cerchio del player ora scala con `p.r` tramite `Math.round(p.r * factor)` con `min=8`. A raggio default produce la stessa size di prima; cresce/diminuisce correttamente con raggi grandi/piccoli.
+
+---
+
 ## v2.21.2 — Fix auth card: form visibile immediatamente
 
 ### 🔧 Fix
