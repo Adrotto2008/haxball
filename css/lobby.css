@@ -160,6 +160,10 @@ input[type=text]::placeholder{font-family:'Inter',sans-serif;letter-spacing:1px;
 }
 .preset-select option { background:#1a1a2e; color:#fff; }
 
+.preset-empty-hint {
+  font-size:10px; color:rgba(255,220,80,.6); margin-top:6px; line-height:1.4;
+}
+
 /* ── PRESET in pannello Variabili (in-game) ──────────────── */
 .cfg-preset-row {
   margin-top:14px; padding-top:12px;

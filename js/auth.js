@@ -112,8 +112,27 @@ function _populatePresetSelect() {
   var sel = document.getElementById('preset-select');
   var row = document.getElementById('preset-row');
   if (!sel || !row) return;
-  if (!authUser || !_presets.length) { row.style.display = 'none'; return; }
+
+  // Mostra sempre se loggato (anche senza preset: istruzione su come salvarne uno)
+  if (!authUser) { row.style.display = 'none'; return; }
   row.style.display = '';
+
+  var oldHint = row.querySelector('.preset-empty-hint');
+
+  if (!_presets.length) {
+    sel.innerHTML = '<option value="" disabled selected>Nessun preset ancora</option>';
+    sel.disabled = true;
+    if (!oldHint) {
+      var hint = document.createElement('div');
+      hint.className = 'preset-empty-hint';
+      hint.textContent = '→ Per salvare: apri una stanza, menu P → tab 🎛️ Variabili → ⭐ Salva preset';
+      row.appendChild(hint);
+    }
+    return;
+  }
+
+  if (oldHint) oldHint.remove();
+  sel.disabled = false;
   sel.innerHTML = '<option value="">— Nessun preset (stanza vuota) —</option>' +
     _presets.map(function(p) {
       return '<option value="' + p.id + '" data-mode="' + escHtml(p.mode) + '">' +
