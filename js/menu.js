@@ -14,14 +14,6 @@ function openMenu(context) {
   $('esc-leave').textContent       = menuContext === 'prematch' ? '← Lascia stanza' : '✕ Esci';
   $('pm-admin-hint').style.display = isHost ? '' : 'none';
   $('gm-close-btn').style.display  = menuContext === 'ingame' ? '' : 'none';
-  const chk = $('toggle-prediction');
-  if (chk) chk.checked = useLocalPrediction;
-  const vctrlRow = $('vcontrol-row');
-  if (vctrlRow) {
-    vctrlRow.style.display = (currentGameMode === 'volley') ? '' : 'none';
-    const vchk = $('toggle-vcontrol');
-    if (vchk) vchk.checked = (vControlMode === 'advanced');
-  }
   switchTab('roster');
   $('game-menu').classList.add('open');
   escOpen = (menuContext === 'ingame');
@@ -44,7 +36,181 @@ function switchTab(tab) {
   $('gm-panel-roster').style.display   = tab === 'roster'   ? 'flex' : 'none';
   $('gm-panel-settings').style.display = tab === 'settings' ? 'flex' : 'none';
   $('gm-panel-vars').style.display     = tab === 'vars'     ? 'flex' : 'none';
+  if (tab === 'settings') renderSettingsPanel();
   if (tab === 'vars') renderConfigPanel();
+}
+
+// ── PANNELLO IMPOSTAZIONI ───────────────────────────────
+const KEY_LABELS = {
+  up: '⬆ Su', dn: '⬇ Giù', lt: '⬅ Sinistra', rt: '➡ Destra',
+  kick: '🦵 Tiro (1°)', kick2: '🦵 Tiro (2°)', kick3: '🦵 Tiro (3°)',
+  menu: '📋 Menu', chat: '💬 Chat (1°)', chat2: '💬 Chat (2°)'
+};
+const HOTKEY_LABELS = {
+  togglePrediction: '⚡ Toggle Prediction',
+  toggleAdvanced:   '🏐 Toggle Avanzata (volley)'
+};
+
+let _rebindTarget = null; // { group, key } — tasto in ascolto
+
+function _codeToLabel(code) {
+  if (!code) return '—';
+  return code
+    .replace('Key', '')
+    .replace('Digit', '')
+    .replace('Numpad', 'Num')
+    .replace('Arrow', '↕')
+    .replace('Control', 'Ctrl')
+    .replace('Shift', '⇧')
+    .replace('Left', 'L')
+    .replace('Right', 'R');
+}
+
+function renderSettingsPanel() {
+  const el = $('gm-panel-settings');
+  if (!el) return;
+
+  // Prediction: usa la preferenza per la modalità corrente
+  const isVolley = currentGameMode === 'volley';
+  const predPref  = isVolley ? userSettings.volley.localPrediction : userSettings.soccer.localPrediction;
+  useLocalPrediction = predPref;
+
+  el.innerHTML = `
+    <div class="gm-section-label">Vista campo</div>
+    <div id="view-picker"></div>
+    <div class="gm-vp-hint">0 = più vicino · 9 = più lontano</div>
+
+    <div class="gm-section-label" style="margin-top:16px">Rete</div>
+    <label class="gm-toggle-row">
+      <span class="gm-toggle-label">Prediction locale
+        <span class="gm-toggle-sub">Risponde all'input prima del server. Meglio su reti veloci, peggio su reti instabili.</span>
+      </span>
+      <input type="checkbox" id="toggle-prediction" class="gm-checkbox" ${predPref ? 'checked' : ''}>
+    </label>
+
+    ${isVolley ? `
+    <div class="gm-section-label" style="margin-top:16px">Pallavolo — controlli</div>
+    <label class="gm-toggle-row">
+      <span class="gm-toggle-label">Controlli avanzati
+        <span class="gm-toggle-sub">Tieni AZIONE per caricare, rilascia per tirare. Base: contatto diretto spinge la palla.</span>
+      </span>
+      <input type="checkbox" id="toggle-vcontrol" class="gm-checkbox" ${userSettings.volley.advancedControl ? 'checked' : ''}>
+    </label>
+    ` : ''}
+
+    <div class="gm-section-label" style="margin-top:16px">Tasti — movimento e tiro</div>
+    <div class="keybind-grid" id="keybind-grid"></div>
+
+    <div class="gm-section-label" style="margin-top:12px">Comandi rapidi</div>
+    <div class="keybind-grid" id="hotkey-grid"></div>
+    <div style="font-size:10px;color:rgba(255,255,255,.3);margin-top:4px">
+      I comandi rapidi funzionano in-game con menu chiuso e chat chiusa.
+    </div>
+
+    <button class="btn btn-ghost btn-sm" id="settings-reset-btn" style="margin-top:14px;opacity:.6">↺ Ripristina default</button>
+    <div id="settings-save-msg" style="font-size:11px;min-height:14px;color:#6ddc7e;text-align:center"></div>
+  `;
+
+  buildViewPicker();
+
+  // Toggle prediction
+  document.getElementById('toggle-prediction').addEventListener('change', e => {
+    const mode2 = currentGameMode === 'volley' ? 'volley' : 'soccer';
+    userSettings[mode2].localPrediction = e.target.checked;
+    useLocalPrediction = e.target.checked;
+    _saveSettings();
+    _settingsMsg('Salvato');
+    if (typeof authSyncSettings === 'function') authSyncSettings();
+  });
+
+  // Toggle vcontrol
+  const vchk = document.getElementById('toggle-vcontrol');
+  if (vchk) {
+    vchk.addEventListener('change', e => {
+      userSettings.volley.advancedControl = e.target.checked;
+      vControlMode = e.target.checked ? 'advanced' : 'base';
+      _saveSettings();
+      _settingsMsg('Salvato');
+      if (typeof ws !== 'undefined' && ws && ws.readyState === 1) {
+        wsSend({ type: 'vmode', payload: { advanced: vControlMode === 'advanced' } });
+      }
+      if (typeof authSyncSettings === 'function') authSyncSettings();
+    });
+  }
+
+  // Griglia tasti
+  _renderKeybindGrid('keybind-grid', 'keybinds', KEY_LABELS);
+  _renderKeybindGrid('hotkey-grid', 'hotkeys', HOTKEY_LABELS);
+
+  // Reset default
+  document.getElementById('settings-reset-btn').addEventListener('click', () => {
+    if (!confirm('Ripristinare i tasti predefiniti?')) return;
+    userSettings = JSON.parse(JSON.stringify(SETTINGS_DEFAULT));
+    _saveSettings();
+    renderSettingsPanel();
+    _settingsMsg('Tasti ripristinati');
+    if (typeof authSyncSettings === 'function') authSyncSettings();
+  });
+}
+
+function _settingsMsg(txt) {
+  const el = document.getElementById('settings-save-msg');
+  if (!el) return;
+  el.textContent = txt;
+  setTimeout(() => { if (el) el.textContent = ''; }, 2000);
+}
+
+function _renderKeybindGrid(containerId, group, labels) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+  const map = userSettings[group];
+  let html = '';
+  for (const [key, label] of Object.entries(labels)) {
+    const code = map[key] || '—';
+    html += `<div class="kb-row" data-group="${group}" data-key="${key}">
+      <span class="kb-label">${label}</span>
+      <button class="kb-btn" data-group="${group}" data-key="${key}">${_codeToLabel(code)}</button>
+    </div>`;
+  }
+  container.innerHTML = html;
+  container.querySelectorAll('.kb-btn').forEach(btn => {
+    btn.addEventListener('click', () => _startRebind(btn, btn.dataset.group, btn.dataset.key));
+  });
+}
+
+function _startRebind(btn, group, key) {
+  // Annulla eventuale rebind precedente
+  if (_rebindTarget) {
+    const prev = document.querySelector(`.kb-btn[data-group="${_rebindTarget.group}"][data-key="${_rebindTarget.key}"]`);
+    if (prev) {
+      prev.textContent = _codeToLabel(userSettings[_rebindTarget.group][_rebindTarget.key]);
+      prev.classList.remove('kb-listening');
+    }
+  }
+  _rebindTarget = { group, key, btn };
+  btn.textContent = '…premi tasto';
+  btn.classList.add('kb-listening');
+
+  const onKey = (e) => {
+    e.preventDefault();
+    if (e.code === 'Escape') {
+      // Annulla
+      btn.textContent = _codeToLabel(userSettings[group][key]);
+      btn.classList.remove('kb-listening');
+      _rebindTarget = null;
+      document.removeEventListener('keydown', onKey, true);
+      return;
+    }
+    userSettings[group][key] = e.code;
+    btn.textContent = _codeToLabel(e.code);
+    btn.classList.remove('kb-listening');
+    _rebindTarget = null;
+    _saveSettings();
+    _settingsMsg('✓ Tasto salvato');
+    document.removeEventListener('keydown', onKey, true);
+    if (typeof authSyncSettings === 'function') authSyncSettings();
+  };
+  document.addEventListener('keydown', onKey, true);
 }
 
 // ── PANNELLO VARIABILI ──────────────────────────────────
@@ -170,25 +336,3 @@ $('esc-restart').onclick  = () => {
   }
 };
 $('esc-leave').onclick = () => { closeMenu(); leaveGame(); };
-
-// ── TOGGLE: prediction locale ──────────────────────────
-document.getElementById('toggle-prediction').addEventListener('change', e => {
-  useLocalPrediction = e.target.checked;
-  localStorage.setItem('hax_prediction', JSON.stringify(useLocalPrediction));
-});
-
-// ── TOGGLE: controlli avanzati volley ─────────────────
-const _vctrl = document.getElementById('toggle-vcontrol');
-if (_vctrl) {
-  _vctrl.addEventListener('change', e => {
-    vControlMode = e.target.checked ? 'advanced' : 'base';
-    localStorage.setItem('hax_vcontrol', vControlMode);
-    if (ws && ws.readyState === 1) {
-      wsSend({ type: 'vmode', payload: { advanced: vControlMode === 'advanced' } });
-    }
-    const hint = vControlMode === 'advanced'
-      ? '🏐 Controlli avanzati: tieni AZIONE per caricare, rilascia per tirare'
-      : '🏐 Controlli base: avvicinati alla palla e tieni AZIONE per colpirla';
-    sysMsg(hint);
-  });
-}

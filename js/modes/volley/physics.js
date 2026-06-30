@@ -15,6 +15,9 @@ function vApplyInput(p, inp) {
   const advanced = (vControlMode === 'advanced');
   const pressing = inp.kick;
 
+  // ── topSpd calcolato subito (usato sia per cap immediato che post-accel) ──
+  const topSpd = pressing ? cfg.V_P_SPEED_MAX * 0.45 : cfg.V_P_SPEED_MAX;
+
   if (advanced) {
     if (pressing) {
       if (!p.held) { p.vx *= 0.3; p.vy *= 0.3; }
@@ -33,13 +36,27 @@ function vApplyInput(p, inp) {
     p.charge = 0;
   }
 
-  const topSpd = pressing ? cfg.V_P_SPEED_MAX * 0.45 : cfg.V_P_SPEED_MAX;
+  // ── Cap immediato: se pressing è appena diventato true e la vel è alta,
+  //    la velocità accumulata nei frame precedenti viene ridotta subito.
+  //    Senza questo, bastava raggiungere la velocità massima e poi premere
+  //    AZIONE: il player continuava a muoversi veloce per inerzia.
+  if (pressing) {
+    const curSpd = Math.hypot(p.vx, p.vy);
+    if (curSpd > topSpd) {
+      p.vx = p.vx / curSpd * topSpd;
+      p.vy = p.vy / curSpd * topSpd;
+    }
+  }
+
   if (inp.up) { if (p.vy > -cfg.V_P_START) p.vy = -cfg.V_P_START; p.vy -= cfg.V_P_ACCEL; }
   if (inp.dn) { if (p.vy <  cfg.V_P_START) p.vy =  cfg.V_P_START; p.vy += cfg.V_P_ACCEL; }
   if (inp.lt) { if (p.vx > -cfg.V_P_START) p.vx = -cfg.V_P_START; p.vx -= cfg.V_P_ACCEL; }
   if (inp.rt) { if (p.vx <  cfg.V_P_START) p.vx =  cfg.V_P_START; p.vx += cfg.V_P_ACCEL; }
+
+  // Cap post-accelerazione (impedisce di superare topSpd anche con accel)
   const spd = Math.hypot(p.vx, p.vy);
   if (spd > topSpd) { p.vx = p.vx/spd*topSpd; p.vy = p.vy/spd*topSpd; }
+
   p.x += p.vx; p.y += p.vy; p.vx *= cfg.V_P_FRIC; p.vy *= cfg.V_P_FRIC;
   if (p.x < V_FL.l + p.r) { p.x = V_FL.l + p.r; p.vx *= -.4; }
   if (p.x > V_FL.r - p.r) { p.x = V_FL.r - p.r; p.vx *= -.4; }
@@ -163,4 +180,28 @@ function vCheckSideChange() {
     vTouches[0] = 0; vTouches[1] = 0;
   }
   vBallLastSide = side;
+}
+
+// ── RESTRIZIONE RETE (fase battuta) ─────────────────────
+// Impedisce alla squadra che NON sta battendo di avvicinarsi al centro.
+// serveTeam: 0 = rossi battono (sx), 1 = blu battono (dx).
+// La squadra avversaria non può superare la propria linea dei 2/3 campo.
+const V_SERVE_RESTRICT_X_L = V_FL.l + (V_FL.r - V_FL.l) * 0.33; // linea restrizione per team 1 (blu) quando battono i rossi
+const V_SERVE_RESTRICT_X_R = V_FL.l + (V_FL.r - V_FL.l) * 0.67; // linea restrizione per team 0 (rossi) quando battono i blu
+
+function vApplyServeRestriction(p, serveTeam) {
+  if (serveTeam === null || serveTeam === undefined) return;
+  // La squadra che NON batte viene respinta lontano dalla rete
+  if (p.team !== serveTeam && p.team !== -1) {
+    if (p.team === 1 && p.x - p.r < V_SERVE_RESTRICT_X_L) {
+      // Blu: non può andare a sx della linea di restrizione
+      p.x = V_SERVE_RESTRICT_X_L + p.r;
+      if (p.vx < 0) p.vx *= -0.3;
+    }
+    if (p.team === 0 && p.x + p.r > V_SERVE_RESTRICT_X_R) {
+      // Rossi: non può andare a dx della linea di restrizione
+      p.x = V_SERVE_RESTRICT_X_R - p.r;
+      if (p.vx > 0) p.vx *= -0.3;
+    }
+  }
 }

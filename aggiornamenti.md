@@ -4,6 +4,54 @@ Versione più recente sempre in cima. Ad ogni modifica aggiornare `VERSION` in `
 
 ---
 
+## v2.23.0 — Impostazioni account (tasti + preferenze), fix rallentamento volley, sistema battuta server-authoritative, hotkey rapidi
+
+### ✨ Novità
+- **Impostazioni account complete** (`userSettings` in `state.js`, persistito in `localStorage` come `hax_settings` e, se loggati, sincronizzato su Supabase `profiles.settings`):
+  - **Tasti personalizzabili**: movimento (su/giù/sx/dx), tiro/AZIONE (3 alternative), apertura menu, apertura chat (2 alternative). Rebind in-game cliccando il pulsante e premendo il nuovo tasto (Esc per annullare). Pannello in Menu → tab ⚙️ Impostazioni, sezione "Tasti — movimento e tiro".
+  - **Prediction locale per-modalità**: preferenza separata per calcio e pallavolo (`userSettings.soccer.localPrediction` / `userSettings.volley.localPrediction`), non più un singolo toggle globale.
+  - **Modalità controlli volley persistita**: `userSettings.volley.advancedControl` (base/avanzata) salvata e ripristinata automaticamente.
+  - **Comandi rapidi (hotkey) configurabili**: `F1` = toggle prediction locale, `F2` = toggle modalità avanzata pallavolo. Personalizzabili dalla stessa griglia tasti, sezione "Comandi rapidi". Funzionano solo in-game con menu e chat chiusi; mostrano un messaggio di conferma in chat di sistema e aggiornano live i checkbox del pannello impostazioni se aperto.
+  - **Reset ai default**: bottone ↺ nel pannello impostazioni per ripristinare tutti i tasti.
+  - **Sync su Supabase**: se l'utente è loggato, ogni modifica a tasti/preferenze viene salvata in `profiles.settings` (richiede la colonna `settings jsonb` sulla tabella, vedi sezione ⚠️ sotto). Al login, le impostazioni salvate vengono caricate e sostituiscono quelle locali (merge con i default per eventuali nuove chiavi).
+
+- **Sistema battuta pallavolo (server-authoritative)**:
+  - All'inizio della partita batte sempre la squadra **rossa (sinistra)**. Dopo ogni punto, la battuta passa alla squadra che ha **subito** il punto.
+  - Durante la fase di battuta, la squadra che **non** sta battendo viene respinta da una linea di restrizione (33%/67% del campo) e non può avvicinarsi al centro/rete.
+  - La fase di battuta termina automaticamente non appena la squadra che batte tocca la palla (`vDoKick` riuscito sul team che serve).
+  - Stato sincronizzato via messaggio dedicato `v_serve` (oltre che incluso nello `state` regolare) così i client mostrano subito chi deve servire, anche per i late-join.
+  - **Indicatore visivo**: linea tratteggiata pulsante sul punto di restrizione + badge "🏐 BATTUTA ROSSI/BLU" sopra al campo durante la fase di battuta (`vDrawField`/`_vDrawServeRestriction` in `draw.js`).
+  - Implementato sia lato server (`server.js`: `vApplyServeRestrictionSrv`, `vResetPositions`, `vHandlePoint`) sia lato client per l'allenamento e la prediction locale (`physics.js`: `vApplyServeRestriction`, `game.js`, `sync.js`).
+
+### 🔧 Fix
+- **Bug rallentamento pallavolo (e calcio) quando si tiene premuto AZIONE**: il cap della velocità massima ridotta (45% quando si preme AZIONE) veniva applicato **solo dopo** il ciclo di accelerazione/attrito del frame successivo, non immediatamente. Risultato: se il player era già alla velocità massima e premeva AZIONE, continuava a scivolare per inerzia prima di rallentare visibilmente. Fix: aggiunto un clamp immediato della velocità corrente al `topSpd` ridotto, applicato **subito** quando `pressing/charging` diventa vero, sia lato client (`physics.js` calcio e volley) sia lato server (`server.js`, funzioni `applyInput` e `vApplyInputSrv`). La fisica predittiva client (`sync.js`, `vTickRemotePhysics`/`tickRemotePhysics`) eredita automaticamente il fix chiamando le stesse funzioni.
+
+### 📁 File modificati
+- `js/config.js` — dichiarazione esplicita di `currentGameMode` (prima implicita, causava `ReferenceError` al primo load)
+- `js/state.js` — `userSettings`, `SETTINGS_DEFAULT`, `_loadSettings()`, `_saveSettings()`
+- `js/input.js` — keybind dinamici da `userSettings.keybinds`, gestione hotkey `handleHotkey()`
+- `js/menu.js` — `renderSettingsPanel()` espanso con griglia tasti, rebind, hotkey, preset; `_renderKeybindGrid()`, `_startRebind()`
+- `js/auth.js` — `authSyncSettings()`, `authLoadSettings()`
+- `js/network-core.js` — gestione messaggio `v_serve`, propagazione stato battuta su `start`/`state`; rimossa dichiarazione duplicata di `currentGameMode`
+- `js/modes/volley/physics.js` — fix cap velocità, `vApplyServeRestriction()`, linee di restrizione
+- `js/modes/volley/game.js` — stato `vServeTeam`/`vServePhase`, logica battuta in `vGoal()`/`vReset()`/training loop
+- `js/modes/volley/sync.js` — restrizione battuta applicata anche in prediction locale multiplayer
+- `js/modes/volley/draw.js` — indicatore visivo linea di restrizione + badge battuta
+- `js/modes/soccer/physics.js` — stesso fix cap velocità (preventivo, stesso pattern di bug)
+- `js/modes/soccer/game.js` — sync `currentGameMode`/`useLocalPrediction` su `startGame()`
+- `server.js` — `vApplyServeRestrictionSrv()`, `vResetPositions()` con `nextServeTeam`, `vHandlePoint()`, messaggio `v_serve`, `p.vAdvanced` per-player, fix cap velocità calcio e volley
+- `css/menu.css` — stili `.keybind-grid`, `.kb-row`, `.kb-btn`, `.kb-listening`
+- `index.html` — pannello impostazioni ora popolato dinamicamente da `renderSettingsPanel()`; hint hotkey in `#ctrl-bar`
+
+### ⚠️ Richiede azione su Supabase (opzionale, solo per sync impostazioni multi-dispositivo)
+Senza questa modifica le impostazioni funzionano comunque in locale (`localStorage`); la sync su Supabase fallisce silenziosamente (warning in console) finché la colonna non esiste.
+```sql
+alter table public.profiles
+  add column if not exists settings jsonb;
+```
+
+---
+
 ## v2.22.1 — Fix auth: nickname card, stato login chiaro, RLS profili
 
 ### 🔧 Fix

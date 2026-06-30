@@ -82,3 +82,67 @@ let useLocalPrediction = JSON.parse(localStorage.getItem('hax_prediction') ?? 't
 
 // ── IMPOSTAZIONE: modalita controlli volley ────────────────
 let vControlMode = localStorage.getItem('hax_vcontrol') || 'base';
+
+// ── IMPOSTAZIONI ACCOUNT / TASTI ────────────────────────
+// Struttura: { keybinds, soccer, volley }
+// keybinds: mappa azione → codice tasto (KeyboardEvent.code)
+// soccer/volley: preferenze per modalità
+const SETTINGS_DEFAULT = {
+  keybinds: {
+    up:    'KeyW',
+    dn:    'KeyS',
+    lt:    'KeyA',
+    rt:    'KeyD',
+    kick:  'ControlLeft',
+    kick2: 'Space',
+    kick3: 'Digit0',
+    menu:  'KeyP',
+    chat:  'Enter',
+    chat2: 'Backslash',
+  },
+  soccer: {
+    localPrediction: true,
+  },
+  volley: {
+    localPrediction: true,
+    advancedControl: false,
+  },
+  hotkeys: {
+    togglePrediction: 'F1',
+    toggleAdvanced:   'F2',
+  }
+};
+
+// Carica impostazioni da localStorage, merge con default
+function _loadSettings() {
+  try {
+    const raw = localStorage.getItem('hax_settings');
+    if (!raw) return JSON.parse(JSON.stringify(SETTINGS_DEFAULT));
+    const saved = JSON.parse(raw);
+    // deep merge: settings default + overrides salvati
+    const s = JSON.parse(JSON.stringify(SETTINGS_DEFAULT));
+    if (saved.keybinds) Object.assign(s.keybinds, saved.keybinds);
+    if (saved.soccer)   Object.assign(s.soccer,   saved.soccer);
+    if (saved.volley)   Object.assign(s.volley,   saved.volley);
+    if (saved.hotkeys)  Object.assign(s.hotkeys,  saved.hotkeys);
+    return s;
+  } catch(e) {
+    return JSON.parse(JSON.stringify(SETTINGS_DEFAULT));
+  }
+}
+function _saveSettings() {
+  localStorage.setItem('hax_settings', JSON.stringify(userSettings));
+  // sincronizza variabili legacy
+  useLocalPrediction = (currentGameMode === 'volley')
+    ? userSettings.volley.localPrediction
+    : userSettings.soccer.localPrediction;
+  vControlMode = userSettings.volley.advancedControl ? 'advanced' : 'base';
+  localStorage.setItem('hax_prediction', JSON.stringify(useLocalPrediction));
+  localStorage.setItem('hax_vcontrol', vControlMode);
+}
+let userSettings = _loadSettings();
+// Sincronizza variabili legacy all'avvio
+useLocalPrediction = (typeof currentGameMode !== 'undefined' && currentGameMode === 'volley')
+  ? userSettings.volley.localPrediction
+  : userSettings.soccer.localPrediction;
+vControlMode = userSettings.volley.advancedControl ? 'advanced' : 'base';

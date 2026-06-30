@@ -8,6 +8,12 @@ let vTouches = { 0: 0, 1: 0 };
 let vBallLastSide = null;
 let vRemoteState = null;
 
+// ── STATO BATTUTA ───────────────────────────────────────
+// vServeTeam: 0 o 1 = chi deve battere; null = nessuna restrizione (palla in gioco)
+// vServePhase: true = in fase di battuta (restrizione attiva), false = palla in gioco
+let vServeTeam  = 0;    // all'inizio battono i rossi (squadra sx)
+let vServePhase = true; // inizia sempre in fase di battuta
+
 // ── COSTANTI LOOP ────────────────────────────────────────
 const V_PHYS_TICK = 1000 / 60;
 let vPhysAccum = 0;
@@ -20,11 +26,12 @@ function vUpdate(dt) {
   if (vGoalCD > 0) { vGoalCD--; return; }
 
   if (netMode === 'train') {
-    // INPUT + TIRO locale
     const inp = inpLocal();
     for (const p of vPlayers) {
       if (p.team === -1) continue;
       vApplyInput(p, inp);
+      // Restrizione battuta solo in training (in multiplayer la fa il server)
+      if (vServePhase) vApplyServeRestriction(p, vServeTeam);
     }
     // Aggiorna cooldown anche per chi non sta premendo
     for (const p of vPlayers) {
@@ -40,6 +47,12 @@ function vUpdate(dt) {
 
     // Fisica palla
     vTickBall();
+
+    // Se la palla si muove (il battitore l'ha toccata), esci dalla fase serve
+    if (vServePhase) {
+      const spd = Math.hypot(vBall.vx, vBall.vy);
+      if (spd > 1.5) vServePhase = false;
+    }
 
     // Cambio lato -> reset tocchi
     vCheckSideChange();
@@ -86,15 +99,24 @@ function vUpdate(dt) {
 }
 
 // ── GOL ──────────────────────────────────────────────────
-function vGoal(team) {
-  vScore[team]++; vUpdateHUD();
-  setMsg(`🏐 PUNTO! ${team === 0 ? '🔴 ROSSI' : '🔵 BLU'}! (${vScore[0]}\u2013${vScore[1]})`);
-  goalBurst(team === 0 ? V_FL.l : V_FL.r, H / 2);
+function vGoal(scoringTeam) {
+  vScore[scoringTeam]++; vUpdateHUD();
+  setMsg(`🏐 PUNTO! ${scoringTeam === 0 ? '🔴 ROSSI' : '🔵 BLU'}! (${vScore[0]}\u2013${vScore[1]})`);
+  goalBurst(scoringTeam === 0 ? V_FL.l : V_FL.r, H / 2);
   const gf = $('goal-flash'); gf.style.opacity = '1'; setTimeout(() => gf.style.opacity = '0', 140);
   vGoalCD = V_GOAL_CD;
   vTouches = { 0: 0, 1: 0 };
   vBallLastSide = null;
+
+  // Il prossimo serve va alla squadra che ha subito il punto (l'avversaria di chi ha segnato)
+  vServeTeam  = scoringTeam === 0 ? 1 : 0;
+  vServePhase = true;
+
   vBall = vMkBall();
+  // Posiziona la palla sul lato della squadra che batte
+  vBall.x = V_FL.l + (V_FL.r - V_FL.l) * (vServeTeam === 0 ? 0.25 : 0.75);
+  vBall.y = V_FL.t + (V_FL.b - V_FL.t) * 0.35;
+
   for (const p of vPlayers) {
     if (p.team === -1) continue;
     const byTeam = vPlayers.filter(x => x.team === p.team);
@@ -139,9 +161,15 @@ function vUpdateHUD() {
 
 // ── RESET ────────────────────────────────────────────────
 function vReset(full) {
+  vServeTeam  = 0;   // i rossi battono sempre all'inizio
+  vServePhase = true;
   vBall = vMkBall();
+  // Palla sul lato dei rossi (team 0) per la prima battuta
+  vBall.x = V_FL.l + (V_FL.r - V_FL.l) * 0.25;
+  vBall.y = V_FL.t + (V_FL.b - V_FL.t) * 0.35;
+
   vRemoteState = null; particles = [];
-  vSnapshotBuffer = []; // svuota snapshot buffer al reset/inizio partita
+  vSnapshotBuffer = [];
   vTouches = { 0: 0, 1: 0 }; vBallLastSide = null;
   if (vPlayers.length > 0) {
     const byTeam = [[], []];
@@ -151,7 +179,7 @@ function vReset(full) {
       grp.forEach((p, i) => {
         p.x = V_FL.l + (V_FL.r - V_FL.l) * (team === 0 ? .22 : .78);
         p.y = V_FL.t + (V_FL.b - V_FL.t) * (i + 1) / (n + 1);
-        p.vx = 0; p.vy = 0; p.held = false; p.charge = 0;
+        p.vx = 0; p.vy = 0; p.held = false; p.charge = 0; p.kickCooldown = false;
       });
     }
   }
@@ -215,6 +243,10 @@ function vStartLoop() {
 function startVolleyGame(mode, roster) {
   stopLoop();
   currentGameMode = 'volley';
+  // Sincronizza preferenza controlli per questa modalità
+  vControlMode = userSettings.volley.advancedControl ? 'advanced' : 'base';
+  useLocalPrediction = userSettings.volley.localPrediction;
+
   netMode = mode; vPlayers = vBuildPlayers(roster);
   // Comunica subito la propria modalità controllo al server
   if (mode !== 'train' && ws && ws.readyState === 1) {

@@ -8,7 +8,7 @@ const WS_URL = 'wss://haxball-9dkw.onrender.com';
 
 let ws = null;
 let wsRoom = null;           // codice stanza corrente
-let currentGameMode = 'soccer'; // modalità attiva: 'soccer' | 'volley'
+// currentGameMode è dichiarata in js/config.js (caricato per primo)
 
 // ── CONNESSIONE ─────────────────────────────────────────
 function wsConnect(onOpen) {
@@ -130,6 +130,9 @@ function handleServerMsg(msg) {
       closeMenu();
       if (msg.lateJoin) {
         wsRoom = wsRoom || msg.code || '';
+        // Imposta stato battuta ricevuto dal server
+        if (msg.serveTeam !== undefined) vServeTeam  = msg.serveTeam;
+        if (msg.servePhase !== undefined) vServePhase = !!msg.servePhase;
         if (currentGameMode === 'volley') {
           if (!vBall) vBall = vMkBall();
           if (!vPlayers.length) vPlayers = vBuildPlayers(msg.roster);
@@ -164,6 +167,9 @@ function handleServerMsg(msg) {
         }
         sysMsg('\uD83D\uDC4B Sei entrato come spettatore. L\'host pu\u00F2 spostarti in una squadra.');
       } else {
+        // Imposta stato battuta per partita normale
+        if (msg.serveTeam !== undefined) vServeTeam  = msg.serveTeam;
+        if (msg.servePhase !== undefined) vServePhase = !!msg.servePhase;
         if (currentGameMode === 'volley') startVolleyGame('guest', pmRoster);
         else startGame('guest', pmRoster);
       }
@@ -176,11 +182,24 @@ function handleServerMsg(msg) {
 
     case 'state':
       if (currentGameMode === 'volley') {
+        // Aggiorna stato battuta se incluso nello state
+        if (msg.serveTeam !== undefined) vServeTeam = msg.serveTeam;
+        if (msg.servePhase !== undefined) vServePhase = !!msg.servePhase;
         vRemoteState = msg;
         vApplyRemoteState();
       } else {
         remoteState = msg;
         applyRemoteState();
+      }
+      break;
+
+    case 'v_serve':
+      // Messaggio dedicato per aggiornare la fase battuta
+      if (msg.serveTeam !== undefined) vServeTeam  = msg.serveTeam;
+      if (msg.servePhase !== undefined) vServePhase = !!msg.servePhase;
+      if (vServePhase) {
+        const teamName = vServeTeam === 0 ? '🔴 ROSSI' : '🔵 BLU';
+        sysMsg('🏐 Battuta: ' + teamName);
       }
       break;
 
@@ -280,6 +299,10 @@ function handleServerMsg(msg) {
     case 'kicked':
       alert('Sei stato rimosso dalla stanza dall\'admin.');
       leaveGame();
+      break;
+
+    case 'vmode':
+      // conferma server della propria modalità controlli volley
       break;
 
     case 'error':

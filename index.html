@@ -142,7 +142,7 @@
     <div id="goal-flash"></div>
   </div>
   <div id="ctrl-bar">
-    <span><kbd>WASD</kbd>/<kbd>↑←↓→</kbd> muovi · <kbd>0/Ctrl/Spazio</kbd> tiro · <kbd>P</kbd> menu · <kbd>Enter</kbd>/<kbd>\</kbd> chat</span>
+    <span><kbd>WASD</kbd>/<kbd>↑←↓→</kbd> muovi · <kbd>0/Ctrl/Spazio</kbd> tiro · <kbd>P</kbd> menu · <kbd>Enter</kbd>/<kbd>\</kbd> chat · <kbd>F1</kbd> prediction · <kbd>F2</kbd> avanzata</span>
   </div>
 </div>
 
@@ -197,26 +197,8 @@
       </div>
     </div>
 
-    <!-- TAB: impostazioni -->
+    <!-- TAB: impostazioni (popolato da renderSettingsPanel() in menu.js) -->
     <div class="gm-panel" id="gm-panel-settings" style="display:none">
-      <div class="gm-section-label">Vista campo</div>
-      <div id="view-picker"></div>
-      <div class="gm-vp-hint">0 = più vicino · 9 = più lontano</div>
-      <div class="gm-section-label" style="margin-top:16px">Rete</div>
-      <label class="gm-toggle-row">
-        <span class="gm-toggle-label">Prediction locale
-          <span class="gm-toggle-sub">Risponde all'input prima del server. Meglio su reti veloci, peggio su reti instabili.</span>
-        </span>
-        <input type="checkbox" id="toggle-prediction" class="gm-checkbox">
-      </label>
-      <div class="gm-section-label" id="vcontrol-row" style="display:none;margin-top:16px">Pallavolo — controlli
-        <label class="gm-toggle-row" style="margin-top:8px">
-          <span class="gm-toggle-label">Controlli avanzati
-            <span class="gm-toggle-sub">Tieni AZIONE per caricare, rilascia per tirare. Base: contatto diretto spinge la palla con forza.</span>
-          </span>
-          <input type="checkbox" id="toggle-vcontrol" class="gm-checkbox">
-        </label>
-      </div>
     </div>
 
     <!-- TAB: variabili fisiche -->

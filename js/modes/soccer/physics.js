@@ -37,6 +37,15 @@ function applyInput(p, inp) {
     p.charge = 0;
   }
   p.held = charging;
+
+  // Cap immediato: se si preme AZIONE e la velocità corrente supera
+  // il topSpd ridotto, la abbassa subito invece di aspettare il
+  // prossimo ciclo di accelerazione/attrito (fix rallentamento).
+  if(charging) {
+    const curSpd = Math.hypot(p.vx, p.vy);
+    if(curSpd > topSpd) { p.vx = p.vx/curSpd*topSpd; p.vy = p.vy/curSpd*topSpd; }
+  }
+
   if(inp.up) { if(p.vy >  -P_START) p.vy = -P_START; p.vy -= P_ACCEL; }
   if(inp.dn) { if(p.vy <   P_START) p.vy =  P_START; p.vy += P_ACCEL; }
   if(inp.lt) { if(p.vx >  -P_START) p.vx = -P_START; p.vx -= P_ACCEL; }

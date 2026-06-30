@@ -10,6 +10,40 @@ document.addEventListener('touchmove', e => {
   if(e.touches.length > 1) e.preventDefault();
 }, {passive:false});
 
+// ── HOTKEY IN-GAME (comandi veloci) ─────────────────────
+// Chiamata dal keydown listener quando si e' in-game e menu e chat chiusi.
+// Ritorna true se l'hotkey e' stata gestita (per prevenire propagazione).
+function handleHotkey(code) {
+  const hk = userSettings.hotkeys;
+  // Toggle prediction locale
+  if (code === hk.togglePrediction) {
+    const mode = currentGameMode === 'volley' ? 'volley' : 'soccer';
+    userSettings[mode].localPrediction = !userSettings[mode].localPrediction;
+    useLocalPrediction = userSettings[mode].localPrediction;
+    _saveSettings();
+    const st = useLocalPrediction ? 'ON' : 'OFF';
+    if (typeof sysMsg === 'function') sysMsg('\u26a1 Prediction locale: ' + st);
+    const chk = document.getElementById('toggle-prediction');
+    if (chk) chk.checked = useLocalPrediction;
+    return true;
+  }
+  // Toggle modalita avanzata (solo pallavolo)
+  if (code === hk.toggleAdvanced && currentGameMode === 'volley') {
+    userSettings.volley.advancedControl = !userSettings.volley.advancedControl;
+    vControlMode = userSettings.volley.advancedControl ? 'advanced' : 'base';
+    _saveSettings();
+    if (typeof ws !== 'undefined' && ws && ws.readyState === 1) {
+      wsSend({ type: 'vmode', payload: { advanced: vControlMode === 'advanced' } });
+    }
+    const st2 = vControlMode === 'advanced' ? 'Avanzata' : 'Base';
+    if (typeof sysMsg === 'function') sysMsg('\ud83c\udfd0 Controlli: ' + st2);
+    const vchk = document.getElementById('toggle-vcontrol');
+    if (vchk) vchk.checked = (vControlMode === 'advanced');
+    return true;
+  }
+  return false;
+}
+
 // Tastiera
 document.addEventListener('keydown', e => {
   keys[e.code] = true;
@@ -17,8 +51,7 @@ document.addEventListener('keydown', e => {
   const inLobby  = $('lobby').style.display !== 'none';
   const menuOpen = $('game-menu').classList.contains('open');
 
-  // In lobby: nessun shortcut di gioco (P, Invio, Backslash)
-  // per evitare aperture accidentali mentre si scrive
+  // In lobby: nessun shortcut di gioco
   if(inLobby) return;
 
   // Escape: chiude chat se aperta, poi chiude menu se aperto
@@ -29,8 +62,14 @@ document.addEventListener('keydown', e => {
     return;
   }
 
-  // P: apre/chiude menu di gioco
-  if(e.code === 'KeyP' && inGame && !chatOpen) {
+  // Hotkey veloci in-game (solo se in game, menu chiuso, chat chiusa)
+  if(inGame && !menuOpen && !chatOpen) {
+    if(handleHotkey(e.code)) { e.preventDefault(); return; }
+  }
+
+  // Tasto menu personalizzato (default P)
+  const menuKey = (typeof userSettings !== 'undefined' && userSettings.keybinds.menu) || 'KeyP';
+  if(e.code === menuKey && inGame && !chatOpen) {
     e.preventDefault(); toggleEscMenu(); return;
   }
 
@@ -42,24 +81,35 @@ document.addEventListener('keydown', e => {
     if(m) { setView(parseInt(m[1])); return; }
   }
 
-  // Backslash o Enter aprono la chat (solo in-game, menu chiuso)
+  // Tasti chat personalizzabili
+  const chatKey  = (typeof userSettings !== 'undefined' && userSettings.keybinds.chat)  || 'Enter';
+  const chatKey2 = (typeof userSettings !== 'undefined' && userSettings.keybinds.chat2) || 'Backslash';
   if(inGame && !menuOpen) {
-    if(e.code === 'Backslash') { e.preventDefault(); toggleChat(); return; }
-    if(e.code === 'Enter' && !chatOpen) { e.preventDefault(); toggleChat(true); return; }
+    if(e.code === chatKey2) { e.preventDefault(); toggleChat(); return; }
+    if(e.code === chatKey && !chatOpen) { e.preventDefault(); toggleChat(true); return; }
   }
 });
 document.addEventListener('keyup', e => { keys[e.code] = false; });
 
 function isKick() {
-  return !!(keys['ControlLeft']||keys['ControlRight']||keys['Space']||keys['Digit0']||keys['Numpad0']||touchKick);
+  const kb = (typeof userSettings !== 'undefined') ? userSettings.keybinds : {};
+  return !!(
+    keys[kb.kick  || 'ControlLeft'] ||
+    keys[kb.kick2 || 'Space']       ||
+    keys[kb.kick3 || 'Digit0']      ||
+    keys['ControlRight'] ||
+    keys['Numpad0']      ||
+    touchKick
+  );
 }
 function inpLocal() {
-  if(chatOpen) return noInp; // nessun movimento mentre si chatta
+  if(chatOpen) return noInp;
+  const kb = (typeof userSettings !== 'undefined') ? userSettings.keybinds : {};
   return {
-    up: !!(keys['KeyW']||keys['ArrowUp']||joyY<-0.22),
-    dn: !!(keys['KeyS']||keys['ArrowDown']||joyY>0.22),
-    lt: !!(keys['KeyA']||keys['ArrowLeft']||joyX<-0.22),
-    rt: !!(keys['KeyD']||keys['ArrowRight']||joyX>0.22),
+    up:   !!(keys[kb.up || 'KeyW']  || keys['ArrowUp']    || joyY<-0.22),
+    dn:   !!(keys[kb.dn || 'KeyS']  || keys['ArrowDown']  || joyY>0.22),
+    lt:   !!(keys[kb.lt || 'KeyA']  || keys['ArrowLeft']  || joyX<-0.22),
+    rt:   !!(keys[kb.rt || 'KeyD']  || keys['ArrowRight'] || joyX>0.22),
     kick: isKick()
   };
 }

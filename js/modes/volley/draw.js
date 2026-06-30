@@ -55,6 +55,9 @@ function vDrawField() {
 
   // ── INDICATORI TOCCHI ────────────────────────────────
   _vDrawTouchIndicators();
+
+  // ── RESTRIZIONE BATTUTA ───────────────────────────────
+  if (typeof vServePhase !== 'undefined' && vServePhase) _vDrawServeRestriction();
 }
 
 function _vDrawTouchIndicators() {
@@ -70,6 +73,45 @@ function _vDrawTouchIndicators() {
       ctx.fill();
     }
   }
+}
+
+// ── LINEA E BADGE FASE BATTUTA ───────────────────────────
+// Mostra dove la squadra NON battente non può avvicinarsi, e chi
+// deve servire. La linea è dalla parte del campo della squadra
+// che NON sta battendo (la respinge lontano dalla rete).
+function _vDrawServeRestriction() {
+  if (typeof V_SERVE_RESTRICT_X_L === 'undefined' || typeof V_SERVE_RESTRICT_X_R === 'undefined') return;
+  const lineX = vServeTeam === 0 ? V_SERVE_RESTRICT_X_R : V_SERVE_RESTRICT_X_L;
+  const col = V_TEAM_COLS[vServeTeam === 0 ? 1 : 0]; // colore della squadra che NON può avvicinarsi
+
+  ctx.save();
+  ctx.setLineDash([8, 6]);
+  ctx.strokeStyle = col;
+  ctx.globalAlpha = 0.55 + 0.25 * Math.sin(Date.now() * 0.004);
+  ctx.lineWidth = 2.5;
+  ctx.beginPath();
+  ctx.moveTo(lineX, V_FL.t);
+  ctx.lineTo(lineX, V_FL.b);
+  ctx.stroke();
+  ctx.restore();
+
+  // Badge "chi batte" sopra al campo
+  const teamName = vServeTeam === 0 ? 'ROSSI' : 'BLU';
+  const badgeCol = V_TEAM_COLS[vServeTeam];
+  const badgeX = vServeTeam === 0 ? V_FL.l + (V_FL.r - V_FL.l) * 0.25 : V_FL.l + (V_FL.r - V_FL.l) * 0.75;
+  ctx.save();
+  ctx.font = '700 12px Inter,sans-serif';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  const label = '🏐 BATTUTA ' + teamName;
+  const tw = ctx.measureText(label).width;
+  ctx.fillStyle = 'rgba(0,0,0,0.55)';
+  ctx.beginPath();
+  if (ctx.roundRect) ctx.roundRect(badgeX - tw/2 - 10, V_FL.t - 28, tw + 20, 20, 10);
+  else ctx.rect(badgeX - tw/2 - 10, V_FL.t - 28, tw + 20, 20);
+  ctx.fill();
+  ctx.fillStyle = badgeCol;
+  ctx.fillText(label, badgeX, V_FL.t - 18);
+  ctx.restore();
 }
 
 // ── PALLA PALLAVOLO ─────────────────────────────────────

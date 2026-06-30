@@ -168,6 +168,8 @@ function startLoop() {
 // ── START GAME ─────────────────────────────────────────
 function startGame(mode, roster) {
   vStopLoop(); // ferma eventuale loop pallavolo attivo
+  currentGameMode = 'soccer';
+  useLocalPrediction = userSettings.soccer.localPrediction;
   netMode = mode; players = buildPlayers(roster);
   if(mySkin && myPlayerId) playerSkins[myPlayerId] = mySkin;
   $('game-menu').classList.remove('open');

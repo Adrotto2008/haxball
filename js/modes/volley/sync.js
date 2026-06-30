@@ -111,6 +111,10 @@ function vTickRemotePhysics() {
     if (p.team === -1) continue;
     if (p.id === myPlayerId && useLocalPrediction) {
       vApplyInput(p, inpLocal());
+      // Applica restrizione battuta anche in prediction locale,
+      // così il player non vede il proprio avatar attraversare la
+      // linea per poi essere respinto dalla correzione server.
+      if (vServePhase) vApplyServeRestriction(p, vServeTeam);
     }
     // remoti: gestiti da vInterpolateRemotePlayers()
   }

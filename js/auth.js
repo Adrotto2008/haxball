@@ -15,7 +15,7 @@ try {
 
 // ── stato pubblico ────────────────────────────────────────
 let authUser    = null;   // oggetto User Supabase (null = non loggato)
-let authProfile = null;   // riga profiles (può essere null anche se loggato, se RLS manca)
+let authProfile = null;   // riga profiles
 let _presets    = [];
 
 // ── Nickname → email fake ────────────────────────────────
@@ -23,7 +23,6 @@ function _nickToEmail(nickname) {
   return nickname.toLowerCase().replace(/[^a-z0-9.]/g, '').slice(0, 30) + '@haxball2.local';
 }
 
-// Ricava il nickname da mostrare anche senza profilo
 function _displayNick() {
   if (authProfile && authProfile.nickname) return authProfile.nickname;
   if (authUser && authUser.email) return authUser.email.replace('@haxball2.local', '') || 'Utente';
@@ -38,6 +37,8 @@ async function authLogin(nickname, password) {
   if (error) throw error;
   authUser = data.user;
   await _loadProfile();
+  // Carica impostazioni dal profilo (se presenti)
+  await authLoadSettings();
   return authProfile;
 }
 
@@ -49,14 +50,12 @@ async function authRegister(nickname, password) {
   const { data, error } = await _supabase.auth.signUp({ email, password });
   if (error) throw error;
   authUser = data.user;
-  // upsert invece di insert: più robusto, non fallisce se la riga esiste già
   const { error: pe } = await _supabase.from('profiles').upsert({
     id: authUser.id,
     nickname: nickname.slice(0, 16),
-    avatar: ''
+    avatar: '',
+    settings: null
   });
-  // Non blocchiamo su errore profilo: l'utente è già autenticato.
-  // L'errore più comune è mancanza di RLS policy → istruire l'utente.
   if (pe) console.warn('[Auth] Profilo non creato (controlla RLS su profiles):', pe.message);
   await _loadProfile();
   return authProfile;
@@ -75,6 +74,41 @@ async function authSaveAvatar(avatar) {
   await _supabase.from('profiles').update({ avatar }).eq('id', authUser.id);
   mySkin = avatar;
   localStorage.setItem('hax_skin', avatar);
+}
+
+// ── API impostazioni (sync Supabase) ─────────────────────
+// Salva userSettings nella colonna 'settings' del profilo.
+// Non blocca su errori: il localStorage è già stato aggiornato da _saveSettings().
+async function authSyncSettings() {
+  if (!_supabase || !authUser) return;
+  try {
+    await _supabase.from('profiles')
+      .update({ settings: userSettings })
+      .eq('id', authUser.id);
+  } catch (e) {
+    console.warn('[Auth] Sync impostazioni fallito:', e);
+  }
+}
+
+// Carica le impostazioni dal profilo e le applica (merge con default).
+async function authLoadSettings() {
+  if (!_supabase || !authUser || !authProfile) return;
+  try {
+    const remote = authProfile.settings;
+    if (remote && typeof remote === 'object') {
+      // Merge: i valori remoti sovrascrivono il default ma non aggiungono chiavi extra
+      const s = JSON.parse(JSON.stringify(SETTINGS_DEFAULT));
+      if (remote.keybinds) Object.assign(s.keybinds, remote.keybinds);
+      if (remote.soccer)   Object.assign(s.soccer,   remote.soccer);
+      if (remote.volley)   Object.assign(s.volley,   remote.volley);
+      if (remote.hotkeys)  Object.assign(s.hotkeys,  remote.hotkeys);
+      userSettings = s;
+      _saveSettings(); // sincronizza localStorage
+      console.log('[Auth] Impostazioni caricate dal profilo Supabase');
+    }
+  } catch (e) {
+    console.warn('[Auth] Caricamento impostazioni fallito:', e);
+  }
 }
 
 // ── API preset ────────────────────────────────────────────
@@ -113,7 +147,6 @@ function _populatePresetSelect() {
   var row = document.getElementById('preset-row');
   if (!sel || !row) return;
 
-  // Mostra sempre se loggato (anche senza preset: istruzione su come salvarne uno)
   if (!authUser) { row.style.display = 'none'; return; }
   row.style.display = '';
 
@@ -125,7 +158,7 @@ function _populatePresetSelect() {
     if (!oldHint) {
       var hint = document.createElement('div');
       hint.className = 'preset-empty-hint';
-      hint.textContent = '→ Per salvare: apri una stanza, menu P → tab 🎛️ Variabili → ⭐ Salva preset';
+      hint.textContent = '\u2192 Per salvare: apri una stanza, menu P \u2192 tab \uD83C\uDF9B\uFE0F Variabili \u2192 \u2B50 Salva preset';
       row.appendChild(hint);
     }
     return;
@@ -133,7 +166,7 @@ function _populatePresetSelect() {
 
   if (oldHint) oldHint.remove();
   sel.disabled = false;
-  sel.innerHTML = '<option value="">— Nessun preset (stanza vuota) —</option>' +
+  sel.innerHTML = '<option value="">\u2014 Nessun preset (stanza vuota) \u2014</option>' +
     _presets.map(function(p) {
       return '<option value="' + p.id + '" data-mode="' + escHtml(p.mode) + '">' +
              escHtml(p.name) + ' (' + (p.mode === 'volley' ? '\uD83C\uDFD0' : '\u26BD') + ')</option>';
@@ -152,7 +185,6 @@ async function _loadProfile() {
 }
 
 // ── render card ───────────────────────────────────────────
-// REGOLA: nasconde card-nickname se authUser è settato (indipendentemente dal profilo)
 function _renderAuthCard() {
   var card = document.getElementById('auth-card');
   if (!card) return;
@@ -160,7 +192,6 @@ function _renderAuthCard() {
   var nickCard = document.getElementById('card-nickname');
 
   if (authUser) {
-    // ── LOGGATO (anche senza profilo) ────────────────────
     if (nickCard) nickCard.style.display = 'none';
 
     var nick    = _displayNick();
@@ -178,7 +209,7 @@ function _renderAuthCard() {
         '<button class="btn btn-ghost btn-sm" id="auth-logout-btn">Esci</button>' +
       '</div>' +
       (noProfile
-        ? '<div class="auth-msg" style="color:#ffaa44;margin-top:6px">\u26a0\ufe0f Profilo non trovato. Controlla le RLS policy su Supabase (profiles).</div>'
+        ? '<div class="auth-msg" style="color:#ffaa44;margin-top:6px">\u26a0\ufe0f Profilo non trovato. Controlla le RLS policy su Supabase.</div>'
         : '<div class="auth-avatar-row">' +
             '<label class="auth-avatar-label">Avatar (emoji, max 2)</label>' +
             '<input type="text" id="auth-avatar-input" class="auth-avatar-input" maxlength="2" placeholder="\uD83D\uDC09" value="' + escHtml(authProfile.avatar || '') + '">' +
@@ -199,7 +230,6 @@ function _renderAuthCard() {
     }
 
   } else {
-    // ── NON LOGGATO ──────────────────────────────────────
     if (nickCard) nickCard.style.display = '';
 
     card.innerHTML =
@@ -262,7 +292,7 @@ function _handleRegister() {
 }
 
 // ── INIT ─────────────────────────────────────────────────
-_renderAuthCard();   // sincrono: mostra form subito
+_renderAuthCard();
 
 if (_supabase) {
   _supabase.auth.getSession().then(function(result) {
@@ -272,6 +302,7 @@ if (_supabase) {
       _loadProfile().then(function() {
         _renderAuthCard();
         authLoadPresets();
+        authLoadSettings(); // carica impostazioni salvate sul profilo
       });
     }
   }).catch(function(e) {
