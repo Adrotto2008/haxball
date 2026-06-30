@@ -108,8 +108,8 @@ const SETTINGS_DEFAULT = {
     advancedControl: false,
   },
   hotkeys: {
-    togglePrediction: 'F1',
-    toggleAdvanced:   'F2',
+    togglePrediction: 'KeyQ',
+    toggleAdvanced:   'KeyE',
   }
 };
 

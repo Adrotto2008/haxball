@@ -4,6 +4,17 @@ Versione più recente sempre in cima. Ad ogni modifica aggiornare `VERSION` in `
 
 ---
 
+## v2.23.1 — Fix critico: schermo nero, menu P non funzionante, hotkey F1/F2 → Q/E
+
+### 🔧 Fix
+- **Causa root dello schermo nero / menu P non apribile**: in `lobby.js`, la chiamata `buildViewPicker()` a livello top-level (eseguita subito al caricamento dello script, non dentro una funzione) cercava l'elemento `#view-picker` nel DOM. La v2.23.0 aveva rimosso quell'elemento dall'HTML statico spostandolo nella generazione dinamica di `renderSettingsPanel()` (creato solo quando si apre la tab ⚙️ Impostazioni). Risultato: `buildViewPicker()` falliva con `TypeError` su `null.innerHTML`, e poiché l'errore avveniva in codice top-level di `lobby.js` (l'ultimo script con la logica dei bottoni della lobby), **interrompeva l'esecuzione dell'intero file**: nessun listener veniva agganciato ai bottoni "Crea stanza"/"Allenamento"/ecc., schermo nero, tasto P morto. Fix: rimesso `<div id="view-picker"></div>` come contenitore statico dentro `#gm-panel-settings` in `index.html`, così esiste fin dal caricamento della pagina indipendentemente da quale tab sia aperta.
+- **Hotkey rapidi F1/F2 sostituiti con Q/E**: F1/F2 sono spesso intercettati dal browser/sistema operativo (apertura guida, ecc.) e scomodi da raggiungere durante il gioco. Nuovi default: `Q` = toggle prediction locale, `E` = toggle modalità avanzata pallavolo. Restano comunque liberamente rimappabili dal pannello Impostazioni (sezione "Comandi rapidi"). Chi aveva già salvato impostazioni in precedenza mantiene i propri tasti finché non li rimappa o usa "Ripristina default".
+
+### 📝 Dove si trovano le impostazioni account
+In-game (o in allenamento), premi **P** per aprire il menu → tab **⚙️ Impostazioni**. Lì si trovano: vista campo, prediction locale (per-modalità), modalità controlli pallavolo, griglia tasti rimappabili (clic sul pulsante poi premi il nuovo tasto, Esc per annullare) e i comandi rapidi (Q/E di default). Tutto si salva automaticamente in locale e, se loggati, viene sincronizzato sul proprio account Supabase.
+
+---
+
 ## v2.23.0 — Impostazioni account (tasti + preferenze), fix rallentamento volley, sistema battuta server-authoritative, hotkey rapidi
 
 ### ✨ Novità
