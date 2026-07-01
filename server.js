@@ -412,6 +412,11 @@ function vTick(room){
       }
     }
 
+  // 2b. Riapplica restrizione battuta DOPO le collisioni: un compagno di
+  // squadra puo' spingere un altro oltre la linea tramite l'urto; senza
+  // questo secondo passaggio la linea era superabile.
+  if(room.vServePhase) for(const p of players){ if(p.team!==-1) vApplyServeRestrictionSrv(p, room.vServeTeam); }
+
   // 3. Fisica palla
   vTickBallSrv(ball, vcfg);
 

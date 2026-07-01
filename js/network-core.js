@@ -10,6 +10,19 @@ let ws = null;
 let wsRoom = null;           // codice stanza corrente
 // currentGameMode è dichiarata in js/config.js (caricato per primo)
 
+// ── PRESET: stato applicazione ──────────────────────────
+// true tra l'invio di set_config/set_vconfig per un preset e la
+// conferma del server (broadcast 'config'/'vconfig'). Mentre è true
+// il bottone "Inizia partita" resta disabilitato, così la partita
+// non può mai iniziare con valori di default invece del preset scelto.
+let _presetApplyPending = false;
+function _updateStartBtnPresetState() {
+  const btn = $('pm-btn-start');
+  if (!btn) return;
+  btn.disabled = _presetApplyPending;
+  btn.textContent = _presetApplyPending ? '⏳ Applico preset…' : '▶ Inizia partita';
+}
+
 // ── CONNESSIONE ─────────────────────────────────────────
 function wsConnect(onOpen) {
   if (ws && ws.readyState <= 1) ws.close();
@@ -32,7 +45,8 @@ function handleServerMsg(msg) {
       // aggiorna raggi live
       if (msg.config.P_RADIUS !== undefined) { const r = msg.config.P_RADIUS; for (const p of players) if (p.team !== -1) p.r = r; }
       if (msg.config.B_RADIUS !== undefined && ball) ball.r = msg.config.B_RADIUS;
-      if ($('game-menu').classList.contains('open')) renderConfigPanel();
+      if ($('game-menu').classList.contains('open') && document.getElementById('gm-panel-vars').style.display !== 'none') renderConfigPanel();
+      _presetApplyPending = false; _updateStartBtnPresetState();
       break;
 
     case 'vconfig':
@@ -40,7 +54,8 @@ function handleServerMsg(msg) {
       // aggiorna raggi live
       if (msg.vconfig.V_PR !== undefined) { const r = msg.vconfig.V_PR; for (const p of vPlayers) if (p.team !== -1) p.r = r; }
       if (msg.vconfig.V_BR !== undefined && vBall) vBall.r = msg.vconfig.V_BR;
-      if ($('game-menu').classList.contains('open')) renderConfigPanel();
+      if ($('game-menu').classList.contains('open') && document.getElementById('gm-panel-vars').style.display !== 'none') renderConfigPanel();
+      _presetApplyPending = false; _updateStartBtnPresetState();
       break;
 
     case 'created':
@@ -57,18 +72,22 @@ function handleServerMsg(msg) {
         codeEl.textContent = `🏠 ${msg.roomName || msg.code}  ·  ${msg.code}${msg.hasPassword ? '  🔒' : ''}`;
         codeEl.style.display = ''; }
       // ── Applica preset selezionato dall'host (se presente) ──
+      // Inviato subito (niente timeout arbitrario): finche' la conferma
+      // ('config'/'vconfig' broadcast dal server) non arriva, il bottone
+      // "Inizia partita" resta disabilitato (vedi _presetApplyPending sotto)
+      // cosi' la partita non puo' partire con i valori di default.
       if (typeof _pendingPreset !== 'undefined' && _pendingPreset) {
         var _pp = _pendingPreset;
         _pendingPreset = null;
-        setTimeout(function() {
-          if (_pp.config && Object.keys(_pp.config).length > 0) {
-            if (_pp.mode === 'volley') {
-              wsSend({ type: 'set_vconfig', payload: { patch: _pp.config } });
-            } else {
-              wsSend({ type: 'set_config', payload: { patch: _pp.config } });
-            }
+        if (_pp.config && Object.keys(_pp.config).length > 0) {
+          _presetApplyPending = true;
+          _updateStartBtnPresetState();
+          if (_pp.mode === 'volley') {
+            wsSend({ type: 'set_vconfig', payload: { patch: _pp.config } });
+          } else {
+            wsSend({ type: 'set_config', payload: { patch: _pp.config } });
           }
-        }, 400);
+        }
       }
       break;
 

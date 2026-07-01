@@ -45,6 +45,12 @@ function vUpdate(dt) {
         if (vPlayers[i].team !== -1 && vPlayers[j].team !== -1)
           vCircleCollide(vPlayers[i], vPlayers[j]);
 
+    // Riapplica restrizione DOPO le collisioni: un compagno di squadra
+    // puo' spingere l'altro oltre la linea tramite l'urto.
+    if (vServePhase) {
+      for (const p of vPlayers) { if (p.team !== -1) vApplyServeRestriction(p, vServeTeam); }
+    }
+
     // Fisica palla
     vTickBall();
 

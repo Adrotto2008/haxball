@@ -35,6 +35,7 @@ function showLobby() {
   isHost = false; pmRoster = []; hostId = null;
   chatMessages = []; chatOpen = false; afkPlayers = new Set(); playerSkins = {};
   _lastInputMask = -1;
+  if (typeof _presetApplyPending !== 'undefined') _presetApplyPending = false;
 }
 function updateWaitingCard() {
   const n = pmRoster.length;

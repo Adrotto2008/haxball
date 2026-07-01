@@ -4,6 +4,21 @@ Versione più recente sempre in cima. Ad ogni modifica aggiornare `VERSION` in `
 
 ---
 
+## v2.24.0 — Fix restrizione battuta superabile, fix preset applicato solo esteticamente
+
+### 🔧 Fix
+- Restrizione battuta pallavolo superabile tramite spinta di un compagno di squadra: ora riapplicata anche dopo le collisioni player-player (server.js vTick e game.js vUpdate training).
+- Preset non applicato correttamente all'avvio partita: causa una race condition con timeout fisso di 400ms. Ora il preset viene inviato subito e il bottone Inizia partita resta disabilitato finché il server non conferma.
+
+### 📁 File modificati
+- server.js
+- js/modes/volley/game.js
+- js/network-core.js
+- js/menu.js
+- js/lobby.js
+
+---
+
 ## v2.23.1 — Fix critico: schermo nero, menu P non funzionante, hotkey F1/F2 → Q/E
 
 ### 🔧 Fix

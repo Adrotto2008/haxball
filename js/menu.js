@@ -9,6 +9,7 @@ function openMenu(context) {
   renderPmRoster();
   buildViewPicker();
   $('pm-btn-start').style.display  = (isHost && menuContext === 'prematch') ? '' : 'none';
+  if (typeof _updateStartBtnPresetState === 'function') _updateStartBtnPresetState();
   $('esc-resume').style.display    = menuContext === 'ingame' ? '' : 'none';
   $('esc-restart').style.display   = (menuContext === 'ingame' && netMode !== 'guest') ? '' : 'none';
   $('esc-leave').textContent       = menuContext === 'prematch' ? '← Lascia stanza' : '✕ Esci';
@@ -315,6 +316,7 @@ function hidePrematch() {
 // ── AVVIO / RITORNO PARTITA ────────────────────────────
 function hostStartMatch() {
   if (!pmRoster.filter(r => r.team === 0 || r.team === 1).length) return;
+  if (typeof _presetApplyPending !== 'undefined' && _presetApplyPending) return; // aspetta conferma preset dal server
   wsSend({ type: 'start', payload: {} });
 }
 function backToPrematch() {
