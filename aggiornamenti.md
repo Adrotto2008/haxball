@@ -4,6 +4,26 @@ Versione più recente sempre in cima. Ad ogni modifica aggiornare `VERSION` in `
 
 ---
 
+## v2.25.0 — Redesign restrizione battuta (palla al centro, rete come vero muro), fix definitivo preset
+
+### ⚠️ NOTA IMPORTANTE — deploy server
+`server.js` gira su Render (deploy da `origin` GitHub, branch `main`). Le modifiche a questo file **non hanno alcun effetto in multiplayer online finché non vengono commit+push** e Render non rifà il deploy. Se dopo aver aggiornato il codice locale i problemi lato server persistono online, verificare prima di tutto che il push sia stato fatto e che il deploy su Render sia completato (dashboard Render → stato ultimo deploy). In allenamento (solo client) i fix sono invece immediati perché non serve il server.
+
+### 🔧 Fix — pallavolo, battuta
+- **Design precedente sbagliato**: la v2.24.0 aveva provato a fixare la restrizione con una "seconda applicazione dopo le collisioni", ma il difetto di fondo era nel design stesso: la linea di restrizione era a 33%/67% del campo (lontana dalla rete) invece che sulla rete, e la palla veniva posizionata al 25%/75% del campo (dentro la metà campo di chi batte) invece che sulla linea centrale. Risultato: sembrava tutto "vicino al centro" ma non era realmente ancorato alla rete, e la linea tratteggiata non corrispondeva a un vincolo fisico solido.
+- **Nuovo design**: la palla è ora sempre posizionata esattamente su `V_NET_X` (la rete/linea bianca centrale) a inizio partita e dopo ogni punto, sia lato server (`mkVolleyBall`) sia lato client/allenamento (`vReset`, `vGoal`). Il muro della rete (`V_NET_X`), che normalmente blocca entrambe le squadre, ora **si disattiva selettivamente per la squadra che deve battere** durante la fase di battuta (`netBlocked = !(servePhase && p.team === serveTeam)` in `vApplyInputSrv`/`vApplyInput`), così solo lei può attraversarlo e raggiungere la palla. La squadra avversaria resta invece bloccata a una linea di sicurezza 70px più indietro della rete (`vApplyServeRestrictionSrv`/`vApplyServeRestriction`), non più superabile nemmeno con l'aiuto di un compagno di squadra (riapplicata dopo le collisioni player-player, fix già presente dalla v2.24.0 e mantenuto).
+- Implementato identicamente su `server.js` (multiplayer) e `js/modes/volley/{physics.js,game.js}` (allenamento/client).
+
+### 🔧 Fix — preset non applicato
+- Il fix v2.24.0 (invio immediato + blocco bottone "Inizia" finché non arriva conferma `config`/`vconfig` dal server) è corretto nella logica ma **richiede che `server.js` sia effettivamente deployato su Render** per avere effetto — la parte server (applicazione della patch, broadcast di conferma) non può funzionare se il server in esecuzione è ancora la versione precedente. Vedi nota sul deploy sopra. Nessuna ulteriore modifica di codice necessaria qui oltre al deploy; verificato che il flusso client (`js/network-core.js`, `js/menu.js`, `js/lobby.js`) sia coerente.
+
+### 📁 File modificati
+- `server.js` — `mkVolleyBall` (palla su `V_NET_X`), `vApplyInputSrv` (parametro `servePhase`/`serveTeam`, muro rete selettivo), `V_SERVE_RESTRICT_X_L/R` ricalcolate rispetto a `V_NET_X` con margine fisso
+- `js/modes/volley/physics.js` — `vApplyInput` (muro rete selettivo), `V_SERVE_RESTRICT_X_L/R` ricalcolate
+- `js/modes/volley/game.js` — `vGoal`/`vReset` posizionano la palla su `V_NET_X`
+
+---
+
 ## v2.24.0 — Fix restrizione battuta superabile, fix preset applicato solo esteticamente
 
 ### 🔧 Fix

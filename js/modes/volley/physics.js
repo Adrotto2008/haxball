@@ -62,8 +62,15 @@ function vApplyInput(p, inp) {
   if (p.x > V_FL.r - p.r) { p.x = V_FL.r - p.r; p.vx *= -.4; }
   if (p.y < V_FL.t + p.r) { p.y = V_FL.t + p.r; p.vy *= -.4; }
   if (p.y > V_FL.b - p.r) { p.y = V_FL.b - p.r; p.vy *= -.4; }
-  if (p.team === 0 && p.x + p.r > V_NET_X) { p.x = V_NET_X - p.r; p.vx *= -.4; }
-  if (p.team === 1 && p.x - p.r < V_NET_X) { p.x = V_NET_X + p.r; p.vx *= -.4; }
+  // Muro centrale (rete): la squadra che sta battendo puo' attraversarlo
+  // per raggiungere la palla ferma sulla linea centrale; l'altra squadra
+  // resta sempre bloccata (vedi vApplyServeRestriction per il blocco extra
+  // di chi NON batte, applicato separatamente durante la fase battuta).
+  const netBlocked = !(vServePhase && p.team === vServeTeam);
+  if (netBlocked) {
+    if (p.team === 0 && p.x + p.r > V_NET_X) { p.x = V_NET_X - p.r; p.vx *= -.4; }
+    if (p.team === 1 && p.x - p.r < V_NET_X) { p.x = V_NET_X + p.r; p.vx *= -.4; }
+  }
 }
 
 // ── TIRO (AZIONE) ───────────────────────────────────────
@@ -183,23 +190,26 @@ function vCheckSideChange() {
 }
 
 // ── RESTRIZIONE RETE (fase battuta) ─────────────────────
-// Impedisce alla squadra che NON sta battendo di avvicinarsi al centro.
-// serveTeam: 0 = rossi battono (sx), 1 = blu battono (dx).
-// La squadra avversaria non può superare la propria linea dei 2/3 campo.
-const V_SERVE_RESTRICT_X_L = V_FL.l + (V_FL.r - V_FL.l) * 0.33; // linea restrizione per team 1 (blu) quando battono i rossi
-const V_SERVE_RESTRICT_X_R = V_FL.l + (V_FL.r - V_FL.l) * 0.67; // linea restrizione per team 0 (rossi) quando battono i blu
+// La palla e' ferma sulla linea centrale (rete) durante la battuta.
+// La squadra che batte puo' attraversare la rete per raggiungerla
+// (vedi vApplyInput: netBlocked = false per lei); la squadra che NON
+// batte resta invece bloccata ANCHE piu' indietro della rete normale,
+// a una linea di sicurezza, cosi' non puo' intercettare la battuta.
+const V_SERVE_RESTRICT_MARGIN = 70; // distanza extra dalla rete per chi non batte
+const V_SERVE_RESTRICT_X_L = V_NET_X - V_SERVE_RESTRICT_MARGIN; // limite per team 1 (blu) quando battono i rossi
+const V_SERVE_RESTRICT_X_R = V_NET_X + V_SERVE_RESTRICT_MARGIN; // limite per team 0 (rossi) quando battono i blu
 
 function vApplyServeRestriction(p, serveTeam) {
   if (serveTeam === null || serveTeam === undefined) return;
   // La squadra che NON batte viene respinta lontano dalla rete
   if (p.team !== serveTeam && p.team !== -1) {
     if (p.team === 1 && p.x - p.r < V_SERVE_RESTRICT_X_L) {
-      // Blu: non può andare a sx della linea di restrizione
+      // Blu: non puo' andare a sx della linea di restrizione
       p.x = V_SERVE_RESTRICT_X_L + p.r;
       if (p.vx < 0) p.vx *= -0.3;
     }
     if (p.team === 0 && p.x + p.r > V_SERVE_RESTRICT_X_R) {
-      // Rossi: non può andare a dx della linea di restrizione
+      // Rossi: non puo' andare a dx della linea di restrizione
       p.x = V_SERVE_RESTRICT_X_R - p.r;
       if (p.vx > 0) p.vx *= -0.3;
     }

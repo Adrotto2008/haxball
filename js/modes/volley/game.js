@@ -119,8 +119,9 @@ function vGoal(scoringTeam) {
   vServePhase = true;
 
   vBall = vMkBall();
-  // Posiziona la palla sul lato della squadra che batte
-  vBall.x = V_FL.l + (V_FL.r - V_FL.l) * (vServeTeam === 0 ? 0.25 : 0.75);
+  // La palla e' ferma sulla linea centrale (rete): solo la squadra che
+  // batte puo' attraversare la rete per raggiungerla.
+  vBall.x = V_NET_X;
   vBall.y = V_FL.t + (V_FL.b - V_FL.t) * 0.35;
 
   for (const p of vPlayers) {
@@ -170,8 +171,8 @@ function vReset(full) {
   vServeTeam  = 0;   // i rossi battono sempre all'inizio
   vServePhase = true;
   vBall = vMkBall();
-  // Palla sul lato dei rossi (team 0) per la prima battuta
-  vBall.x = V_FL.l + (V_FL.r - V_FL.l) * 0.25;
+  // Palla ferma sulla linea centrale (rete) per la prima battuta
+  vBall.x = V_NET_X;
   vBall.y = V_FL.t + (V_FL.b - V_FL.t) * 0.35;
 
   vRemoteState = null; particles = [];

@@ -39,9 +39,12 @@ const V_B_GRAV_BASE=0.015, V_B_GRAV_MAX=0.06, V_B_GRAV_RAMP=0.0008;
 const V_TEAM_MAX_TOUCHES=3;
 const TICK_MS=1000/60, BCAST_MS=1000/60;
 
-// Linee di restrizione battuta (stessa logica del client)
-const V_SERVE_RESTRICT_X_L = V_FL.l + (V_FL.r - V_FL.l) * 0.33;
-const V_SERVE_RESTRICT_X_R = V_FL.l + (V_FL.r - V_FL.l) * 0.67;
+// Linee di restrizione battuta (stessa logica del client). La palla e'
+// ferma sulla linea centrale (rete): la squadra che batte puo' attraversare
+// la rete per raggiungerla, l'altra squadra resta bloccata piu' indietro.
+const V_SERVE_RESTRICT_MARGIN = 70;
+const V_SERVE_RESTRICT_X_L = V_NET_X - V_SERVE_RESTRICT_MARGIN;
+const V_SERVE_RESTRICT_X_R = V_NET_X + V_SERVE_RESTRICT_MARGIN;
 
 // ── FISICA CALCIO ─────────────────────────────────────────
 function circleCollide(a,b,res){
@@ -103,7 +106,7 @@ function vDoKickSrv(p, ball, advanced, vcfg) {
   return true;
 }
 
-function vApplyInputSrv(p, inp, ball, vcfg) {
+function vApplyInputSrv(p, inp, ball, vcfg, servePhase, serveTeam) {
   const advanced = p.vAdvanced || false;
   const pressing = inp.kick || false;
   const prevHeld = p.held;
@@ -160,8 +163,13 @@ function vApplyInputSrv(p, inp, ball, vcfg) {
   if(p.x>V_FL.r-p.r){p.x=V_FL.r-p.r;p.vx*=-.4;}
   if(p.y<V_FL.t+p.r){p.y=V_FL.t+p.r;p.vy*=-.4;}
   if(p.y>V_FL.b-p.r){p.y=V_FL.b-p.r;p.vy*=-.4;}
-  if(p.team===0&&p.x+p.r>V_NET_X){p.x=V_NET_X-p.r;p.vx*=-.4;}
-  if(p.team===1&&p.x-p.r<V_NET_X){p.x=V_NET_X+p.r;p.vx*=-.4;}
+  // Muro centrale (rete): la squadra che batte puo' attraversarlo per
+  // raggiungere la palla ferma sulla linea centrale.
+  const netBlocked = !(servePhase && p.team === serveTeam);
+  if (netBlocked) {
+    if(p.team===0&&p.x+p.r>V_NET_X){p.x=V_NET_X-p.r;p.vx*=-.4;}
+    if(p.team===1&&p.x-p.r<V_NET_X){p.x=V_NET_X+p.r;p.vx*=-.4;}
+  }
   return kicked;
 }
 
@@ -211,10 +219,11 @@ function vTickBallSrv(ball, vcfg){
 // ── ROOM ─────────────────────────────────────────────────
 function mkBall(cfg){ return {x:W/2,y:H/2,vx:0,vy:0,r:cfg?cfg.B_RADIUS:BR}; }
 function mkVolleyBall(vcfg,serveTeam){
-  const st = (serveTeam===0||serveTeam===1) ? serveTeam : 0;
-  const bx = V_FL.l + (V_FL.r - V_FL.l) * (st === 0 ? 0.25 : 0.75);
+  // La palla parte ferma esattamente sulla linea centrale (rete),
+  // non spostata verso il lato di chi batte: solo la squadra che batte
+  // puo' attraversare la rete per raggiungerla (vedi netBlocked in vApplyInputSrv).
   const by = V_FL.t + (V_FL.b - V_FL.t) * 0.35;
-  return {x:bx, y:by, vx:0, vy:0, r:vcfg?vcfg.V_BR:V_BR, grav:V_B_GRAV_BASE};
+  return {x:V_NET_X, y:by, vx:0, vy:0, r:vcfg?vcfg.V_BR:V_BR, grav:V_B_GRAV_BASE};
 }
 
 function mkRoom(code,name,password,mode){
@@ -383,7 +392,7 @@ function vTick(room){
     // Applica restrizione battuta prima dell'input
     if(room.vServePhase) vApplyServeRestrictionSrv(p, room.vServeTeam);
 
-    const kicked=vApplyInputSrv(p, room.inputs[p.id]||{}, ball, vcfg);
+    const kicked=vApplyInputSrv(p, room.inputs[p.id]||{}, ball, vcfg, room.vServePhase, room.vServeTeam);
     if(kicked){
       kickedThisTick.add(p.id);
       const opp=p.team===0?1:0;
