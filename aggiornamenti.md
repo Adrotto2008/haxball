@@ -4,6 +4,35 @@ Versione più recente sempre in cima. Ad ogni modifica aggiornare `VERSION` in `
 
 ---
 
+## v2.26.0 — Fix critico: la v2.25.0 aveva la direzione della restrizione INVERTITA + muro rete disattivato per tutto il campo
+
+### ❌ Cosa c'era di sbagliato nella v2.25.0
+La v2.25.0 introduceva due bug nuovi, opposti a quelli che doveva risolvere:
+1. **Linea di restrizione invertita**: le costanti `V_SERVE_RESTRICT_X_L`/`X_R` erano scritte con la logica giusta nei commenti ma la clamp era applicata alla squadra sbagliata con il segno sbagliato — di fatto permettevano a chi NON doveva battere di **oltrepassare la rete ed entrare nel campo avversario** fino a 70px oltre il centro, invece di tenerlo indietro. Per questo la squadra che non batteva poteva arrivare comunque al centro senza che la riga tratteggiata la fermasse.
+2. **Muro della rete disattivato per l'intero campo avversario**: per far raggiungere la palla a chi batte, la v2.25.0 disattivava completamente il muro della rete (`netBlocked`) per la squadra che batte, invece di limitarsi a farla toccare la palla. Risultato: chi batteva poteva camminare in tutto il campo avversario, anche fino in fondo.
+
+### ✅ Fix (analisi rifatta da zero)
+- **La palla ferma sulla rete è GIÀ raggiungibile senza disattivare il muro**: quando un player è appoggiato al muro della rete (`V_NET_X`), il centro del suo corpo dista `p.r` dal centro della palla (che sta esattamente su `V_NET_X`) — sempre meno del raggio di tiro `p.r + V_BR`. Quindi **il muro della rete torna a essere SEMPRE bloccato per entrambe le squadre**, esattamente come nel gioco normale: non serve più nessuna eccezione, e chi batte non può più sconfinare nel campo avversario.
+- **Direzione della restrizione corretta**: chi NON batte viene ora tenuto sul PROPRIO lato della rete, ad almeno 70px di distanza da essa (fuori dal raggio di tiro), e MAI oltre la rete. Riscritta `vApplyServeRestriction`/`vApplyServeRestrictionSrv` con logica esplicita per squadra (non più la formula ambigua `V_NET_X ± margin` che aveva causato l'inversione), per evitare lo stesso errore in futuro.
+- Fix applicato identicamente in `server.js` (multiplayer), `js/modes/volley/physics.js` (motore condiviso client/training/prediction).
+
+### 🔧 Fix — preset (rinforzato)
+La logica di invio/conferma introdotta in v2.24.0 era corretta ma dipendeva interamente dal round-trip col server. Rinforzata con:
+- **Applicazione locale immediata (ottimistica)**: i valori del preset vengono ora scritti subito in `CONFIG`/`V_CONFIG` lato host, prima ancora della risposta del server, così la UI (pannello Variabili) è già corretta senza aspettare la rete.
+- **Failsafe 3 secondi**: se la conferma dal server (`config`/`vconfig`) non arriva mai per qualsiasi motivo, il bottone "Inizia partita" si sblocca comunque dopo 3s (i valori locali sono già applicati, quindi è sicuro).
+- **Fix caricamento lista preset**: se il login Supabase si risolve DOPO che l'host ha già aperto la card "Crea stanza", la select dei preset ora si ripopola automaticamente non appena la sessione risulta valida, invece di restare vuota fino al prossimo click su "Crea stanza".
+
+### ⚠️ Promemoria deploy server (invariato dalla v2.25.0)
+`server.js` gira su Render: le modifiche a questo file non hanno effetto in multiplayer online finché non vengono fatti `git push` + deploy completato su Render. I fix di questa versione riguardano sia `server.js` sia file client puri (`js/network-core.js`, `js/auth.js`, `js/modes/volley/physics.js`) — questi ultimi funzionano già senza deploy, ma per il comportamento in multiplayer online (battuta) serve comunque il deploy di `server.js`.
+
+### 📁 File modificati
+- `server.js` — `vApplyInputSrv` (rimossa eccezione muro rete), `vApplyServeRestrictionSrv` (direzione corretta), `mkVolleyBall` (commento aggiornato)
+- `js/modes/volley/physics.js` — `vApplyInput` (rimossa eccezione muro rete), `vApplyServeRestriction` (direzione corretta)
+- `js/network-core.js` — applicazione locale immediata preset + failsafe 3s
+- `js/auth.js` — ripopolamento select preset dopo risoluzione sessione
+
+---
+
 ## v2.25.0 — Redesign restrizione battuta (palla al centro, rete come vero muro), fix definitivo preset
 
 ### ⚠️ NOTA IMPORTANTE — deploy server

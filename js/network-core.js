@@ -72,21 +72,41 @@ function handleServerMsg(msg) {
         codeEl.textContent = `🏠 ${msg.roomName || msg.code}  ·  ${msg.code}${msg.hasPassword ? '  🔒' : ''}`;
         codeEl.style.display = ''; }
       // ── Applica preset selezionato dall'host (se presente) ──
-      // Inviato subito (niente timeout arbitrario): finche' la conferma
-      // ('config'/'vconfig' broadcast dal server) non arriva, il bottone
-      // "Inizia partita" resta disabilitato (vedi _presetApplyPending sotto)
-      // cosi' la partita non puo' partire con i valori di default.
+      // 1) Applicazione LOCALE IMMEDIATA (ottimistica): non aspetta il
+      //    giro di rete, cosi' l'host vede subito i valori giusti anche
+      //    se il round-trip col server e' lento o fallisce.
+      // 2) Invio al server per renderla autoritativa/sincronizzata con gli
+      //    altri client; finche' la conferma non arriva il bottone "Inizia
+      //    partita" resta disabilitato (vedi _presetApplyPending sotto).
       if (typeof _pendingPreset !== 'undefined' && _pendingPreset) {
         var _pp = _pendingPreset;
         _pendingPreset = null;
-        if (_pp.config && Object.keys(_pp.config).length > 0) {
+        if (_pp.config && typeof _pp.config === 'object' && Object.keys(_pp.config).length > 0) {
+          if (_pp.mode === 'volley') {
+            Object.assign(V_CONFIG, _pp.config);
+            if (_pp.config.V_PR !== undefined) V_CONFIG.V_PR = parseFloat(_pp.config.V_PR);
+          } else {
+            Object.assign(CONFIG, _pp.config);
+          }
           _presetApplyPending = true;
           _updateStartBtnPresetState();
+          if ($('game-menu').classList.contains('open') && document.getElementById('gm-panel-vars').style.display !== 'none') renderConfigPanel();
           if (_pp.mode === 'volley') {
             wsSend({ type: 'set_vconfig', payload: { patch: _pp.config } });
           } else {
             wsSend({ type: 'set_config', payload: { patch: _pp.config } });
           }
+          // Failsafe: se per qualsiasi motivo la conferma dal server non
+          // arriva mai (es. round-trip perso), non lasciare il bottone
+          // "Inizia partita" bloccato per sempre: i valori locali sono
+          // gia' stati applicati sopra, quindi e' sicuro sbloccare.
+          setTimeout(function() {
+            if (_presetApplyPending) {
+              console.warn('[Preset] conferma dal server non ricevuta entro 3s, sblocco comunque (valori locali gia\' applicati)');
+              _presetApplyPending = false;
+              _updateStartBtnPresetState();
+            }
+          }, 3000);
         }
       }
       break;

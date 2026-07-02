@@ -301,7 +301,12 @@ if (_supabase) {
       authUser = session.user;
       _loadProfile().then(function() {
         _renderAuthCard();
-        authLoadPresets();
+        authLoadPresets().then(function() {
+          // Ripopola subito il select preset se la card "Crea stanza" e' gia'
+          // aperta (evita che il preset non compaia se il login si risolve
+          // dopo che l'utente ha gia' cliccato "Crea stanza").
+          if (typeof _populatePresetSelect === 'function') _populatePresetSelect();
+        });
         authLoadSettings(); // carica impostazioni salvate sul profilo
       });
     }

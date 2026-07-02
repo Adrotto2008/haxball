@@ -39,12 +39,14 @@ const V_B_GRAV_BASE=0.015, V_B_GRAV_MAX=0.06, V_B_GRAV_RAMP=0.0008;
 const V_TEAM_MAX_TOUCHES=3;
 const TICK_MS=1000/60, BCAST_MS=1000/60;
 
-// Linee di restrizione battuta (stessa logica del client). La palla e'
-// ferma sulla linea centrale (rete): la squadra che batte puo' attraversare
-// la rete per raggiungerla, l'altra squadra resta bloccata piu' indietro.
+// Linee di restrizione battuta (stessa logica del client, vedi physics.js).
+// La palla e' ferma sulla rete: chi batte la raggiunge gia' stando
+// appoggiato al muro normale. Chi NON batte resta indietro, sul PROPRIO
+// campo, ben oltre il raggio di tiro: la linea sta dalla propria parte
+// della rete, mai oltre.
 const V_SERVE_RESTRICT_MARGIN = 70;
-const V_SERVE_RESTRICT_X_L = V_NET_X - V_SERVE_RESTRICT_MARGIN;
-const V_SERVE_RESTRICT_X_R = V_NET_X + V_SERVE_RESTRICT_MARGIN;
+const V_SERVE_RESTRICT_X_L = V_NET_X - V_SERVE_RESTRICT_MARGIN; // limite ROSSI (team 0) quando NON battono
+const V_SERVE_RESTRICT_X_R = V_NET_X + V_SERVE_RESTRICT_MARGIN; // limite BLU  (team 1) quando NON battono
 
 // ── FISICA CALCIO ─────────────────────────────────────────
 function circleCollide(a,b,res){
@@ -106,7 +108,7 @@ function vDoKickSrv(p, ball, advanced, vcfg) {
   return true;
 }
 
-function vApplyInputSrv(p, inp, ball, vcfg, servePhase, serveTeam) {
+function vApplyInputSrv(p, inp, ball, vcfg) {
   const advanced = p.vAdvanced || false;
   const pressing = inp.kick || false;
   const prevHeld = p.held;
@@ -163,27 +165,30 @@ function vApplyInputSrv(p, inp, ball, vcfg, servePhase, serveTeam) {
   if(p.x>V_FL.r-p.r){p.x=V_FL.r-p.r;p.vx*=-.4;}
   if(p.y<V_FL.t+p.r){p.y=V_FL.t+p.r;p.vy*=-.4;}
   if(p.y>V_FL.b-p.r){p.y=V_FL.b-p.r;p.vy*=-.4;}
-  // Muro centrale (rete): la squadra che batte puo' attraversarlo per
-  // raggiungere la palla ferma sulla linea centrale.
-  const netBlocked = !(servePhase && p.team === serveTeam);
-  if (netBlocked) {
-    if(p.team===0&&p.x+p.r>V_NET_X){p.x=V_NET_X-p.r;p.vx*=-.4;}
-    if(p.team===1&&p.x-p.r<V_NET_X){p.x=V_NET_X+p.r;p.vx*=-.4;}
-  }
+  // Muro centrale (rete): SEMPRE bloccato per entrambe le squadre. La palla
+  // ferma sulla rete e' gia' raggiungibile da chi e' appoggiato al muro
+  // (distanza dal centro palla = p.r, sempre entro il raggio di tiro
+  // p.r+V_BR): non serve disattivare il muro per chi batte.
+  if(p.team===0&&p.x+p.r>V_NET_X){p.x=V_NET_X-p.r;p.vx*=-.4;}
+  if(p.team===1&&p.x-p.r<V_NET_X){p.x=V_NET_X+p.r;p.vx*=-.4;}
   return kicked;
 }
 
 // ── RESTRIZIONE RETE (fase battuta) ─────────────────────
 function vApplyServeRestrictionSrv(p, serveTeam) {
   if (serveTeam === null || serveTeam === undefined) return;
-  if (p.team !== serveTeam && p.team !== -1) {
-    if (p.team === 1 && p.x - p.r < V_SERVE_RESTRICT_X_L) {
-      p.x = V_SERVE_RESTRICT_X_L + p.r;
-      if (p.vx < 0) p.vx *= -0.3;
-    }
-    if (p.team === 0 && p.x + p.r > V_SERVE_RESTRICT_X_R) {
-      p.x = V_SERVE_RESTRICT_X_R - p.r;
+  if (p.team === serveTeam || p.team === -1) return; // riguarda solo chi NON batte
+  if (p.team === 0) {
+    // Rossi (campo sx): non possono avvicinarsi oltre V_SERVE_RESTRICT_X_L
+    if (p.x + p.r > V_SERVE_RESTRICT_X_L) {
+      p.x = V_SERVE_RESTRICT_X_L - p.r;
       if (p.vx > 0) p.vx *= -0.3;
+    }
+  } else if (p.team === 1) {
+    // Blu (campo dx): non possono avvicinarsi oltre V_SERVE_RESTRICT_X_R
+    if (p.x - p.r < V_SERVE_RESTRICT_X_R) {
+      p.x = V_SERVE_RESTRICT_X_R + p.r;
+      if (p.vx < 0) p.vx *= -0.3;
     }
   }
 }
@@ -219,9 +224,9 @@ function vTickBallSrv(ball, vcfg){
 // ── ROOM ─────────────────────────────────────────────────
 function mkBall(cfg){ return {x:W/2,y:H/2,vx:0,vy:0,r:cfg?cfg.B_RADIUS:BR}; }
 function mkVolleyBall(vcfg,serveTeam){
-  // La palla parte ferma esattamente sulla linea centrale (rete),
-  // non spostata verso il lato di chi batte: solo la squadra che batte
-  // puo' attraversare la rete per raggiungerla (vedi netBlocked in vApplyInputSrv).
+  // La palla parte ferma esattamente sulla linea centrale (rete). Chi batte
+  // la raggiunge stando appoggiato al muro normale della rete (vApplyInputSrv);
+  // chi non batte e' tenuto lontano da vApplyServeRestrictionSrv.
   const by = V_FL.t + (V_FL.b - V_FL.t) * 0.35;
   return {x:V_NET_X, y:by, vx:0, vy:0, r:vcfg?vcfg.V_BR:V_BR, grav:V_B_GRAV_BASE};
 }
@@ -392,7 +397,7 @@ function vTick(room){
     // Applica restrizione battuta prima dell'input
     if(room.vServePhase) vApplyServeRestrictionSrv(p, room.vServeTeam);
 
-    const kicked=vApplyInputSrv(p, room.inputs[p.id]||{}, ball, vcfg, room.vServePhase, room.vServeTeam);
+    const kicked=vApplyInputSrv(p, room.inputs[p.id]||{}, ball, vcfg);
     if(kicked){
       kickedThisTick.add(p.id);
       const opp=p.team===0?1:0;

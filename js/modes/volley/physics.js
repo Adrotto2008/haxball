@@ -62,15 +62,14 @@ function vApplyInput(p, inp) {
   if (p.x > V_FL.r - p.r) { p.x = V_FL.r - p.r; p.vx *= -.4; }
   if (p.y < V_FL.t + p.r) { p.y = V_FL.t + p.r; p.vy *= -.4; }
   if (p.y > V_FL.b - p.r) { p.y = V_FL.b - p.r; p.vy *= -.4; }
-  // Muro centrale (rete): la squadra che sta battendo puo' attraversarlo
-  // per raggiungere la palla ferma sulla linea centrale; l'altra squadra
-  // resta sempre bloccata (vedi vApplyServeRestriction per il blocco extra
-  // di chi NON batte, applicato separatamente durante la fase battuta).
-  const netBlocked = !(vServePhase && p.team === vServeTeam);
-  if (netBlocked) {
-    if (p.team === 0 && p.x + p.r > V_NET_X) { p.x = V_NET_X - p.r; p.vx *= -.4; }
-    if (p.team === 1 && p.x - p.r < V_NET_X) { p.x = V_NET_X + p.r; p.vx *= -.4; }
-  }
+  // Muro centrale (rete): SEMPRE bloccato per entrambe le squadre. La palla
+  // ferma sulla rete durante la battuta e' gia' raggiungibile da chi e'
+  // appoggiato al muro (distanza dal centro palla = p.r, sempre entro il
+  // raggio di tiro p.r+V_BR): non serve disattivare il muro per chi batte.
+  // Chi NON batte viene tenuto indietro da vApplyServeRestriction, ben
+  // oltre il raggio di tiro (vedi sotto).
+  if (p.team === 0 && p.x + p.r > V_NET_X) { p.x = V_NET_X - p.r; p.vx *= -.4; }
+  if (p.team === 1 && p.x - p.r < V_NET_X) { p.x = V_NET_X + p.r; p.vx *= -.4; }
 }
 
 // ── TIRO (AZIONE) ───────────────────────────────────────
@@ -190,28 +189,29 @@ function vCheckSideChange() {
 }
 
 // ── RESTRIZIONE RETE (fase battuta) ─────────────────────
-// La palla e' ferma sulla linea centrale (rete) durante la battuta.
-// La squadra che batte puo' attraversare la rete per raggiungerla
-// (vedi vApplyInput: netBlocked = false per lei); la squadra che NON
-// batte resta invece bloccata ANCHE piu' indietro della rete normale,
-// a una linea di sicurezza, cosi' non puo' intercettare la battuta.
-const V_SERVE_RESTRICT_MARGIN = 70; // distanza extra dalla rete per chi non batte
-const V_SERVE_RESTRICT_X_L = V_NET_X - V_SERVE_RESTRICT_MARGIN; // limite per team 1 (blu) quando battono i rossi
-const V_SERVE_RESTRICT_X_R = V_NET_X + V_SERVE_RESTRICT_MARGIN; // limite per team 0 (rossi) quando battono i blu
+// La palla e' ferma sulla linea centrale (rete). Chi batte puo' gia'
+// raggiungerla stando appoggiato al muro normale (vedi vApplyInput).
+// Chi NON batte deve restare BEN INDIETRO, sul PROPRIO campo, fuori dal
+// raggio di tiro: la linea di restrizione sta quindi dalla propria parte
+// della rete (mai oltre la rete stessa, altrimenti si sconfina).
+const V_SERVE_RESTRICT_MARGIN = 70; // distanza dalla rete oltre la quale chi non batte non puo' avvicinarsi
+const V_SERVE_RESTRICT_X_L = V_NET_X - V_SERVE_RESTRICT_MARGIN; // limite per i ROSSI (team 0, campo sx) quando NON battono
+const V_SERVE_RESTRICT_X_R = V_NET_X + V_SERVE_RESTRICT_MARGIN; // limite per i BLU  (team 1, campo dx) quando NON battono
 
 function vApplyServeRestriction(p, serveTeam) {
   if (serveTeam === null || serveTeam === undefined) return;
-  // La squadra che NON batte viene respinta lontano dalla rete
-  if (p.team !== serveTeam && p.team !== -1) {
-    if (p.team === 1 && p.x - p.r < V_SERVE_RESTRICT_X_L) {
-      // Blu: non puo' andare a sx della linea di restrizione
-      p.x = V_SERVE_RESTRICT_X_L + p.r;
-      if (p.vx < 0) p.vx *= -0.3;
-    }
-    if (p.team === 0 && p.x + p.r > V_SERVE_RESTRICT_X_R) {
-      // Rossi: non puo' andare a dx della linea di restrizione
-      p.x = V_SERVE_RESTRICT_X_R - p.r;
+  if (p.team === serveTeam || p.team === -1) return; // riguarda solo chi NON batte
+  if (p.team === 0) {
+    // Rossi (campo sx): non possono avvicinarsi oltre V_SERVE_RESTRICT_X_L
+    if (p.x + p.r > V_SERVE_RESTRICT_X_L) {
+      p.x = V_SERVE_RESTRICT_X_L - p.r;
       if (p.vx > 0) p.vx *= -0.3;
+    }
+  } else if (p.team === 1) {
+    // Blu (campo dx): non possono avvicinarsi oltre V_SERVE_RESTRICT_X_R
+    if (p.x - p.r < V_SERVE_RESTRICT_X_R) {
+      p.x = V_SERVE_RESTRICT_X_R + p.r;
+      if (p.vx < 0) p.vx *= -0.3;
     }
   }
 }
