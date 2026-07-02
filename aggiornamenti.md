@@ -4,6 +4,27 @@ Versione più recente sempre in cima. Ad ogni modifica aggiornare `VERSION` in `
 
 ---
 
+## v2.27.0 — Trovata e risolta la VERA causa del preset "solo estetico"
+
+### ✅ Battuta pallavolo confermata risolta (v2.26.0)
+
+### 🔍 Causa reale del bug preset (mai trovata prima)
+Le versioni precedenti (v2.24.0–v2.26.0) avevano tutte cercato di risolvere il problema lato *sincronizzazione* (round-trip col server, applicazione ottimistica, ecc.), ma il vero difetto era altrove: le funzioni che costruiscono player e palla lato client — `vBuildPlayers()`, `vMkBall()` (pallavolo) e `buildPlayers()`, `mkBall()` (calcio), tutte in `js/modes/*/game.js` — creavano gli oggetti con il **raggio hardcoded** (`r: V_PR`, `r: V_BR`, `r: PR`, `r: BR`, costanti fisse definite in `config.js`), invece di leggere i valori **live** da `V_CONFIG.V_PR`/`V_CONFIG.V_BR` o `CONFIG.P_RADIUS`/`CONFIG.B_RADIUS`. Un preset che modifica questi raggi veniva sincronizzato correttamente nell'oggetto config, ma non si rifletteva mai sui player/palla creati a inizio partita, perché quelle funzioni ignoravano l'oggetto config e usavano sempre i valori di fabbrica. L'aggiornamento visivo scattava solo quando l'host toccava manualmente lo slider di un raggio, perché SOLO in quel caso il codice esistente (`applyVConfigPatch`/handler `vconfig`) applica esplicitamente `p.r = nuovoRaggio` a tutti i player già creati.
+
+### 🔧 Fix
+- `vBuildPlayers()` e `vMkBall()` (`js/modes/volley/game.js`) ora leggono `V_CONFIG.V_PR`/`V_CONFIG.V_BR` (con fallback alle costanti solo se `V_CONFIG` non è ancora pronto).
+- `buildPlayers()` e `mkBall()` (`js/modes/soccer/game.js`) ora leggono `CONFIG.P_RADIUS`/`CONFIG.B_RADIUS` allo stesso modo.
+- Nessun'altra modifica necessaria: l'ordine dei messaggi era già corretto (`Object.assign(CONFIG/V_CONFIG, msg.config/vconfig)` avviene sempre prima della chiamata a `startGame`/`startVolleyGame` sia per host che guest, quindi ora i valori del preset sono già presenti in `CONFIG`/`V_CONFIG` nel momento in cui i player/la palla vengono costruiti).
+
+### 📁 File modificati
+- `js/modes/volley/game.js` — `vBuildPlayers()`, `vMkBall()`
+- `js/modes/soccer/game.js` — `buildPlayers()`, `mkBall()`
+
+### ⚠️ Deploy
+Questi sono fix client-only (nessuna modifica a `server.js` in questa versione): attivi subito, non serve deploy su Render.
+
+---
+
 ## v2.26.0 — Fix critico: la v2.25.0 aveva la direzione della restrizione INVERTITA + muro rete disattivato per tutto il campo
 
 ### ❌ Cosa c'era di sbagliato nella v2.25.0

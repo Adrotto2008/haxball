@@ -198,6 +198,7 @@ function vReset(full) {
 // ── BUILD PLAYERS / BALL ────────────────────────────────
 function vBuildPlayers(roster) {
   const result = [], byTeam = [[], []];
+  const pr = (typeof V_CONFIG !== 'undefined' && V_CONFIG.V_PR) ? V_CONFIG.V_PR : V_PR;
   for (const r of roster) {
     if (r.team === 0 || r.team === 1) byTeam[r.team].push(r);
   }
@@ -208,20 +209,21 @@ function vBuildPlayers(roster) {
         id: r.id, team, col: V_TEAM_COLS[team],
         x: V_FL.l + (V_FL.r - V_FL.l) * (team === 0 ? .22 : .78),
         y: V_FL.t + (V_FL.b - V_FL.t) * (i + 1) / (n + 1),
-        vx: 0, vy: 0, r: V_PR, held: false, charge: 0, kickCooldown: false
+        vx: 0, vy: 0, r: pr, held: false, charge: 0, kickCooldown: false
       });
     });
   }
   for (const r of roster) {
     if (r.team === -1) {
-      result.push({ id: r.id, team: -1, col: '#555', x: -9999, y: -9999, vx: 0, vy: 0, r: V_PR, held: false, charge: 0 });
+      result.push({ id: r.id, team: -1, col: '#555', x: -9999, y: -9999, vx: 0, vy: 0, r: pr, held: false, charge: 0 });
     }
   }
   return result;
 }
 
 function vMkBall() {
-  return { x: W / 2, y: H / 2 - 60, vx: 0, vy: 0, r: V_BR, grav: V_B_GRAV_BASE, trail: [] };
+  const br = (typeof V_CONFIG !== 'undefined' && V_CONFIG.V_BR) ? V_CONFIG.V_BR : V_BR;
+  return { x: W / 2, y: H / 2 - 60, vx: 0, vy: 0, r: br, grav: V_B_GRAV_BASE, trail: [] };
 }
 
 // ── LOOP ────────────────────────────────────────────────

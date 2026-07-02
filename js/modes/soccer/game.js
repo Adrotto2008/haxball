@@ -96,6 +96,7 @@ function resetLocal(full) {
 function buildPlayers(roster) {
   const result = [];
   const byTeam = [[],[]];
+  const pr = (typeof CONFIG !== 'undefined' && CONFIG.P_RADIUS) ? CONFIG.P_RADIUS : PR;
   for(const r of roster) {
     if(r.team===0||r.team===1) byTeam[r.team].push(r);
   }
@@ -104,18 +105,21 @@ function buildPlayers(roster) {
     grp.forEach((r,i) => {
       result.push({id:r.id, team, col:TEAM_COLS[team],
         x:FL.l+(FL.r-FL.l)*(team===0?.22:.78), y:FL.t+(FL.b-FL.t)*(i+1)/(n+1),
-        vx:0,vy:0, r:PR, charge:0, held:false});
+        vx:0,vy:0, r:pr, charge:0, held:false});
     });
   }
   for(const r of roster) {
     if(r.team===-1) {
       result.push({id:r.id, team:-1, col:'#555',
-        x:-9999, y:-9999, vx:0,vy:0, r:PR, charge:0, held:false});
+        x:-9999, y:-9999, vx:0,vy:0, r:pr, charge:0, held:false});
     }
   }
   return result;
 }
-function mkBall() { return {x:W/2,y:H/2,vx:0,vy:0,r:BR,trail:[]}; }
+function mkBall() {
+  const br = (typeof CONFIG !== 'undefined' && CONFIG.B_RADIUS) ? CONFIG.B_RADIUS : BR;
+  return {x:W/2,y:H/2,vx:0,vy:0,r:br,trail:[]};
+}
 function reset(full) {
   ball=mkBall(); remoteInputs={}; remoteState=null; particles=[]; snapshotBuffer=[];
   if(players.length>0) {
