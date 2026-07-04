@@ -167,9 +167,14 @@ document.addEventListener('touchstart', e => {
 document.addEventListener('touchmove', e => {
   for(const t of e.changedTouches) if(t.identifier===joyTouchId) joyTo(t.clientX, t.clientY);
 }, {passive:true});
-document.addEventListener('touchend', e => {
+// touchend E touchcancel condividono la stessa logica di rilascio: se il
+// sistema interrompe il touch (notifica, gesture OS) senza un touchend
+// "pulito", senza touchcancel il joystick/tasto tiro restava incollato.
+function handleTouchRelease(e) {
   for(const t of e.changedTouches) {
     if(t.identifier===joyTouchId)  { joyTouchId=null;  resetJoy(); }
     if(t.identifier===kickTouchId) { kickTouchId=null; touchKick=false; kickBtn.classList.remove('pressed'); }
   }
-}, {passive:true});
+}
+document.addEventListener('touchend', handleTouchRelease, {passive:true});
+document.addEventListener('touchcancel', handleTouchRelease, {passive:true});

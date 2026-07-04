@@ -4,6 +4,44 @@ Versione più recente sempre in cima. Ad ogni modifica aggiornare `VERSION` in `
 
 ---
 
+## v2.28.0 — Audit di sicurezza e fisica: XSS stanza, config live ovunque, cleanup
+
+Sessione di audit completo (letti client, server, CSS, README) a partire da una revisione esterna: verificati tutti i punti trovati (quasi tutti confermati, uno già risolto in v2.27.0), più alcuni bug aggiuntivi trovati durante la verifica.
+
+### 🔒 Sicurezza
+- **XSS stanza (il più serio)**: `r.code` non passava per `escHtml()` in `renderRoomsList()` (sia nell'attributo `data-code` che nel testo) e il server non validava mai il `code` mandato dal client in `create` — chiunque poteva creare una stanza con `code` contenente HTML/script arbitrario, iniettato senza escape a chi apriva "Lista stanze". Fix: escape lato client + `CODE_RE` lato server che accetta solo l'alfabeto sicuro già usato da `genCode()`.
+- **`ADMIN_TOKEN`** non è più `'hax-admin-dev'` in chiaro come fallback: se la env var manca, il server genera un token casuale a ogni avvio e lo stampa nei log (endpoint `/admin/config` altrimenti compromissibile da chiunque conoscesse il default).
+- **Validazione server assente**: nickname, nome stanza, password, chat e skin arrivavano al server senza alcun limite di lunghezza (i `maxlength` erano solo lato client, bypassabili con messaggi WS grezzi). Aggiunto `clampStr()` con cap coerenti applicati in `create`/`join`/`chat`/`skin`.
+- **`escHtml()`** ora escapa anche `"`/`'`, non solo `<`/`>`/`&`: alcuni usi (avatar in `auth.js`) finiscono dentro attributi HTML dove le virgolette contano.
+
+### 🐛 Fix fisica (CONFIG/V_CONFIG live)
+- **Allenamento calcio**: la fisica della palla in `update()` (`js/modes/soccer/game.js`) leggeva costanti statiche (`B_HIT_R`, `B_FRIC`, `B_BOUNCE`, `BR`) invece di `CONFIG.*`/`ball.r` — cambiare i raggi/attrito/rimbalzo da Variabili non aveva alcun effetto sulla palla in allenamento (il movimento giocatore invece era già corretto). Ora legge tutto da `CONFIG` e `ball.r`, come già faceva `tickRemotePhysics()` in multiplayer.
+- **Distanza di tiro (`doKick`)**: sia client (`physics.js`) sia server (`server.js`) usavano `PR+BR` fissi invece di `p.r+ball.r` — cambiare i raggi non cambiava mai la vera portata del tiro, nemmeno in multiplayer. Corretto in entrambi. Anche la freccia di carica (`drawShotArrow`) e lo spawn delle particelle su tiro usavano lo stesso calcolo fisso (`KICK_DIST` in `config.js`, con un `+12` hardcoded che duplicava `CONFIG.KICK_DIST_X`): rimossa la costante, ora calcolata live ovunque.
+- **Pallavolo — `vDoKick`/`vUpdateKickCooldown`** (client, prediction locale) usavano `V_BR` fisso mentre il server (`vDoKickSrv`) usa correttamente `ball.r`: disallineamento prediction/server quando si cambia il raggio palla. Allineato a `vBall.r`.
+- **Pallavolo — `vTickRemotePhysics`** (prediction multiplayer, `sync.js`) usava `V_B_FRIC` statico invece di `V_CONFIG.V_B_FRIC` live, oltre a `V_BR` fisso per tutti i rimbalzi. Corretto.
+- **Pallavolo — `vTickBall`/`vBallCollidePost`** (allenamento, `physics.js`) usavano `V_BR` fisso per le pareti laterali e il muretto centrale, **e mancava del tutto il rimbalzo sulla parete superiore** (in allenamento la palla poteva uscire dal campo verso l'alto senza rimbalzare; multiplayer — sia prediction che server — ce l'ha sempre avuta). Aggiunta la parete mancante e allineati tutti i raggi a `vBall.r`.
+- **AFK in pallavolo**: `toggleAfk()` (`admin.js`) spostava fuori campo solo l'entità in `players` (calcio), mai in `vPlayers` — durante una partita di pallavolo il proprio avatar restava visibile in campo (solo sul proprio client, finché non arrivava il prossimo `state` dal server: il server era già corretto). Ora mode-aware.
+- **Touch**: mancava il listener `touchcancel` — se il sistema interrompeva il touch (notifica, gesture OS), joystick/tasto tiro potevano restare incollati. Aggiunto, condivide la logica con `touchend`.
+
+### ✅ Verificato ma già risolto (falso positivo residuo dall'audit)
+- Il raggio fisso in `mkBall()`/`buildPlayers()`/`vMkBall()`/`vBuildPlayers()` era già stato risolto in v2.27.0 (letto da `CONFIG`/`V_CONFIG` con fallback): confermato nel codice attuale, nessuna azione necessaria.
+
+### 🧹 Pulizia (codice morto)
+- Rimossa `goal(team)` in `js/modes/soccer/game.js`: non era mai chiamata (allenamento e multiplayer hanno ciascuno la propria logica gol inline, con `goalCD` diversi — 90 vs 140 — lasciati invariati per non alterare il comportamento).
+- Rimossa `_vDrawShotArrow()` in `js/modes/volley/draw.js`: sostituita dagli anelli pulsanti in `vDrawPlayer()` fin dalla v2.11.0, ma la funzione era rimasta orfana.
+- Rimossi `V_HIT_R`/`V_HIT_BONUS` (slider "Moltiplicatore colpo"/"Impulso bonus colpo" che dalla v2.9–2.10 non facevano più nulla: nessun codice li leggeva, il server li scartava già dal patch) e `V_KICK_DIST_X` (dichiarata ma mai referenziata) da `js/modes/volley/config.js`.
+- `.auth-form` deduplicata in `css/lobby.css` (stessa identica regola ripetuta due volte).
+
+### 📄 Altro
+- `.idea/` aggiunto a `.gitignore` (portava in giro `workspace.xml` con percorsi locali e uno `shelved.patch` obsoleto).
+- `WS_URL` (`network-core.js`) ora punta automaticamente a `ws://localhost:3000` quando l'host è `localhost`/`127.0.0.1`, senza dover modificare il file per testare in locale.
+- **README aggiornato**: correggeva ancora "Supabase Realtime" come trasporto multiplayer (in realtà server Node.js/WebSocket da diverse versioni), non menzionava affatto `auth.js` né `js/modes/volley/` nella struttura del progetto, e affermava che una nuova modalità non richiede di toccare i file core — falso, `network-core.js`/`menu.js` hanno diramazioni per-modalità. Aggiunta anche una sezione Setup (env var `ADMIN_TOKEN`, tabelle Supabase/RLS).
+
+### ⚠️ Richiede azione
+- Su Render, se non è già impostata, considera di impostare esplicitamente la env var `ADMIN_TOKEN` a un valore stabile: senza, ogni riavvio del server genera un nuovo token casuale (solo nei log), quindi l'endpoint `/admin/config` resta protetto ma il token non è persistente tra un deploy e l'altro.
+
+---
+
 ## v2.27.0 — Trovata e risolta la VERA causa del preset "solo estetico"
 
 ### ✅ Battuta pallavolo confermata risolta (v2.26.0)

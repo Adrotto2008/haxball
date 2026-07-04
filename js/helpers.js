@@ -9,5 +9,7 @@ function isTouchDev() {
   return 'ontouchstart' in window && navigator.maxTouchPoints > 0
          && !window.matchMedia('(pointer:fine)').matches;
 }
-// escaping HTML condiviso (chat + roster)
-function escHtml(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+// escaping HTML condiviso (chat + roster). Escapa anche le virgolette:
+// alcuni usi (es. avatar in auth.js) finiscono dentro attributi HTML
+// (value="..."), dove < e > da soli non bastano a prevenire un breakout.
+function escHtml(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }

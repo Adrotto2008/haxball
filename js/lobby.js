@@ -157,10 +157,10 @@ function renderRoomsList(rooms) {
   const el = $('rooms-list-content');
   if (!rooms.length) { el.innerHTML = '<div class="rooms-empty">Nessuna stanza disponibile</div>'; return; }
   el.innerHTML = rooms.map(r => `
-    <div class="room-row" data-code="${r.code}" data-pw="${r.hasPassword?'1':'0'}">
+    <div class="room-row" data-code="${escHtml(r.code)}" data-pw="${r.hasPassword?'1':'0'}">
       <div class="room-info">
         <span class="room-name">${escHtml(r.name)}</span>
-        <span class="room-meta">${r.code} · ${r.players} ${r.players===1?'giocatore':'giocatori'} ${r.started?'· <em>in corso</em>':''}</span>
+        <span class="room-meta">${escHtml(r.code)} · ${r.players} ${r.players===1?'giocatore':'giocatori'} ${r.started?'· <em>in corso</em>':''}</span>
       </div>
       <div class="room-badges">
         ${r.hasPassword ? '<span class="room-badge room-badge-lock">🔒</span>' : ''}

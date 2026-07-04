@@ -1,6 +1,7 @@
 // ── SERVER — HaxBall 2 autoritativo ────────────────────
 const { WebSocketServer } = require('ws');
 const http = require('http');
+const crypto = require('crypto');
 
 const CONFIG_DEFAULT = {
   P_START:1.4, P_SPEED_MAX:10.0, P_ACCEL:0.01, P_FRIC:0.78,
@@ -19,8 +20,21 @@ const V_CONFIG_DEFAULT = {
   V_PR:20, V_BR:10,
 };
 
-const ADMIN_TOKEN = process.env.ADMIN_TOKEN || 'hax-admin-dev';
+const ADMIN_TOKEN = process.env.ADMIN_TOKEN || crypto.randomBytes(24).toString('hex');
+if (!process.env.ADMIN_TOKEN) {
+  console.warn('[SECURITY] ADMIN_TOKEN non impostata: generato un token casuale valido solo per questo processo.');
+  console.warn('[SECURITY] Token generato: ' + ADMIN_TOKEN);
+  console.warn('[SECURITY] Imposta la env var ADMIN_TOKEN su Render per un token stabile e persistente.');
+}
 const W=1020, H=600;
+
+// Validazione input rete (difesa in profondità: i limiti lato client sono
+// bypassabili con messaggi WS grezzi). clampStr tronca le stringhe libere;
+// CODE_RE vincola il codice stanza allo stesso alfabeto sicuro generato dal
+// client (genCode() in lobby.js), impedendo un codice-stanza malformato che
+// veniva poi renderizzato senza escape in renderRoomsList (XSS).
+function clampStr(s, max) { return typeof s === 'string' ? s.slice(0, max) : ''; }
+const CODE_RE = /^[A-Za-z0-9]{4,10}$/;
 
 // ── COSTANTI CALCIO ──────────────────────────────────────
 const PR=18, BR=11;
@@ -60,7 +74,7 @@ function circleCollide(a,b,res){
 }
 function doKick(p,ball,force,cfg){
   const dx=ball.x-p.x,dy=ball.y-p.y,d=Math.hypot(dx,dy);
-  if(d>PR+BR+cfg.KICK_DIST_X)return;
+  if(d>p.r+ball.r+cfg.KICK_DIST_X)return;
   const nx=d>0.01?dx/d:1,ny=d>0.01?dy/d:0;
   ball.vx=nx*force+p.vx*0.28; ball.vy=ny*force+p.vy*0.28;
 }
@@ -511,9 +525,11 @@ wss.on('connection',ws=>{
       send(ws,{type:'rooms_list',rooms:list});return;
     }
     if(type==='create'){
-      const{pid,name,code,roomName,password,mode}=payload;myPid=pid;
-      myRoom=getOrCreate(code,roomName,password,mode||'soccer');myRoom.hostPid=pid;
-      myRoom.clients.set(ws,{pid,name,team:0,skin:payload.skin||'',afk:false});syncRoster(myRoom);
+      const{pid,name,code,roomName,password,mode}=payload;
+      if(typeof code!=='string'||!CODE_RE.test(code)){send(ws,{type:'error',msg:'Codice stanza non valido'});return;}
+      myPid=pid;
+      myRoom=getOrCreate(code,clampStr(roomName,32),clampStr(password,24),mode||'soccer');myRoom.hostPid=pid;
+      myRoom.clients.set(ws,{pid,name:clampStr(name,20),team:0,skin:clampStr(payload.skin||'',8),afk:false});syncRoster(myRoom);
       send(ws,{type:'created',code,hostId:pid,roomName:myRoom.name,hasPassword:!!myRoom.password,config:myRoom.config,vconfig:myRoom.vconfig,mode:myRoom.mode});return;
     }
     if(type==='join'){
@@ -522,7 +538,7 @@ wss.on('connection',ws=>{
       if(myRoom.password&&myRoom.password!==(password||'')){send(ws,{type:'error',msg:'Password errata'});return;}
       let team;
       if(myRoom.started){team=-1;}else{const r=[...myRoom.clients.values()].filter(c=>c.team===0).length,b=[...myRoom.clients.values()].filter(c=>c.team===1).length;team=r<=b?0:1;}
-      myRoom.clients.set(ws,{pid,name,team,skin:payload.skin||'',afk:false});
+      myRoom.clients.set(ws,{pid,name:clampStr(name,20),team,skin:clampStr(payload.skin||'',8),afk:false});
       const pr=myRoom.mode==='volley'?V_PR:PR;
       if(myRoom.started){
         myRoom.players.push({id:pid,team:-1,col:'#555',x:-9999,y:-9999,vx:0,vy:0,r:pr,charge:0,held:false,vAdvanced:false});
@@ -542,7 +558,7 @@ wss.on('connection',ws=>{
       else{resetPositions(myRoom,true);myRoom.gameOver=false;}
       bcastAll(myRoom,{type:'restarted'});return;
     }
-    if(type==='chat'){bcastAll(myRoom,{type:'chat',pid:myPid,name:payload.name,text:payload.text});return;}
+    if(type==='chat'){bcastAll(myRoom,{type:'chat',pid:myPid,name:clampStr(payload.name,20),text:clampStr(payload.text,150)});return;}
     if(type==='set_config'){if(myPid!==myRoom.hostPid)return;applyConfigPatch(payload.patch,myRoom);return;}
     if(type==='set_vconfig'){if(myPid!==myRoom.hostPid)return;applyVConfigPatch(payload.patch,myRoom);return;}
     if(type==='vmode'){
@@ -560,7 +576,7 @@ wss.on('connection',ws=>{
       else{myRoom.afkSet.delete(myPid);bcast(myRoom,{type:'chat',pid:'system',name:'Sistema',text:`👤 ${nm} non è più AFK`},ws);}
       syncRoster(myRoom);bcastAll(myRoom,{type:'afk',pid:myPid,afk:payload.afk});return;
     }
-    if(type==='skin'){const c=myRoom.clients.get(ws);if(!c)return;c.skin=payload.skin;myRoom.skins[myPid]=payload.skin;bcastAll(myRoom,{type:'skin',pid:myPid,skin:payload.skin});return;}
+    if(type==='skin'){const c=myRoom.clients.get(ws);if(!c)return;const sk=clampStr(payload.skin,8);c.skin=sk;myRoom.skins[myPid]=sk;bcastAll(myRoom,{type:'skin',pid:myPid,skin:sk});return;}
     if(type==='team_change'){
       if(myPid!==myRoom.hostPid)return;
       const{pid,team}=payload;const c=[...myRoom.clients.values()].find(x=>x.pid===pid);if(!c)return;

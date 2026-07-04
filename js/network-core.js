@@ -4,7 +4,13 @@
 // Questo file non conosce le regole del calcio — smista i messaggi
 // verso le funzioni di chat/roster/admin e di modes/soccer/ o modes/volley/.
 
-const WS_URL = 'wss://haxball-9dkw.onrender.com';
+// In locale (127.0.0.1/localhost) punta al server Node avviato con
+// `node server.js` (porta di default 3000, vedi PORT in server.js);
+// altrove usa sempre l'URL di produzione su Render. Prima era hardcoded
+// solo alla produzione: testare in locale richiedeva modificare il file.
+const WS_URL = (location.hostname === 'localhost' || location.hostname === '127.0.0.1')
+  ? 'ws://localhost:3000'
+  : 'wss://haxball-9dkw.onrender.com';
 
 let ws = null;
 let wsRoom = null;           // codice stanza corrente

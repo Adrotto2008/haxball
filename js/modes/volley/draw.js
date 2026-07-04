@@ -234,37 +234,9 @@ function vDrawPlayer(p) {
 }
 
 // ── FRECCIA CARICA (modalità avanzata) ───────────────────
-function _vDrawShotArrow(p, t) {
-  const dx = vBall.x - p.x, dy = vBall.y - p.y;
-  const d = Math.hypot(dx, dy);
-  const nx = d > 0.01 ? dx / d : 0, ny = d > 0.01 ? dy / d : -1;
-
-  const minLen = 18, maxLen = 52;
-  const arrowLen = minLen + t * (maxLen - minLen);
-  const startR = p.r + 4;
-  const ax = p.x + nx * startR, ay = p.y + ny * startR;
-  const bx = p.x + nx * (startR + arrowLen), by2 = p.y + ny * (startR + arrowLen);
-
-  const alpha = 0.55 + t * 0.45;
-  ctx.strokeStyle = `rgba(255,220,80,${alpha})`;
-  ctx.lineWidth = 2 + t * 2;
-  ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by2); ctx.stroke();
-
-  const headLen = 7 + t * 5;
-  const angle = Math.atan2(ny, nx);
-  ctx.fillStyle = `rgba(255,220,80,${alpha})`;
-  ctx.beginPath();
-  ctx.moveTo(bx, by2);
-  ctx.lineTo(bx - headLen * Math.cos(angle - 0.45), by2 - headLen * Math.sin(angle - 0.45));
-  ctx.lineTo(bx - headLen * Math.cos(angle + 0.45), by2 - headLen * Math.sin(angle + 0.45));
-  ctx.closePath(); ctx.fill();
-
-  ctx.beginPath();
-  ctx.arc(p.x, p.y, p.r + 6 + t * 4, 0, Math.PI * 2);
-  ctx.strokeStyle = `rgba(255,220,80,${0.3 + t * 0.5})`;
-  ctx.lineWidth = 1.5; ctx.setLineDash([4, 4]);
-  ctx.stroke(); ctx.setLineDash([]);
-}
+// _vDrawShotArrow(p, t) rimossa in v2.28.0: sostituita dall'animazione ad
+// anelli pulsanti in vDrawPlayer() fin dalla v2.11.0 ("Rimossa freccia"),
+// ma la funzione era rimasta nel file senza che nessuno la richiamasse più.
 
 // ── DRAW PRINCIPALE ──────────────────────────────────────
 function vDraw() {

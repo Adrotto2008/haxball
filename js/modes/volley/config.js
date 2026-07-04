@@ -30,18 +30,19 @@ const V_B_GRAV_RAMP   = 0.0008;
 const V_B_BOUNCE_WALL = 0.35;
 
 // ── COLPO PALLA (modalità base: spinta diretta) ──────────
-// Quando la palla tocca il player, riceve un impulso proporzionale
-// alla velocità relativa + un bonus fisso V_HIT_BONUS.
-// Questo dà una "spinta" immediata potente senza cattura.
-const V_HIT_R     = 1.4;    // moltiplicatore impulso su contatto (> B_HIT_R calcio=0.82)
-const V_HIT_BONUS = 6.0;    // impulso bonus in direzione palla←player al contatto
+// Rimossi in v2.28.0: dalla v2.9–2.10 (spinta a contatto sostituita dal
+// tiro) V_HIT_R e V_HIT_BONUS non erano più lette da alcun codice (client
+// o server), ma restavano come slider "Moltiplicatore colpo" / "Impulso
+// bonus colpo" in V_CONFIG_META che non facevano nulla.
 
 // ── TIRO CARICATO (modalità avanzata) ───────────────────
 // Come il calcio: tieni AZIONE per caricare, rilascia per tirare.
 const V_KICK_MIN    = 4.0;
 const V_KICK_MAX    = 14.0;
 const V_KICK_CHG_F  = 50;
-const V_KICK_DIST_X = 14;   // raggio zona tiro (player.r + V_BR + margine)
+// (V_KICK_DIST_X rimossa in v2.28.0: dichiarata ma mai referenziata in
+// nessun file client o server — a differenza del calcio, vDoKick/vDoKickSrv
+// non applicano alcun margine extra oltre p.r+V_BR)
 
 // ── REGOLA TOCCHI ───────────────────────────────────────
 const V_TEAM_MAX_TOUCHES = 3;
@@ -62,8 +63,6 @@ let V_CONFIG = {
   V_P_FRIC:     0.78,
   V_B_FRIC:     0.99,
   V_B_BOUNCE:   0.35,
-  V_HIT_R:      1.4,
-  V_HIT_BONUS:  6.0,
   V_KICK_MIN:   4.0,
   V_KICK_MAX:   14.0,
   V_KICK_CHG_F: 50,
@@ -82,8 +81,6 @@ const V_CONFIG_META = [
   { key:'V_P_FRIC',     label:'Attrito player',         min:0.5, max:1,   step:0.01 },
   { key:'V_B_FRIC',     label:'Attrito palla',          min:0.9, max:1,   step:0.001},
   { key:'V_B_BOUNCE',   label:'Rimbalzo palla',         min:0,   max:1,   step:0.05 },
-  { key:'V_HIT_R',      label:'Moltiplicatore colpo',   min:0,   max:3,   step:0.05 },
-  { key:'V_HIT_BONUS',  label:'Impulso bonus colpo',    min:0,   max:20,  step:0.5  },
   { key:'V_KICK_MIN',   label:'Tiro caricato minimo',   min:1,   max:20,  step:0.5  },
   { key:'V_KICK_MAX',   label:'Tiro caricato massimo',  min:5,   max:40,  step:0.5  },
   { key:'V_KICK_CHG_F', label:'Frame carica tiro',      min:10,  max:120, step:5    },

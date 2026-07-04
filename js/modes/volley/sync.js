@@ -123,11 +123,11 @@ function vTickRemotePhysics() {
   vBall.grav = (vBall.grav || V_B_GRAV_BASE);
   vBall.vy += vBall.grav;
   vBall.grav = Math.min(vBall.grav + V_B_GRAV_RAMP, V_B_GRAV_MAX);
-  vBall.vx *= V_B_FRIC; vBall.vy *= V_B_FRIC;
+  vBall.vx *= V_CONFIG.V_B_FRIC; vBall.vy *= V_CONFIG.V_B_FRIC;
   vBall.x += vBall.vx; vBall.y += vBall.vy;
-  const bw = V_CONFIG.V_B_BOUNCE;
-  if (vBall.x - V_BR < V_FL.l) { vBall.x = V_FL.l + V_BR; vBall.vx *= -bw; }
-  if (vBall.x + V_BR > V_FL.r) { vBall.x = V_FL.r - V_BR; vBall.vx *= -bw; }
-  if (vBall.y - V_BR < V_FL.t) { vBall.y = V_FL.t + V_BR; vBall.vy *= -bw; vBall.grav = V_B_GRAV_BASE; }
-  if (vBall.y + V_BR > V_FL.b) { vBall.y = V_FL.b - V_BR; vBall.vy *= -bw * 0.5; }
+  const bw = V_CONFIG.V_B_BOUNCE, br = vBall.r;
+  if (vBall.x - br < V_FL.l) { vBall.x = V_FL.l + br; vBall.vx *= -bw; }
+  if (vBall.x + br > V_FL.r) { vBall.x = V_FL.r - br; vBall.vx *= -bw; }
+  if (vBall.y - br < V_FL.t) { vBall.y = V_FL.t + br; vBall.vy *= -bw; vBall.grav = V_B_GRAV_BASE; }
+  if (vBall.y + br > V_FL.b) { vBall.y = V_FL.b - br; vBall.vy *= -bw * 0.5; }
 }

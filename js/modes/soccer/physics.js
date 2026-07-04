@@ -13,7 +13,7 @@ function circleCollide(a, b, res) {
 }
 
 function doKick(p, force) {
-  const KICK_DIST = PR + BR + CONFIG.KICK_DIST_X;
+  const KICK_DIST = p.r + ball.r + CONFIG.KICK_DIST_X;
   const dx = ball.x-p.x, dy = ball.y-p.y, d = Math.hypot(dx,dy);
   if(d > KICK_DIST) return;
   const nx = d>0.01?dx/d:1, ny = d>0.01?dy/d:0;
@@ -31,7 +31,7 @@ function applyInput(p, inp) {
     if(p.held && p.charge > 0) {
       const t = p.charge/KICK_CHG_F, force = KICK_MIN+t*(KICK_MAX-KICK_MIN);
       doKick(p, force);
-      if(Math.hypot(ball.x-p.x, ball.y-p.y) <= PR+BR+CONFIG.KICK_DIST_X)
+      if(Math.hypot(ball.x-p.x, ball.y-p.y) <= p.r+ball.r+CONFIG.KICK_DIST_X)
         spawnP(ball.x, ball.y, 8, p.col, force*.5, 16);
     }
     p.charge = 0;

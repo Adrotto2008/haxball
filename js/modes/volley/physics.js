@@ -83,7 +83,7 @@ function vDoKick(p, advanced) {
   const d = Math.hypot(dx, dy);
 
   // Palla fuori: azzera cooldown (pronto per il prossimo ingresso)
-  if (d >= p.r + V_BR) {
+  if (d >= p.r + vBall.r) {
     p.kickCooldown = false;
     return false;
   }
@@ -120,7 +120,7 @@ function vUpdateKickCooldown(p) {
   if (!p.kickCooldown) return;
   const dx = vBall.x - p.x, dy = vBall.y - p.y;
   const d = Math.hypot(dx, dy);
-  if (d >= p.r + V_BR) p.kickCooldown = false;
+  if (d >= p.r + vBall.r) p.kickCooldown = false;
 }
 
 // ── FISICA PALLA ────────────────────────────────────────
@@ -134,14 +134,18 @@ function vTickBall() {
   vBall.x   += vBall.vx;
   vBall.y   += vBall.vy;
   vBallCollidePost();
-  const bw = cfg.V_B_BOUNCE;
-  if (vBall.x - V_BR < V_FL.l) { vBall.x = V_FL.l + V_BR; vBall.vx *= -bw; }
-  if (vBall.x + V_BR > V_FL.r) { vBall.x = V_FL.r - V_BR; vBall.vx *= -bw; }
+  const bw = cfg.V_B_BOUNCE, br = vBall.r;
+  if (vBall.x - br < V_FL.l) { vBall.x = V_FL.l + br; vBall.vx *= -bw; }
+  if (vBall.x + br > V_FL.r) { vBall.x = V_FL.r - br; vBall.vx *= -bw; }
+  // Parete superiore: mancava del tutto in allenamento (la palla poteva
+  // uscire dal campo verso l'alto senza rimbalzare), a differenza del
+  // multiplayer dove sia la prediction client che il server la applicano.
+  if (vBall.y - br < V_FL.t) { vBall.y = V_FL.t + br; vBall.vy *= -bw; vBall.grav = V_B_GRAV_BASE; }
 }
 
 // ── COLLISIONE PALLA ↔ MURETTO CENTRALE ─────────────────
 function vBallCollidePost() {
-  const bx = vBall.x, by = vBall.y, br = V_BR;
+  const bx = vBall.x, by = vBall.y, br = vBall.r;
   if (bx < V_POST_X1 - br || bx > V_POST_X2 + br) return;
   if (by < V_POST_Y1 - br || by > V_POST_Y2 + br) return;
   const cx = Math.max(V_POST_X1, Math.min(V_POST_X2, bx));

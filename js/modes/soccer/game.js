@@ -18,15 +18,16 @@ function update(dt) {
     const p = players[0];
     if(p) {
       applyInput(p, inpLocal());
-      circleCollide(p, ball, B_HIT_R);
+      circleCollide(p, ball, CONFIG.B_HIT_R);
     }
     ball.x += ball.vx; ball.y += ball.vy;
-    ball.vx *= B_FRIC; ball.vy *= B_FRIC;
+    ball.vx *= CONFIG.B_FRIC; ball.vy *= CONFIG.B_FRIC;
+    const bR = ball.r;
     const inGoal = ball.y > GY && ball.y < GY + GH;
-    if(ball.x - BR < FL.l) { if(inGoal){ score[1]++; updateHUD(); setMsg(`⚽ BLU! (${score[0]}–${score[1]})`); goalBurst(FL.l,H/2); goalCD=90; resetLocal(false); } else { ball.x=FL.l+BR; ball.vx*=-B_BOUNCE; } }
-    if(ball.x + BR > FL.r) { if(inGoal){ score[0]++; updateHUD(); setMsg(`⚽ ROSSO! (${score[0]}–${score[1]})`); goalBurst(FL.r,H/2); goalCD=90; resetLocal(false); } else { ball.x=FL.r-BR; ball.vx*=-B_BOUNCE; } }
-    if(ball.y - BR < FL.t){ ball.y=FL.t+BR; ball.vy*=-B_BOUNCE; }
-    if(ball.y + BR > FL.b){ ball.y=FL.b-BR; ball.vy*=-B_BOUNCE; }
+    if(ball.x - bR < FL.l) { if(inGoal){ score[1]++; updateHUD(); setMsg(`⚽ BLU! (${score[0]}–${score[1]})`); goalBurst(FL.l,H/2); goalCD=90; resetLocal(false); } else { ball.x=FL.l+bR; ball.vx*=-CONFIG.B_BOUNCE; } }
+    if(ball.x + bR > FL.r) { if(inGoal){ score[0]++; updateHUD(); setMsg(`⚽ ROSSO! (${score[0]}–${score[1]})`); goalBurst(FL.r,H/2); goalCD=90; resetLocal(false); } else { ball.x=FL.r-bR; ball.vx*=-CONFIG.B_BOUNCE; } }
+    if(ball.y - bR < FL.t){ ball.y=FL.t+bR; ball.vy*=-CONFIG.B_BOUNCE; }
+    if(ball.y + bR > FL.b){ ball.y=FL.b-bR; ball.vy*=-CONFIG.B_BOUNCE; }
     if(timeLeft>0){ secondAccum+=dt; if(secondAccum>=1000){secondAccum-=1000;timeLeft--;updateHUD();} }
     if(timeLeft<=0 && !gameOver){ gameOver=true; handleGameOverLocal(); }
   } else {
@@ -44,14 +45,10 @@ function update(dt) {
 }
 
 // ── GOL / FINE ─────────────────────────────────────────
-function goal(team) {
-  score[team]++; updateHUD();
-  setMsg(`⚽ GOOOL! ${team===0?'🔴 ROSSI':'🔵 BLU'}! (${score[0]}–${score[1]})`);
-  goalBurst(team===0?FL.l:FL.r, H/2);
-  const gf=$('goal-flash'); gf.style.opacity='1'; setTimeout(()=>gf.style.opacity='0',140);
-  goalCD=140;
-}
-
+// (la logica di gol vive inline in update() per l'allenamento, e nel
+// case 'goal' di network-core.js per il multiplayer: la funzione
+// goal(team) che stava qui non era mai chiamata da nessuno dei due
+// percorsi — rimossa)
 function handleGameOverLocal() {
   // solo training: torna al prematch dopo 3 secondi
   const msg = score[0]>score[1] ? `🏆 Vincono i ROSSI! (${score[0]}–${score[1]})` :

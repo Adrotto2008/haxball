@@ -63,7 +63,8 @@ function drawBall() {
 function drawShotArrow(p) {
   if(!p.held && p.charge<=0) return;
   const d = Math.hypot(ball.x-p.x, ball.y-p.y);
-  if(d > KICK_DIST) return;
+  const kickDist = p.r + ball.r + CONFIG.KICK_DIST_X;
+  if(d > kickDist) return;
   const cr = p.charge/KICK_CHG_F;
   const dx = ball.x-p.x, dy = ball.y-p.y, len = Math.hypot(dx,dy)||1;
   const nx = dx/len, ny = dy/len;
