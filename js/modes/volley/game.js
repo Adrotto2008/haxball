@@ -114,8 +114,8 @@ function vGoal(scoringTeam) {
   vTouches = { 0: 0, 1: 0 };
   vBallLastSide = null;
 
-  // Il prossimo serve va alla squadra che ha subito il punto (l'avversaria di chi ha segnato)
-  vServeTeam  = scoringTeam === 0 ? 1 : 0;
+  // Il prossimo serve va alla squadra che ha fatto punto
+  vServeTeam  = scoringTeam;
   vServePhase = true;
 
   vBall = vMkBall();

@@ -354,8 +354,8 @@ function handleGoal(room,team){room.score[team]++;room.goalCD=room.config.GOAL_C
 function vHandlePoint(room,scoringTeam){
   room.score[scoringTeam]++;
   room.vTouches={0:0,1:0}; room.vBallLastSide=null;
-  // Il prossimo serve va alla squadra che ha subito il punto
-  const nextServeTeam = scoringTeam === 0 ? 1 : 0;
+  // Il prossimo serve va alla squadra che ha fatto punto
+  const nextServeTeam = scoringTeam;
   vResetPositions(room, false, nextServeTeam);
   bcastAll(room,{type:'goal',team:scoringTeam,score:room.score.slice()});
   if(room.score[0]>99||room.score[1]>99)endMatch(room);

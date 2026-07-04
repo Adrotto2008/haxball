@@ -4,6 +4,17 @@ Versione più recente sempre in cima. Ad ogni modifica aggiornare `VERSION` in `
 
 ---
 
+## v2.29.0 — Fix regola battuta pallavolo: serve chi fa punto, non chi lo subisce
+
+### 🐛 Fix
+- **Regola battuta invertita**: dopo un punto, il serve andava alla squadra che aveva SUBITO il punto (l'avversaria di chi segnava) invece che a chi lo aveva appena fatto — comportamento sbagliato rispetto alla regola reale della pallavolo (side-out: chi vince lo scambio serve). Corretto sia lato client allenamento (`vGoal()` in `js/modes/volley/game.js`) sia lato server multiplayer (`vHandlePoint()` in `server.js`): ora `vServeTeam`/`nextServeTeam` = `scoringTeam`.
+
+### 📁 File modificati
+- `js/modes/volley/game.js` — `vGoal()`
+- `server.js` — `vHandlePoint()`
+
+---
+
 ## v2.28.0 — Audit di sicurezza e fisica: XSS stanza, config live ovunque, cleanup
 
 Sessione di audit completo (letti client, server, CSS, README) a partire da una revisione esterna: verificati tutti i punti trovati (quasi tutti confermati, uno già risolto in v2.27.0), più alcuni bug aggiuntivi trovati durante la verifica.
