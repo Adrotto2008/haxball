@@ -4,6 +4,46 @@ Versione più recente sempre in cima. Ad ogni modifica aggiornare `VERSION` in `
 
 ---
 
+## v2.32.0 — Migrazione server Render: Virginia → Frankfurt
+
+La region del servizio Render era **Virginia (US East)**: per utenti in Italia la sola tratta transatlantica pesava 100-150ms+ di RTT, piu' di qualsiasi ottimizzazione software fatta nelle sessioni precedenti (v2.30.0/v2.31.0 nascondono il ritardo, non lo eliminano). Creato un nuovo servizio Render in region **Frankfurt (EU Central)**, stesso repo/build/start command, nessuna env var aggiuntiva necessaria (solo `PORT`, automatica, e l'opzionale `ADMIN_TOKEN`, non impostata nemmeno sul vecchio servizio).
+
+- `js/network-core.js`: `WS_URL` di produzione aggiornato da `wss://haxball-9dkw.onrender.com` a `wss://haxball-1.onrender.com`
+- Nessun altro file referenzia l'URL del vecchio servizio (verificato anche `README.md`)
+- Il vecchio servizio su Virginia puo' restare attivo qualche giorno come fallback, poi va eliminato dalla dashboard Render
+
+### 📁 File modificati
+- `js/network-core.js` — `WS_URL`
+
+---
+
+## v2.31.0 — Rifinitura fluidità: ping adattivo + estrapolazione remoti
+
+Seguito diretto di v2.30.0, su richiesta di ridurre ulteriormente il lag percepito. Qui le due ottimizzazioni lasciate volutamente fuori dalla sessione precedente perché più delicate (comportamentali, non solo di banda), più due piccole rifiniture correlate. Riletti `js/state.js`, `js/network-core.js`, `server.js` e i due `sync.js` prima di ogni modifica.
+
+### 🎯 `INTERP_DELAY_MS` adattivo sul ping reale
+- `js/state.js`: `INTERP_DELAY_MS` da `const` a `let` (default 80ms), più due bound `INTERP_DELAY_MIN=60` / `INTERP_DELAY_MAX=200`.
+- `js/network-core.js`, handler `pong`: ad ogni pong ricalcola `INTERP_DELAY_MS = clamp(round(pingMs*0.7)+40, 60, 200)`. Ping basso → remoti più vicini al tempo reale; ping alto → più margine in automatico, senza dover configurare nulla.
+- **EMA sul ping**: `pingMs = pingMs*0.7 + sample*0.3` invece del valore istantaneo grezzo — un singolo pacchetto lento isolato non fa più saltare `INTERP_DELAY_MS` su e giù.
+- **Ping ogni 1s** invece di 2s, così l'adattamento reagisce ai cambi di rete con un ritardo massimo di ~1s invece di ~2s. Costo in banda trascurabile (un messaggio piccolissimo in più al secondo); verificato lato server che l'handler `ping`→`pong` non abbia rate limit.
+
+### 🏃 Estrapolazione player remoti quando il buffer va a secco
+- Prima (v2.30.0 e prima): se `renderTime` superava l'ultimo snapshot disponibile (rete lenta/jitter), il player remoto si congelava di scatto sull'ultima posizione nota.
+- Ora, in `interpolateRemotePlayers()` (calcio) e `vInterpolateRemotePlayers()` (pallavolo): si stima la velocità dagli **ultimi due snapshot reali** nel buffer (delta posizione / delta tempo — nessun vx/vy aggiuntivo trasmesso, coerente con il taglio del payload di v2.30.0) e si estrapola la posizione in avanti per una finestra breve (**max 150ms**). Oltre la finestra il player resta fermo alla posizione estrapolata raggiunta.
+- Guardie: l'estrapolazione parte solo se i due snapshot usati per stimare la velocità sono abbastanza ravvicinati (`0 < dtSnap < 100ms`) — altrimenti (avvio partita, primo snapshot, gap anomalo) si torna al comportamento di freeze secco di prima, per non inventare velocità da dati inaffidabili.
+
+### 📁 File modificati
+- `js/state.js` — `INTERP_DELAY_MS` (`const`→`let`), nuovi `INTERP_DELAY_MIN`/`MAX`
+- `js/network-core.js` — handler `pong` (EMA + calcolo adattivo), intervallo ping 2s→1s
+- `js/modes/soccer/sync.js` — `interpolateRemotePlayers()` (estrapolazione)
+- `js/modes/volley/sync.js` — `vInterpolateRemotePlayers()` (estrapolazione)
+
+### ⚠️ Ancora aperto (non ancora azione richiesta)
+- Region del server su Render — verificabile solo dalla dashboard, non dal filesystem: se non è già su Frankfurt/EU, per utenti in Italia pesa più di ogni ottimizzazione software.
+- Limite strutturale del WebSocket/TCP (head-of-line blocking): fuori scopo per questo progetto, richiederebbe un trasporto UDP-like (es. WebRTC DataChannel non affidabile).
+
+---
+
 ## v2.30.0 — Ottimizzazione rete: pacchetti più piccoli, broadcast più fluido
 
 Sessione di audit dell'architettura di rete (connessione WS, ciclo partita, formato pacchetti) a partire da un'analisi esterna che aveva lavorato solo sul codice incollato (senza filesystem): riletti tutti i file coinvolti (`server.js`, `network-core.js`, `state.js`, `js/modes/{soccer,volley}/{sync,game}.js`) per verificare ogni punto prima di applicarlo. Obiettivo: meno byte per pacchetto, meno banda sprecata, movimento remoto più fluido.

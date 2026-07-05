@@ -74,6 +74,7 @@ function vApplyRemoteState() {
 function vInterpolateRemotePlayers(now) {
   if (vPlayers.length === 0 || vSnapshotBuffer.length === 0) return;
   const renderTime = now - INTERP_DELAY_MS;
+  const EXTRAPOLATE_MAX_MS = 150; // oltre, il player potrebbe aver cambiato direzione
 
   for (let i = 0; i < vPlayers.length; i++) {
     const p = vPlayers[i];
@@ -86,9 +87,24 @@ function vInterpolateRemotePlayers(now) {
       continue;
     }
 
+    // renderTime e piu recente dell'ultimo snapshot: estrapola per una
+    // finestra breve con la velocita stimata dagli ultimi due snapshot
+    // reali (v2.31.0, simmetrico al calcio), poi resta fermo.
     if (renderTime >= vSnapshotBuffer[vSnapshotBuffer.length - 1].recvAt) {
-      const snap = vSnapshotBuffer[vSnapshotBuffer.length - 1];
-      if (snap.p[i]) { p.x = snap.p[i][0]; p.y = snap.p[i][1]; p.charge = snap.p[i][2] || 0; p.held = !!snap.p[i][3]; }
+      const lastSnap = vSnapshotBuffer[vSnapshotBuffer.length - 1];
+      if (!lastSnap.p[i]) continue;
+      const prevSnap = vSnapshotBuffer.length > 1 ? vSnapshotBuffer[vSnapshotBuffer.length - 2] : null;
+      const dtSnap = prevSnap ? lastSnap.recvAt - prevSnap.recvAt : 0;
+      if (prevSnap && prevSnap.p[i] && dtSnap > 0 && dtSnap < 100) {
+        const overMs = Math.min(renderTime - lastSnap.recvAt, EXTRAPOLATE_MAX_MS);
+        const vx = (lastSnap.p[i][0] - prevSnap.p[i][0]) / dtSnap;
+        const vy = (lastSnap.p[i][1] - prevSnap.p[i][1]) / dtSnap;
+        p.x = lastSnap.p[i][0] + vx * overMs;
+        p.y = lastSnap.p[i][1] + vy * overMs;
+      } else {
+        p.x = lastSnap.p[i][0]; p.y = lastSnap.p[i][1];
+      }
+      p.charge = lastSnap.p[i][2] || 0; p.held = !!lastSnap.p[i][3];
       continue;
     }
 

@@ -87,6 +87,7 @@ function applyRemoteState() {
 function interpolateRemotePlayers(now) {
   if (players.length === 0 || snapshotBuffer.length === 0) return;
   const renderTime = now - INTERP_DELAY_MS;
+  const EXTRAPOLATE_MAX_MS = 150; // oltre, il player potrebbe aver cambiato direzione
 
   for (let i = 0; i < players.length; i++) {
     const p = players[i];
@@ -103,11 +104,26 @@ function interpolateRemotePlayers(now) {
     }
 
     // renderTime e piu recente dell'ultimo snapshot (rete lenta / jitter):
-    // congela all'ultima posizione nota — meglio un player fermo di uno
-    // che scivola nella direzione sbagliata.
+    // invece di congelare subito, estrapola per una finestra breve usando
+    // la velocita stimata dagli ultimi due snapshot reali (nessun vx/vy
+    // trasmesso via rete dal v2.30.0: si ricava dal delta di posizione).
+    // Oltre la finestra resta fermo alla posizione estrapolata raggiunta —
+    // meglio un player fermo che scivola nella direzione sbagliata a lungo.
     if (renderTime >= snapshotBuffer[snapshotBuffer.length - 1].recvAt) {
-      const snap = snapshotBuffer[snapshotBuffer.length - 1];
-      if (snap.p[i]) { p.x = snap.p[i][0]; p.y = snap.p[i][1]; p.charge = snap.p[i][2]; p.held = !!snap.p[i][3]; }
+      const lastSnap = snapshotBuffer[snapshotBuffer.length - 1];
+      if (!lastSnap.p[i]) continue;
+      const prevSnap = snapshotBuffer.length > 1 ? snapshotBuffer[snapshotBuffer.length - 2] : null;
+      const dtSnap = prevSnap ? lastSnap.recvAt - prevSnap.recvAt : 0;
+      if (prevSnap && prevSnap.p[i] && dtSnap > 0 && dtSnap < 100) {
+        const overMs = Math.min(renderTime - lastSnap.recvAt, EXTRAPOLATE_MAX_MS);
+        const vx = (lastSnap.p[i][0] - prevSnap.p[i][0]) / dtSnap;
+        const vy = (lastSnap.p[i][1] - prevSnap.p[i][1]) / dtSnap;
+        p.x = lastSnap.p[i][0] + vx * overMs;
+        p.y = lastSnap.p[i][1] + vy * overMs;
+      } else {
+        p.x = lastSnap.p[i][0]; p.y = lastSnap.p[i][1];
+      }
+      p.charge = lastSnap.p[i][2]; p.held = !!lastSnap.p[i][3];
       continue;
     }
 

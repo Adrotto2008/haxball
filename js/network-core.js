@@ -8,9 +8,12 @@
 // `node server.js` (porta di default 3000, vedi PORT in server.js);
 // altrove usa sempre l'URL di produzione su Render. Prima era hardcoded
 // solo alla produzione: testare in locale richiedeva modificare il file.
+// v2.32.0: nuovo servizio Render su region Frankfurt (EU) al posto del
+// vecchio su Virginia (US East) — la tratta transatlantica pesava piu' di
+// ogni ottimizzazione software per utenti in Italia.
 const WS_URL = (location.hostname === 'localhost' || location.hostname === '127.0.0.1')
   ? 'ws://localhost:3000'
-  : 'wss://haxball-9dkw.onrender.com';
+  : 'wss://haxball-1.onrender.com';
 
 let ws = null;
 let wsRoom = null;           // codice stanza corrente
@@ -260,8 +263,14 @@ function handleServerMsg(msg) {
 
     case 'pong':
       if (msg.ts) {
-        pingMs = ~~((Date.now() - msg.ts) / 2);
+        const sample = ~~((Date.now() - msg.ts) / 2);
+        // EMA (v2.31.0): smorza i picchi isolati di ping cosi' INTERP_DELAY_MS
+        // non salta su e giu' per un singolo pacchetto lento.
+        pingMs = pingMs ? Math.round(pingMs * 0.7 + sample * 0.3) : sample;
         $('ping').textContent = `ping:${pingMs}ms`;
+        // INTERP_DELAY_MS adattivo (v2.31.0): piu' margine con ping alto,
+        // meno con ping basso. pingMs e' gia' una stima one-way (vedi sopra).
+        INTERP_DELAY_MS = Math.max(INTERP_DELAY_MIN, Math.min(INTERP_DELAY_MAX, Math.round(pingMs * 0.7) + 40));
       }
       break;
 
@@ -369,9 +378,12 @@ function sendGuestInput() {
   wsSend({ type: 'input', payload: { b: mask } });
 }
 
+// Ping ogni 1s (dimezzato da 2s in v2.31.0): serve un campione piu' fresco
+// perche' ora INTERP_DELAY_MS si aggiorna ad ogni pong (vedi sopra). Il
+// costo in banda e' trascurabile (payload minuscolo, 1 msg/s in piu').
 setInterval(() => {
   if (ws && ws.readyState === 1) wsSend({ type: 'ping', payload: { ts: Date.now() } });
-}, 2000);
+}, 1000);
 
 // ── DISCONNECT / LEAVE ───────────────────────────────────
 function handleWsClose() {
