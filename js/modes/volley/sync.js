@@ -13,8 +13,11 @@ function vApplyRemoteState() {
     vSnapshotBuffer = [];
     for (let i = 0; i < s.p.length && i < vPlayers.length; i++) {
       const sp = s.p[i], p = vPlayers[i];
-      p.x = sp[0]; p.y = sp[1]; p.vx = sp[2]; p.vy = sp[3];
-      p.charge = sp[4] || 0; p.held = !!sp[5];
+      if (!sp) continue; // spettatore (payload compresso a 0, v2.30.0)
+      // vx/vy non arrivano piu nel payload (v2.30.0): dopo un punto il
+      // server azzera comunque la velocita di tutti i player.
+      p.x = sp[0]; p.y = sp[1]; p.vx = 0; p.vy = 0;
+      p.charge = sp[2] || 0; p.held = !!sp[3];
     }
     if (s.b) {
       vBall.x = s.b[0]; vBall.y = s.b[1]; vBall.vx = s.b[2]; vBall.vy = s.b[3];
@@ -28,15 +31,18 @@ function vApplyRemoteState() {
   for (let i = 0; i < s.p.length && i < vPlayers.length; i++) {
     const sp = s.p[i], p = vPlayers[i];
     if (p.id !== myPlayerId) continue;
+    if (!sp) continue; // spettatore (payload compresso a 0, v2.30.0)
     if (!useLocalPrediction) continue;
     const dx = sp[0] - p.x, dy = sp[1] - p.y;
     const dist = Math.hypot(dx, dy);
-    if (dist > 80) { p.x = sp[0]; p.y = sp[1]; p.vx = sp[2]; p.vy = sp[3]; }
+    // vx/vy non arrivano piu nel payload (v2.30.0): sullo snap secco la
+    // velocita predetta localmente si riallinea da sola col prossimo input.
+    if (dist > 80) { p.x = sp[0]; p.y = sp[1]; }
     else if (dist > 1) {
       const alpha = Math.min(0.12, dist * 0.015);
       p.x += dx * alpha; p.y += dy * alpha;
     }
-    p.charge = sp[4] || 0; p.held = !!sp[5];
+    p.charge = sp[2] || 0; p.held = !!sp[3];
   }
 
   // ── PALLA: dead reckoning ─────────────────────────────────
@@ -76,13 +82,13 @@ function vInterpolateRemotePlayers(now) {
 
     if (renderTime <= vSnapshotBuffer[0].recvAt) {
       const snap = vSnapshotBuffer[0];
-      if (snap.p[i]) { p.x = snap.p[i][0]; p.y = snap.p[i][1]; p.charge = snap.p[i][4] || 0; p.held = !!snap.p[i][5]; }
+      if (snap.p[i]) { p.x = snap.p[i][0]; p.y = snap.p[i][1]; p.charge = snap.p[i][2] || 0; p.held = !!snap.p[i][3]; }
       continue;
     }
 
     if (renderTime >= vSnapshotBuffer[vSnapshotBuffer.length - 1].recvAt) {
       const snap = vSnapshotBuffer[vSnapshotBuffer.length - 1];
-      if (snap.p[i]) { p.x = snap.p[i][0]; p.y = snap.p[i][1]; p.charge = snap.p[i][4] || 0; p.held = !!snap.p[i][5]; }
+      if (snap.p[i]) { p.x = snap.p[i][0]; p.y = snap.p[i][1]; p.charge = snap.p[i][2] || 0; p.held = !!snap.p[i][3]; }
       continue;
     }
 
@@ -100,8 +106,8 @@ function vInterpolateRemotePlayers(now) {
     const t = span > 0 ? Math.max(0, Math.min(1, (renderTime - older.recvAt) / span)) : 1;
     p.x = older.p[i][0] + (newer.p[i][0] - older.p[i][0]) * t;
     p.y = older.p[i][1] + (newer.p[i][1] - older.p[i][1]) * t;
-    p.charge = newer.p[i][4] || 0;
-    p.held = !!newer.p[i][5];
+    p.charge = newer.p[i][2] || 0;
+    p.held = !!newer.p[i][3];
   }
 }
 

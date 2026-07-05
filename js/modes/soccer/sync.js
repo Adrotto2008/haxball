@@ -19,8 +19,11 @@ function applyRemoteState() {
     snapshotBuffer = [];
     for (let i = 0; i < s.p.length && i < players.length; i++) {
       const sp = s.p[i], p = players[i];
-      p.x = sp[0]; p.y = sp[1]; p.vx = sp[2]; p.vy = sp[3];
-      p.charge = sp[4]; p.held = !!sp[5];
+      if (!sp) continue; // spettatore (payload compresso a 0, v2.30.0)
+      // vx/vy non arrivano piu nel payload (v2.30.0): dopo un gol il
+      // server azzera comunque la velocita di tutti i player.
+      p.x = sp[0]; p.y = sp[1]; p.vx = 0; p.vy = 0;
+      p.charge = sp[2]; p.held = !!sp[3];
     }
     if (s.b) {
       ball.x = s.b[0]; ball.y = s.b[1]; ball.vx = s.b[2]; ball.vy = s.b[3];
@@ -34,6 +37,7 @@ function applyRemoteState() {
   for (let i = 0; i < s.p.length && i < players.length; i++) {
     const sp = s.p[i], p = players[i];
     if (p.id !== myPlayerId) continue;
+    if (!sp) continue; // spettatore (payload compresso a 0, v2.30.0)
     if (!useLocalPrediction) {
       // senza prediction: il server e autoritativo, ma usiamo il buffer
       // per l'interpolazione (vedi interpolateRemotePlayers)
@@ -41,7 +45,10 @@ function applyRemoteState() {
     }
     const dx = sp[0] - p.x, dy = sp[1] - p.y;
     const dist = Math.hypot(dx, dy);
-    if (dist > 80) { p.x = sp[0]; p.y = sp[1]; p.vx = sp[2]; p.vy = sp[3]; }
+    // vx/vy non arrivano piu nel payload (v2.30.0): sullo snap secco la
+    // velocita predetta localmente resta quella che era, si riallinea da
+    // sola col prossimo input/fisica.
+    if (dist > 80) { p.x = sp[0]; p.y = sp[1]; }
     else if (dist > 1) {
       // Correzione morbida: max 12% per frame, dipende dalla distanza.
       // Abbastanza lenta da non essere visibile, abbastanza veloce da
@@ -49,7 +56,7 @@ function applyRemoteState() {
       const alpha = Math.min(0.12, dist * 0.015);
       p.x += dx * alpha; p.y += dy * alpha;
     }
-    p.charge = sp[4]; p.held = !!sp[5];
+    p.charge = sp[2]; p.held = !!sp[3];
   }
 
   // ── PALLA: dead reckoning (vx/vy immediati, x/y lerp leggero) ──
@@ -91,7 +98,7 @@ function interpolateRemotePlayers(now) {
     // Buffer non ancora riempito: usa snapshot piu vecchio disponibile
     if (renderTime <= snapshotBuffer[0].recvAt) {
       const snap = snapshotBuffer[0];
-      if (snap.p[i]) { p.x = snap.p[i][0]; p.y = snap.p[i][1]; p.charge = snap.p[i][4]; p.held = !!snap.p[i][5]; }
+      if (snap.p[i]) { p.x = snap.p[i][0]; p.y = snap.p[i][1]; p.charge = snap.p[i][2]; p.held = !!snap.p[i][3]; }
       continue;
     }
 
@@ -100,7 +107,7 @@ function interpolateRemotePlayers(now) {
     // che scivola nella direzione sbagliata.
     if (renderTime >= snapshotBuffer[snapshotBuffer.length - 1].recvAt) {
       const snap = snapshotBuffer[snapshotBuffer.length - 1];
-      if (snap.p[i]) { p.x = snap.p[i][0]; p.y = snap.p[i][1]; p.charge = snap.p[i][4]; p.held = !!snap.p[i][5]; }
+      if (snap.p[i]) { p.x = snap.p[i][0]; p.y = snap.p[i][1]; p.charge = snap.p[i][2]; p.held = !!snap.p[i][3]; }
       continue;
     }
 
@@ -119,8 +126,8 @@ function interpolateRemotePlayers(now) {
     const t = span > 0 ? Math.max(0, Math.min(1, (renderTime - older.recvAt) / span)) : 1;
     p.x = older.p[i][0] + (newer.p[i][0] - older.p[i][0]) * t;
     p.y = older.p[i][1] + (newer.p[i][1] - older.p[i][1]) * t;
-    p.charge = newer.p[i][4];
-    p.held = !!newer.p[i][5];
+    p.charge = newer.p[i][2];
+    p.held = !!newer.p[i][3];
     // vx/vy non vengono interpolati: non servono per il rendering,
     // il server e l'unica fonte di verita per la fisica.
   }

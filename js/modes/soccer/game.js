@@ -32,10 +32,11 @@ function update(dt) {
     if(timeLeft<=0 && !gameOver){ gameOver=true; handleGameOverLocal(); }
   } else {
     sendGuestInput();
-    const _nowTs = performance.now();
     physAccum = Math.min(physAccum + dt, PHYS_TICK * 4);
     while(physAccum >= PHYS_TICK) { tickRemotePhysics(); physAccum -= PHYS_TICK; }
-    interpolateRemotePlayers(_nowTs);
+    // interpolateRemotePlayers() non si chiama piu qui (v2.30.0): loop()
+    // la richiama gia subito dopo update(), sempre, anche a menu aperto.
+    // Chiamarla anche qui era lavoro doppio ogni frame a menu chiuso.
     if(timeLeft>0){ secondAccum+=dt; if(secondAccum>=1000){secondAccum-=1000;timeLeft--;updateHUD();} }
   }
 

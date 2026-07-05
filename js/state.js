@@ -41,8 +41,11 @@ const CONFIG_META = [
 // (caricato dopo questo file nell'HTML). Non ridefinirli qui.
 
 // ── SNAPSHOT INTERPOLATION ──────────────────────────────
-// Ritardo di render per i player remoti.
-const INTERP_DELAY_MS = 50;
+// Ritardo di render per i player remoti. Alzato da 50 a 80ms in v2.30.0
+// insieme all'abbassamento del broadcast server (60Hz -> 30Hz, ~33ms tra
+// snapshot): serve margine extra per avere quasi sempre 2 snapshot adiacenti
+// disponibili anche con jitter di rete.
+const INTERP_DELAY_MS = 80;
 
 // Buffer snapshot calcio
 let snapshotBuffer = [];

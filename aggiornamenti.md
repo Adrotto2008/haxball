@@ -4,6 +4,34 @@ Versione più recente sempre in cima. Ad ogni modifica aggiornare `VERSION` in `
 
 ---
 
+## v2.30.0 — Ottimizzazione rete: pacchetti più piccoli, broadcast più fluido
+
+Sessione di audit dell'architettura di rete (connessione WS, ciclo partita, formato pacchetti) a partire da un'analisi esterna che aveva lavorato solo sul codice incollato (senza filesystem): riletti tutti i file coinvolti (`server.js`, `network-core.js`, `state.js`, `js/modes/{soccer,volley}/{sync,game}.js`) per verificare ogni punto prima di applicarlo. Obiettivo: meno byte per pacchetto, meno banda sprecata, movimento remoto più fluido.
+
+### 📦 Pacchetti più leggeri
+- **vx/vy dei player tolti dal payload di stato** (`serializeState`/`vSerializeState` in `server.js`): non venivano mai letti per i player remoti (lo dice il commento in `sync.js`: "non servono per il rendering") e per il player locale solo nel raro caso di snap secco (>80px). L'array per player passa da 6 a 4 elementi (`[x,y,charge,held]`): circa **-33% di byte per player**, 30 volte al secondo per stanza. Aggiornati tutti i punti che leggevano gli indici `[4]`/`[5]` (ora `[2]`/`[3]`) in `js/modes/soccer/sync.js` e `js/modes/volley/sync.js` (goal/respawn, correzione player locale, interpolazione remoti).
+- **Spettatori compressi a `0` invece dell'array completo**: uno spettatore restava un elemento statico `[x:-9999,y:-9999,...]` spedito 30 volte/secondo per sempre, mai disegnato né interpolato. Ora `p.team===-1` diventa semplicemente `0` nel payload (**~95% in meno** per quello slot). Aggiunta la guardia `if (!sp) continue;` nei due punti che non l'avevano ancora (blocco reset/gol e correzione player locale in entrambi i `sync.js`); l'interpolazione remoti aveva già il pattern difensivo `if (snap.p[i])`.
+- **Broadcast dimezzato**: `BCAST_MS` in `server.js` passa da 60Hz a 30Hz (`1000/30`), senza toccare `TICK_MS` — la fisica resta a 60Hz, cambia solo la frequenza di invio dello stato ai client. Dimezza il traffico in uscita.
+
+### 🎯 Fluidità
+- **`INTERP_DELAY_MS`** (`js/state.js`) alzato da 50 a 80ms per compensare l'intervallo maggiore tra snapshot (30Hz ≈ 33ms invece di 60Hz ≈ 16ms): serve margine per avere quasi sempre 2 snapshot adiacenti disponibili anche con jitter di rete.
+- **Fix pallavolo — remoti congelati a menu aperto**: `vUpdate()` usciva subito su `escOpen` prima di richiamare `vInterpolateRemotePlayers()`, quindi con il menu P aperto i player remoti restavano fermi (nel calcio invece continuavano a muoversi, perché `loop()` richiama `interpolateRemotePlayers()` separatamente da `update()`). Ora `vLoop()` richiama `vInterpolateRemotePlayers()` subito dopo `vUpdate()`, sempre, come già fa `loop()` per il calcio — comportamento allineato tra le due modalità.
+- **Rimossa una chiamata doppia**: `interpolateRemotePlayers()`/`vInterpolateRemotePlayers()` venivano chiamate sia dentro `update()`/`vUpdate()` sia subito dopo in `loop()`/`vLoop()` — la seconda è quella che serve davvero (copre anche il caso menu aperto), la prima era lavoro ripetuto ogni frame a menu chiuso. Rimossa da entrambi gli `update()`.
+
+### ⚠️ Verificato ma non ancora azione richiesta
+- **Region del server su Render**: non verificabile da qui (serve la dashboard Render). Se il servizio non è già su Frankfurt/EU, per utenti in Italia la tratta di rete pesa più di qualsiasi ottimizzazione lato codice — vale la pena controllarla.
+- Non implementate in questa sessione (proposte solo come rifinitura futura, rischio/beneficio meno chiaro): estrapolazione dei player remoti quando il buffer di snapshot va a secco (oggi si congelano, scelta esplicita), `INTERP_DELAY_MS` adattivo in base al ping.
+
+### 📁 File modificati
+- `server.js` — `BCAST_MS`, `serializeState()`, `vSerializeState()`
+- `js/state.js` — `INTERP_DELAY_MS`
+- `js/modes/soccer/sync.js` — `applyRemoteState()`, `interpolateRemotePlayers()`
+- `js/modes/volley/sync.js` — `vApplyRemoteState()`, `vInterpolateRemotePlayers()`
+- `js/modes/soccer/game.js` — `update()`
+- `js/modes/volley/game.js` — `vUpdate()`, `vLoop()`
+
+---
+
 ## v2.29.0 — Fix regola battuta pallavolo: serve chi fa punto, non chi lo subisce
 
 ### 🐛 Fix

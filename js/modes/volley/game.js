@@ -84,11 +84,11 @@ function vUpdate(dt) {
   } else {
     // MULTIPLAYER: manda input, dead reckoning palla + prediction locale
     sendGuestInput();
-    const _nowTs = performance.now();
     vPhysAccum = Math.min(vPhysAccum + dt, V_PHYS_TICK * 4);
     while (vPhysAccum >= V_PHYS_TICK) { vTickRemotePhysics(); vPhysAccum -= V_PHYS_TICK; }
-    // Interpolazione posizione visiva player remoti tramite snapshot buffer
-    vInterpolateRemotePlayers(_nowTs);
+    // vInterpolateRemotePlayers() non si chiama piu qui (v2.30.0): vLoop()
+    // la richiama gia subito dopo vUpdate(), sempre, anche a menu P aperto
+    // (prima i remoti si congelavano col menu aperto, a differenza del calcio).
 
     // Trail
     if (!vBall.trail) vBall.trail = [];
@@ -233,6 +233,10 @@ function vLoop(ts) {
   const dt = (vLastFrameTime && visible) ? Math.min(ts - vLastFrameTime, 100) : 16.67;
   vLastFrameTime = ts;
   if (visible) vUpdate(dt);
+  // Interpolazione player remoti ad ogni frame, anche a menu P aperto
+  // (simmetrico a loop() in modes/soccer/game.js, v2.30.0). Prima vUpdate()
+  // usciva subito su escOpen e i remoti restavano congelati col menu aperto.
+  if (netMode !== 'train') vInterpolateRemotePlayers(performance.now());
   vDraw();
   _vRafId = requestAnimationFrame(vLoop);
 }

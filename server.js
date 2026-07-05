@@ -51,7 +51,7 @@ const V_POST_X1=V_NET_X-V_POST_W/2, V_POST_X2=V_NET_X+V_POST_W/2;
 const V_POST_Y1=V_FL.b-V_POST_H,    V_POST_Y2=V_FL.b;
 const V_B_GRAV_BASE=0.015, V_B_GRAV_MAX=0.06, V_B_GRAV_RAMP=0.0008;
 const V_TEAM_MAX_TOUCHES=3;
-const TICK_MS=1000/60, BCAST_MS=1000/60;
+const TICK_MS=1000/60, BCAST_MS=1000/30;
 
 // Linee di restrizione battuta (stessa logica del client, vedi physics.js).
 // La palla e' ferma sulla rete: chi batte la raggiunge gia' stando
@@ -330,14 +330,20 @@ function vResetPositions(room,full,nextServeTeam){
 
 function serializeState(room){
   return{type:'state',
-    p:room.players.map(p=>[Math.round(p.x),Math.round(p.y),Math.round(p.vx*100)/100,Math.round(p.vy*100)/100,p.charge,p.held?1:0]),
+    // vx/vy dei player non servono mai al rendering (remoti: mai letti;
+    // locale: solo nel raro caso di snap >80px) — tolti dal payload.
+    // Gli spettatori (team===-1) sono compressi a 0 invece dell'array
+    // completo: nessuno li disegna né li interpola (v2.30.0).
+    p:room.players.map(p=>p.team===-1?0:[Math.round(p.x),Math.round(p.y),p.charge,p.held?1:0]),
     b:[Math.round(room.ball.x),Math.round(room.ball.y),Math.round(room.ball.vx*100)/100,Math.round(room.ball.vy*100)/100],
     gc:room.goalCD};
 }
 function vSerializeState(room){
   const b=room.ball;
   return{type:'state',
-    p:room.players.map(p=>[Math.round(p.x),Math.round(p.y),Math.round(p.vx*100)/100,Math.round(p.vy*100)/100,p.charge||0,p.held?1:0]),
+    // Stessa ottimizzazione di serializeState() (v2.30.0): niente vx/vy
+    // player, spettatori compressi a 0.
+    p:room.players.map(p=>p.team===-1?0:[Math.round(p.x),Math.round(p.y),p.charge||0,p.held?1:0]),
     b:[Math.round(b.x),Math.round(b.y),Math.round(b.vx*100)/100,Math.round(b.vy*100)/100,Math.round((b.grav||V_B_GRAV_BASE)*10000)/10000],
     gc:room.goalCD, touches:[room.vTouches[0],room.vTouches[1]],
     serveTeam:room.vServeTeam, servePhase:room.vServePhase?1:0};
