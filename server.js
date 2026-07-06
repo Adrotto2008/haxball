@@ -257,6 +257,7 @@ function mkRoom(code,name,password,mode){
     score:[0,0], timeLeft:isVolley?V_CONFIG_DEFAULT.V_MATCH_TIME:CONFIG_DEFAULT.MATCH_TIME,
     gameOver:false, goalCD:0, started:false, hostPid:null, roster:[],
     inputs:{}, afkSet:new Set(), skins:{},
+    paused:false,
     vTouches:{0:0,1:0}, vBallLastSide:null,
     // Ultimo giocatore che ha toccato la palla (regola doppio tocco):
     // se la squadra ha piu' di un giocatore attivo, lo stesso giocatore
@@ -374,9 +375,42 @@ function vHandlePoint(room,scoringTeam){
 
 function endMatch(room){room.gameOver=true;bcastAll(room,{type:'game_over',score:room.score.slice()});}
 
+// ── BATTUTE SPECIALI PALLAVOLO (/a /q /z) ────────────────
+// Applica una delle 3 traiettorie di battuta preimpostate direttamente
+// alla palla (bypassa vDoKickSrv: la palla e' comunque gia' raggiungibile
+// dal battitore durante la fase serve, ma qui il tiro e' un comando
+// esplicito invece che un tocco fisico). Usabile solo durante la fase di
+// battuta (room.vServePhase) e solo dal team che deve battere — verificato
+// dal chiamante prima di invocare questa funzione.
+function vApplyServeVariant(room,p,variant){
+  const vcfg=room.vconfig, ball=room.ball;
+  const dir=room.vServeTeam===0?1:-1; // verso il campo avversario
+  const range=vcfg.V_KICK_MAX-vcfg.V_KICK_MIN;
+  let vx,vy;
+  if(variant==='a'){
+    // /a — battuta tesa e potente, arco basso
+    vx=dir*vcfg.V_KICK_MAX; vy=-3;
+  } else if(variant==='q'){
+    // /q — battuta a parabola alta
+    vx=dir*(vcfg.V_KICK_MIN+range*0.45); vy=-9.5;
+  } else {
+    // /z — battuta corta e morbida, arco breve appena oltre la rete
+    vx=dir*(vcfg.V_KICK_MIN*1.15); vy=-6;
+  }
+  ball.vx=vx; ball.vy=vy; ball.grav=V_B_GRAV_BASE;
+  p.kickCooldown=true;
+
+  // Stessa contabilita' di un tocco normale (coerente con vTick)
+  room.vLastToucherId=p.id; room.vLastToucherTeam=p.team;
+  const opp=p.team===0?1:0;
+  room.vTouches[opp]=0; room.vTouches[p.team]=1;
+  room.vServePhase=false;
+  bcastAll(room,{type:'v_serve',serveTeam:room.vServeTeam,servePhase:false});
+}
+
 // ── TICK CALCIO ───────────────────────────────────────────
 function tick(room){
-  if(!room.started||room.gameOver)return;
+  if(!room.started||room.gameOver||room.paused)return;
   if(room.goalCD>0){room.goalCD--;return;}
   const cfg=room.config;
   room.secondAccum+=TICK_MS;
@@ -402,7 +436,7 @@ function tick(room){
 
 // ── TICK PALLAVOLO ────────────────────────────────────────
 function vTick(room){
-  if(!room.started||room.gameOver)return;
+  if(!room.started||room.gameOver||room.paused)return;
   if(room.goalCD>0){room.goalCD--;return;}
   const vcfg=room.vconfig;
 
@@ -494,6 +528,7 @@ function vTick(room){
 function startMatch(room){
   room.roster=buildRoster(room);
   room.players=buildPlayers(room.roster,room.mode,room.config,room.vconfig);
+  room.paused=false;
   if(room.mode==='volley') vResetPositions(room,true,0);  // team 0 (rossi) battono all'inizio
   else resetPositions(room,true);
   room.started=true;
@@ -577,9 +612,42 @@ wss.on('connection',ws=>{
     if(type==='start'){if(myPid===myRoom.hostPid)startMatch(myRoom);return;}
     if(type==='restart'){
       if(myPid!==myRoom.hostPid)return;
+      myRoom.paused=false;
       if(myRoom.mode==='volley'){myRoom.gameOver=false;vResetPositions(myRoom,true,0);}
       else{resetPositions(myRoom,true);myRoom.gameOver=false;}
       bcastAll(myRoom,{type:'restarted'});return;
+    }
+    if(type==='pause'){
+      // Host-only. Toggle pausa: mentre attiva, tick()/vTick() ritornano
+      // subito (nessuna fisica, nessun broadcast di stato) finche' l'host
+      // non la disattiva di nuovo. Disponibile anche da chat (/pause).
+      if(myPid!==myRoom.hostPid)return;
+      if(!myRoom.started||myRoom.gameOver)return;
+      myRoom.paused=!myRoom.paused;
+      bcastAll(myRoom,{type:'paused',paused:myRoom.paused});
+      return;
+    }
+    if(type==='stop'){
+      // Host-only. Termina subito la partita in corso con il punteggio
+      // attuale, riusando lo stesso flusso di fine-partita normale
+      // (endMatch → broadcast game_over). Disponibile anche da chat (/stop).
+      if(myPid!==myRoom.hostPid)return;
+      if(!myRoom.started||myRoom.gameOver)return;
+      myRoom.paused=false;
+      endMatch(myRoom);
+      return;
+    }
+    if(type==='vserve'){
+      // Battute speciali pallavolo (/a /q /z): solo durante la fase di
+      // battuta, solo per un giocatore della squadra che deve servire.
+      if(myRoom.mode!=='volley'||!myRoom.started||myRoom.gameOver||myRoom.paused)return;
+      if(!myRoom.vServePhase)return;
+      const variant=payload&&payload.variant;
+      if(variant!=='a'&&variant!=='q'&&variant!=='z')return;
+      const p=myRoom.players.find(x=>x.id===myPid);
+      if(!p||p.team!==myRoom.vServeTeam)return;
+      vApplyServeVariant(myRoom,p,variant);
+      return;
     }
     if(type==='chat'){bcastAll(myRoom,{type:'chat',pid:myPid,name:clampStr(payload.name,20),text:clampStr(payload.text,150)});return;}
     if(type==='set_config'){if(myPid!==myRoom.hostPid)return;applyConfigPatch(payload.patch,myRoom);return;}
@@ -610,7 +678,7 @@ wss.on('connection',ws=>{
     if(type==='kick'){if(myPid!==myRoom.hostPid)return;for(const[kws,kc] of myRoom.clients)if(kc.pid===payload.pid){send(kws,{type:'kicked'});kws.close();break;}return;}
     if(type==='transfer'){if(myPid!==myRoom.hostPid)return;myRoom.hostPid=payload.pid;bcastAll(myRoom,{type:'host_change',hostId:myRoom.hostPid});return;}
     if(type==='back_prematch'){
-      if(myPid!==myRoom.hostPid)return;myRoom.started=false;
+      if(myPid!==myRoom.hostPid)return;myRoom.started=false;myRoom.paused=false;
       if(myRoom.ticker){clearInterval(myRoom.ticker);myRoom.ticker=null;}
       bcastAll(myRoom,{type:'back_prematch'});return;
     }

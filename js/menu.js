@@ -12,6 +12,13 @@ function openMenu(context) {
   if (typeof _updateStartBtnPresetState === 'function') _updateStartBtnPresetState();
   $('esc-resume').style.display    = menuContext === 'ingame' ? '' : 'none';
   $('esc-restart').style.display   = (menuContext === 'ingame' && netMode !== 'guest') ? '' : 'none';
+  // Pausa/stop: solo l'host, solo in-game, solo in multiplayer (in
+  // allenamento non ha senso: si e' gia' soli e liberi di fermarsi quando
+  // si vuole chiudendo il menu).
+  const canAdminMatch = isHost && menuContext === 'ingame' && netMode !== 'train';
+  $('esc-pause').style.display     = canAdminMatch ? '' : 'none';
+  $('esc-stop').style.display      = canAdminMatch ? '' : 'none';
+  _updatePauseBtnLabel();
   $('esc-leave').textContent       = menuContext === 'prematch' ? '← Lascia stanza' : '✕ Esci';
   $('pm-admin-hint').style.display = isHost ? '' : 'none';
   $('gm-close-btn').style.display  = menuContext === 'ingame' ? '' : 'none';
@@ -294,6 +301,15 @@ function renderConfigPanel() {
   }
 }
 
+// Aggiorna l'etichetta del bottone pausa in base allo stato corrente di
+// matchPaused (chiamata da openMenu() e dall'handler 'paused' in
+// network-core.js quando il menu e' gia' aperto).
+function _updatePauseBtnLabel() {
+  const btn = $('esc-pause');
+  if (!btn) return;
+  btn.textContent = matchPaused ? '▶ Riprendi partita' : '⏸ Pausa partita';
+}
+
 function toggleEscMenu(forceOpen) {
   const isOpen = $('game-menu').classList.contains('open');
   if (forceOpen === true || (!isOpen && forceOpen !== false)) {
@@ -338,3 +354,14 @@ $('esc-restart').onclick  = () => {
   }
 };
 $('esc-leave').onclick = () => { closeMenu(); leaveGame(); };
+
+// ── ADMIN: pausa / stop partita (equivalenti UI di /pause e /stop) ──
+$('esc-pause').onclick = () => {
+  if (!isHost || netMode === 'train') return;
+  wsSend({ type: 'pause', payload: {} });
+};
+$('esc-stop').onclick = () => {
+  if (!isHost || netMode === 'train') return;
+  if (!confirm('Terminare subito la partita con il punteggio attuale?')) return;
+  wsSend({ type: 'stop', payload: {} });
+};

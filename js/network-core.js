@@ -169,6 +169,7 @@ function handleServerMsg(msg) {
       break;
 
     case 'start':
+      matchPaused = false;
       pmRoster = msg.roster;
       hostId   = msg.hostId;
       isHost   = (msg.hostId === myPlayerId);
@@ -224,6 +225,7 @@ function handleServerMsg(msg) {
       break;
 
     case 'restarted':
+      matchPaused = false;
       if (currentGameMode === 'volley') { vReset(true); vUpdateHUD(); }
       else { reset(true); updateHUD(); }
       break;
@@ -249,6 +251,18 @@ function handleServerMsg(msg) {
         const teamName = vServeTeam === 0 ? '🔴 ROSSI' : '🔵 BLU';
         sysMsg('🏐 Battuta: ' + teamName);
       }
+      break;
+
+    case 'paused':
+      // L'host ha messo in pausa/ripreso la partita (menu o /pause).
+      // Mentre matchPaused è true, update()/vUpdate() ritornano subito
+      // (vedi modes/soccer/game.js e modes/volley/game.js): nessun input
+      // inviato, nessuna fisica locale, nessuna interpolazione remota —
+      // lo stato resta congelato esattamente come lato server.
+      matchPaused = !!msg.paused;
+      setMsg(matchPaused ? '⏸️ PARTITA IN PAUSA' : '');
+      sysMsg(matchPaused ? '⏸️ L\'host ha messo in pausa la partita' : '▶️ L\'host ha ripreso la partita');
+      if (typeof _updatePauseBtnLabel === 'function') _updatePauseBtnLabel();
       break;
 
     case 'meta':

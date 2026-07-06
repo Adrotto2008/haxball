@@ -26,6 +26,7 @@ let vRunning = false;
 // ── UPDATE ───────────────────────────────────────────────
 function vUpdate(dt) {
   if (vGameOver || escOpen) return;
+  if (matchPaused) return;
   if (vGoalCD > 0) { vGoalCD--; return; }
 
   if (netMode === 'train') {
@@ -241,7 +242,9 @@ function vLoop(ts) {
   // Interpolazione player remoti ad ogni frame, anche a menu P aperto
   // (simmetrico a loop() in modes/soccer/game.js, v2.30.0). Prima vUpdate()
   // usciva subito su escOpen e i remoti restavano congelati col menu aperto.
-  if (netMode !== 'train') vInterpolateRemotePlayers(performance.now());
+  // Non durante una pausa admin: lo stato deve restare fermo esattamente
+  // com'era al momento del freeze (v2.34.0, simmetrico al calcio).
+  if (netMode !== 'train' && !matchPaused) vInterpolateRemotePlayers(performance.now());
   vDraw();
   _vRafId = requestAnimationFrame(vLoop);
 }

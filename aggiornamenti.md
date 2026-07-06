@@ -4,6 +4,36 @@ Versione più recente sempre in cima. Ad ogni modifica aggiornare `VERSION` in `
 
 ---
 
+## v2.34.0 — Admin: pausa/stop partita (+ /pause /stop) — Pallavolo: battute speciali /a /q /z
+
+Due funzionalità nuove su richiesta. Riletti `server.js`, `js/network-core.js`, `js/menu.js`, `js/chat.js`, `js/state.js`, `index.html` e i file `js/modes/{soccer,volley}/game.js` + `js/modes/volley/physics.js` prima di ogni modifica.
+
+### ⏸️ Admin: pausa e fine partita
+- **Pausa** (toggle): l'host può mettere in pausa/riprendere la partita in corso dal bottone ⏸ nel menu (Esc/P → "Pausa partita") oppure scrivendo **`/pause`** in chat. Lato server, `tick()`/`vTick()` ritornano subito quando `room.paused` è vero (nessuna fisica, nessun broadcast di stato) finché l'host non riattiva. Il server notifica tutti i client col messaggio dedicato `paused`; i client congelano `update()`/`vUpdate()` (e smettono di interpolare i player remoti, così lo stato resta fermo esattamente com'era, invece di continuare a interpolare verso l'ultimo snapshot) finché non arriva `paused:false`.
+- **Fine partita immediata**: l'host può terminare subito la partita col punteggio attuale dal bottone ⏹ nel menu oppure con **`/stop`** in chat. Riusa lo stesso flusso di fine-partita già esistente (`endMatch` → broadcast `game_over`), quindi il comportamento a schermo (schermata risultato, ritorno alla sala d'attesa dopo 3s) è identico a una partita finita normalmente per tempo/punteggio.
+- Entrambi i comandi sono host-only (verificato sia lato chat/menu sia — di nuovo, per sicurezza — lato server) e disabilitati in allenamento (non ha senso mettere in pausa se si gioca da soli).
+
+### 🏐 Battute speciali pallavolo (`/a` `/q` `/z`)
+- Tre traiettorie di battuta preimpostate, utilizzabili **solo durante la fase di battuta** e **solo da un giocatore della squadra che deve servire** in quel momento (verificato sia lato chat/client sia lato server prima di applicarle):
+  - **`/a`** — battuta tesa e potente, arco basso (potenza massima, poca elevazione).
+  - **`/q`** — battuta a parabola alta (elevazione forte, arriva dall'alto).
+  - **`/z`** — battuta corta e morbida (arco breve, appena oltre la rete).
+- Il comando applica direttamente la velocità preimpostata alla palla (bypassando il tiro fisico normale, ma con la stessa contabilità di un tocco: chiude la fase di battuta, conta come primo tocco della squadra, aggiorna `vLastToucher` per la regola del doppio tocco introdotta in v2.33.0).
+- Implementato in modo autoritativo lato server (`vApplyServeVariant()` in `server.js`, nuovo messaggio `vserve`) e specularmente lato client per l'allenamento (`vApplyServeVariantLocal()` in `js/modes/volley/physics.js`), così i comandi funzionano anche da soli in allenamento.
+
+### 📁 File modificati
+- `server.js` — campo room `paused`; handler messaggi `pause`/`stop`/`vserve`; `vApplyServeVariant()`; guardia `room.paused` in `tick()`/`vTick()`; reset `paused` in `startMatch()`/`restart`/`back_prematch`
+- `js/state.js` — nuova variabile globale `matchPaused`
+- `js/network-core.js` — case `paused` (freeze/unfreeze UI), reset `matchPaused` su `start`/`restarted`
+- `js/modes/soccer/game.js` — `update()`/`loop()` rispettano `matchPaused`
+- `js/modes/volley/game.js` — `vUpdate()`/`vLoop()` rispettano `matchPaused`
+- `js/modes/volley/physics.js` — `vApplyServeVariantLocal()` (battute speciali in allenamento)
+- `js/chat.js` — comandi `/pause`, `/stop`, `/a`, `/q`, `/z`
+- `js/menu.js` — bottoni ⏸ Pausa / ⏹ Termina nel menu in-game (host-only), `_updatePauseBtnLabel()`
+- `index.html` — bottoni `esc-pause`/`esc-stop`
+
+---
+
 ## v2.33.0 — Fix trasferimento admin su disconnessione + regola doppio tocco pallavolo
 
 Due fix indipendenti su richiesta. Riletti `server.js`, `js/network-core.js`, `js/admin.js`, `js/menu.js`, `js/lobby.js` e i file `js/modes/volley/{physics,game}.js` prima di ogni modifica.

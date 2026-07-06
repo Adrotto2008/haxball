@@ -12,6 +12,7 @@ let physAccum = 0;
 
 function update(dt) {
   if(gameOver || escOpen) return;
+  if(matchPaused) return;
   if(goalCD>0) { goalCD--; return; }
 
   if(netMode === 'train') {
@@ -149,8 +150,11 @@ function loop(ts) {
   const dt = (lastFrameTime && visible) ? Math.min(ts - lastFrameTime, 100) : 16.67;
   lastFrameTime = ts;
   if(visible) update(dt);
-  // Interpolazione player remoti ad ogni frame (anche in multiplayer fermo)
-  if(netMode !== 'train') interpolateRemotePlayers(performance.now());
+  // Interpolazione player remoti ad ogni frame (anche in multiplayer fermo).
+  // Non durante una pausa admin: lo stato deve restare congelato esattamente
+  // com'era al momento della pausa, non continuare a interpolare verso
+  // l'ultimo snapshot ricevuto prima del freeze.
+  if(netMode !== 'train' && !matchPaused) interpolateRemotePlayers(performance.now());
   draw();
   _rafId = requestAnimationFrame(loop);
 }

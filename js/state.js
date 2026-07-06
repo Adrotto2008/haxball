@@ -82,6 +82,10 @@ let chatOpen = false, chatMessages = [];
 let particles = [];
 let running = false, escOpen = false;
 let currentView = 8;
+// true quando l'host ha messo in pausa la partita in corso (comando/menu
+// admin): il server smette di far avanzare la fisica e di trasmettere
+// stato; i client congelano update()/vUpdate() in eco (vedi game.js).
+let matchPaused = false;
 
 // ── IMPOSTAZIONE: prediction locale ───────────────────
 let useLocalPrediction = JSON.parse(localStorage.getItem('hax_prediction') ?? 'true');

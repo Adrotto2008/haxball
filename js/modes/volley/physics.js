@@ -126,6 +126,35 @@ function vDoKick(p, advanced) {
   return true;
 }
 
+// ── BATTUTE SPECIALI (/a /q /z) — solo allenamento ──────
+// Equivalente locale di vApplyServeVariant() in server.js: applica una
+// delle 3 traiettorie preimpostate direttamente alla palla, bypassando
+// vDoKick. Il chiamante (chat.js) verifica gia' che si sia in fase di
+// battuta e che il player appartenga alla squadra che deve servire.
+function vApplyServeVariantLocal(p, variant) {
+  const cfg = V_CONFIG;
+  const dir = vServeTeam === 0 ? 1 : -1; // verso il campo avversario
+  const range = cfg.V_KICK_MAX - cfg.V_KICK_MIN;
+  let vx, vy;
+  if (variant === 'a') {
+    // /a — battuta tesa e potente, arco basso
+    vx = dir * cfg.V_KICK_MAX; vy = -3;
+  } else if (variant === 'q') {
+    // /q — battuta a parabola alta
+    vx = dir * (cfg.V_KICK_MIN + range * 0.45); vy = -9.5;
+  } else {
+    // /z — battuta corta e morbida, arco breve appena oltre la rete
+    vx = dir * (cfg.V_KICK_MIN * 1.15); vy = -6;
+  }
+  vBall.vx = vx; vBall.vy = vy; vBall.grav = V_B_GRAV_BASE;
+  p.kickCooldown = true;
+
+  vLastToucher = { id: p.id, team: p.team };
+  vIncrementTouch(p.team);
+  vServePhase = false;
+  spawnP(vBall.x, vBall.y, 6, V_TEAM_COLS[p.team], 6, 12);
+}
+
 // ── AGGIORNAMENTO COOLDOWN ───────────────────────────────
 // Chiamato ogni frame per i player che NON stanno premendo AZIONE,
 // così il cooldown si azzera anche senza tirare.

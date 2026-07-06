@@ -60,8 +60,55 @@ const CHAT_COMMANDS = {
       setSkin(val);
       sysMsg(`✅ Skin impostata: "${val}"`);
     }
+  },
+  '/pause': {
+    desc: '(host) Mette in pausa/riprende la partita in corso',
+    run() { _adminPauseCommand(); }
+  },
+  '/stop': {
+    desc: '(host) Termina subito la partita in corso',
+    run() { _adminStopCommand(); }
+  },
+  '/a': {
+    desc: '(pallavolo, solo in battuta) Battuta tesa e veloce',
+    run() { _volleyServeCommand('a'); }
+  },
+  '/q': {
+    desc: '(pallavolo, solo in battuta) Battuta a parabola alta',
+    run() { _volleyServeCommand('q'); }
+  },
+  '/z': {
+    desc: '(pallavolo, solo in battuta) Battuta corta e morbida',
+    run() { _volleyServeCommand('z'); }
   }
 };
+
+// ── COMANDI ADMIN: pausa / stop ───────────────
+function _adminPauseCommand() {
+  if (!isHost) { sysMsg('⛔ Solo l\'host può mettere in pausa la partita.'); return; }
+  if (netMode === 'train') { sysMsg('⛔ Non disponibile in allenamento.'); return; }
+  if (!running && !vRunning) { sysMsg('⛔ Nessuna partita in corso.'); return; }
+  wsSend({ type: 'pause', payload: {} });
+}
+function _adminStopCommand() {
+  if (!isHost) { sysMsg('⛔ Solo l\'host può terminare la partita.'); return; }
+  if (netMode === 'train') { sysMsg('⛔ Non disponibile in allenamento.'); return; }
+  if (!running && !vRunning) { sysMsg('⛔ Nessuna partita in corso.'); return; }
+  wsSend({ type: 'stop', payload: {} });
+}
+
+// ── COMANDO BATTUTE SPECIALI PALLAVOLO (/a /q /z) ───────
+function _volleyServeCommand(variant) {
+  if (currentGameMode !== 'volley') { sysMsg('⛔ Comando disponibile solo in pallavolo.'); return; }
+  if (!vServePhase) { sysMsg('⛔ Puoi usare questo comando solo durante la battuta.'); return; }
+  const me = vPlayers.find(p => p.id === myPlayerId);
+  if (!me || me.team !== vServeTeam) { sysMsg('⛔ Solo chi deve battere può usare questo comando.'); return; }
+  if (netMode === 'train') {
+    vApplyServeVariantLocal(me, variant);
+  } else {
+    wsSend({ type: 'vserve', payload: { variant } });
+  }
+}
 
 function sysMsg(text) {
   pushChatMsg({pid:'system', name:'Sistema', text, ts:Date.now()}, true);
