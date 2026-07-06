@@ -127,32 +127,45 @@ function vDoKick(p, advanced) {
 }
 
 // ── BATTUTE SPECIALI (/a /q /z) — solo allenamento ──────
-// Equivalente locale di vApplyServeVariant() in server.js: applica una
-// delle 3 traiettorie preimpostate direttamente alla palla, bypassando
-// vDoKick. Il chiamante (chat.js) verifica gia' che si sia in fase di
-// battuta e che il player appartenga alla squadra che deve servire.
+// Equivalente locale di vApplyServeVariant() in server.js: sono il LANCIO
+// della battuta (come alzarsi la palla con le mani), NON il colpo che la
+// manda dall'altra parte. La palla spawna appena sotto al battitore e
+// parte verso l'alto: la gravita' (vTickBall, gia' chiamata ogni frame la
+// fa arcuare e ricadere verso di lui — resta sul suo campo. Il colpo vero
+// e proprio e' il tocco normale (AZIONE) successivo, gestito da vDoKick
+// esattamente come ogni altro tocco (direzione/potenza dipendono dalla
+// posizione relativa giocatore<->palla in quel momento). Le 3 varianti
+// cambiano SOLO il lancio (quanto in alto va, quanto ci mette a ricadere),
+// non la direzione. Il chiamante (chat.js) verifica gia' che si sia in
+// fase di battuta e che il player appartenga alla squadra che deve servire.
 function vApplyServeVariantLocal(p, variant) {
-  const cfg = V_CONFIG;
-  const dir = vServeTeam === 0 ? 1 : -1; // verso il campo avversario
-  const range = cfg.V_KICK_MAX - cfg.V_KICK_MIN;
-  let vx, vy;
+  let vy;
   if (variant === 'a') {
-    // /a — battuta tesa e potente, arco basso
-    vx = dir * cfg.V_KICK_MAX; vy = -3;
+    // /a — lancio potente: sale abbastanza in alto, tempo medio per prepararsi
+    vy = -11;
   } else if (variant === 'q') {
-    // /q — battuta a parabola alta
-    vx = dir * (cfg.V_KICK_MIN + range * 0.45); vy = -9.5;
+    // /q — lancio alto: sale molto in alto, tanto tempo per prepararsi
+    vy = -15;
   } else {
-    // /z — battuta corta e morbida, arco breve appena oltre la rete
-    vx = dir * (cfg.V_KICK_MIN * 1.15); vy = -6;
+    // /z — lancio rapido: sale poco, ricade quasi subito
+    vy = -7;
   }
-  vBall.vx = vx; vBall.vy = vy; vBall.grav = V_B_GRAV_BASE;
+
+  // La palla spawna appena sotto al battitore e sale verso l'alto (verso
+  // di lui, non verso il campo avversario).
+  vBall.x = p.x;
+  vBall.y = p.y + (p.r + vBall.r) * 0.6;
+  vBall.vx = 0; vBall.vy = vy;
+  vBall.grav = V_B_GRAV_BASE;
+
+  // Come un tocco: impedisce che il battitore, se ha gia' AZIONE premuto,
+  // colpisca subito la palla appena lanciata.
   p.kickCooldown = true;
 
-  vLastToucher = { id: p.id, team: p.team };
-  vIncrementTouch(p.team);
-  vServePhase = false;
-  spawnP(vBall.x, vBall.y, 6, V_TEAM_COLS[p.team], 6, 12);
+  // NOTA: nessun incremento tocchi, nessun aggiornamento vLastToucher,
+  // nessuna chiusura di vServePhase — il lancio non e' un tocco valido,
+  // lo e' solo il colpo vero e proprio che seguira' (vDoKick).
+  spawnP(vBall.x, vBall.y, 5, V_TEAM_COLS[p.team], 4, 10);
 }
 
 // ── AGGIORNAMENTO COOLDOWN ───────────────────────────────

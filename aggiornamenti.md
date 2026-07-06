@@ -4,6 +4,27 @@ Versione più recente sempre in cima. Ad ogni modifica aggiornare `VERSION` in `
 
 ---
 
+## v2.35.0 — Fix direzione battute pallavolo: ora sono un LANCIO verso l'alto (self-toss), non un tiro verso l'avversario
+
+Riletti `server.js` e `js/modes/volley/physics.js` prima della modifica (le battute erano state introdotte nella sessione precedente, v2.34.0).
+
+### 🐛 Fix concettuale — le battute mandavano subito la palla dall'altra parte
+- **Il problema**: `/a` `/q` `/z` (introdotte in v2.34.0) applicavano una velocità diretta verso il campo avversario direttamente alla palla ferma sulla rete — di fatto un tiro istantaneo e diretto, senza dare al battitore la possibilità di colpirla lui stesso. Il risultato non era una vera battuta: saltava completamente il "tocco" del giocatore.
+- **Come funziona ora**: i tre comandi sono diventati il **lancio** della battuta (l'alzata della palla con le mani prima di colpirla), non il colpo che la manda dall'altra parte. La palla spawna appena sotto al battitore e parte con velocità verso l'alto (mai verso l'avversario): sale, la gravità (già presente in `vTickBallSrv`/`vTickBall`, invariata) la fa rallentare e ricadere a parabola **verso il battitore stesso**, restando sul suo campo. Il colpo vero e proprio che la manda dall'altra parte è il **tocco normale** (AZIONE) che il giocatore darà mentre la palla ricade — riusa integralmente la fisica di tocco già esistente (`vApplyInputSrv`/`vDoKick`), che decide direzione e potenza in base alla posizione relativa giocatore↔palla in quel momento, esattamente come ogni altro tocco in partita. Nessuna logica di direzione speciale nelle funzioni di battuta: solo posizionamento e velocità iniziale del lancio.
+- Le 3 varianti ora cambiano **solo il lancio** (quanto in alto sale, quanto ci mette a ricadere), non più una direzione/potenza verso il campo avversario:
+  - **`/a`** — lancio potente: sale abbastanza in alto, tempo medio per prepararsi al colpo.
+  - **`/q`** — lancio alto: sale molto in alto, più tempo per prepararsi.
+  - **`/z`** — lancio rapido: sale poco, ricade quasi subito, meno tempo di reazione.
+- Il lancio **non conta come tocco** secondo le regole della pallavolo (coerente con le regole vere: l'auto-lancio della battuta non è un tocco): non incrementa `vTouches`, non aggiorna `vLastToucher*`, non chiude `vServePhase`. Tutta quella contabilità (fine fase battuta, conteggio primo tocco, regola del doppio tocco introdotta in v2.33.0) resta a carico del tocco normale successivo, già gestito da `vTick`/`vUpdate` senza bisogno di modifiche.
+- Per evitare che il battitore, se ha già AZIONE premuto, ricolpisca subito la palla appena lanciata (che spawna a distanza ravvicinata): `p.kickCooldown = true` viene impostato al momento del lancio, esattamente come per un tocco normale — si sblocca automaticamente non appena la palla esce dal raggio di tiro (il che avviene quasi subito, data la velocità verso l'alto).
+
+### 📁 File modificati
+- `server.js` — `vApplyServeVariant()` riscritta: posiziona la palla sotto al battitore e la lancia in verticale invece di applicarle direttamente una velocità verso l'avversario; rimossa la chiusura di `vServePhase`/conteggio tocchi (ora a carico del tocco normale)
+- `js/modes/volley/physics.js` — `vApplyServeVariantLocal()` stessa riscrittura per l'allenamento
+- `js/chat.js` — descrizioni comandi `/a`/`/q`/`/z` aggiornate al nuovo significato (lancio, non direzione)
+
+---
+
 ## v2.34.0 — Admin: pausa/stop partita (+ /pause /stop) — Pallavolo: battute speciali /a /q /z
 
 Due funzionalità nuove su richiesta. Riletti `server.js`, `js/network-core.js`, `js/menu.js`, `js/chat.js`, `js/state.js`, `index.html` e i file `js/modes/{soccer,volley}/game.js` + `js/modes/volley/physics.js` prima di ogni modifica.

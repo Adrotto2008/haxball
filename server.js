@@ -376,36 +376,53 @@ function vHandlePoint(room,scoringTeam){
 function endMatch(room){room.gameOver=true;bcastAll(room,{type:'game_over',score:room.score.slice()});}
 
 // ── BATTUTE SPECIALI PALLAVOLO (/a /q /z) ────────────────
-// Applica una delle 3 traiettorie di battuta preimpostate direttamente
-// alla palla (bypassa vDoKickSrv: la palla e' comunque gia' raggiungibile
-// dal battitore durante la fase serve, ma qui il tiro e' un comando
-// esplicito invece che un tocco fisico). Usabile solo durante la fase di
+// Sono il LANCIO della battuta (come alzarsi la palla con le mani prima
+// di colpirla), NON il colpo che la manda dall'altra parte: la palla
+// spawna appena sotto al battitore e parte verso l'alto, poi la gravita'
+// (vTickBallSrv, gia' chiamata ogni tick) la fa arcuare e ricadere verso
+// di lui — resta sul suo campo, non va verso l'avversario. Il colpo vero
+// e proprio che la manda dall'altra parte e' il tocco normale (AZIONE)
+// successivo, gestito dalla fisica di tocco standard (vApplyInputSrv più
+// giu' in vTick): quella decide direzione/potenza in base alla posizione
+// relativa giocatore<->palla al momento del tocco, esattamente come ogni
+// altro tocco in partita — nessuna logica speciale di direzione qui.
+// Le 3 varianti cambiano SOLO il lancio (quanto in alto va, quanto ci
+// mette a ricadere), non la direzione. Usabile solo durante la fase di
 // battuta (room.vServePhase) e solo dal team che deve battere — verificato
 // dal chiamante prima di invocare questa funzione.
 function vApplyServeVariant(room,p,variant){
-  const vcfg=room.vconfig, ball=room.ball;
-  const dir=room.vServeTeam===0?1:-1; // verso il campo avversario
-  const range=vcfg.V_KICK_MAX-vcfg.V_KICK_MIN;
-  let vx,vy;
+  const ball=room.ball;
+  let vy;
   if(variant==='a'){
-    // /a — battuta tesa e potente, arco basso
-    vx=dir*vcfg.V_KICK_MAX; vy=-3;
+    // /a — lancio potente: sale abbastanza in alto, tempo medio per prepararsi
+    vy=-11;
   } else if(variant==='q'){
-    // /q — battuta a parabola alta
-    vx=dir*(vcfg.V_KICK_MIN+range*0.45); vy=-9.5;
+    // /q — lancio alto: sale molto in alto, tanto tempo per prepararsi
+    vy=-15;
   } else {
-    // /z — battuta corta e morbida, arco breve appena oltre la rete
-    vx=dir*(vcfg.V_KICK_MIN*1.15); vy=-6;
+    // /z — lancio rapido: sale poco, ricade quasi subito
+    vy=-7;
   }
-  ball.vx=vx; ball.vy=vy; ball.grav=V_B_GRAV_BASE;
+
+  // La palla spawna appena sotto al battitore e sale verso l'alto (verso
+  // di lui, non verso il campo avversario).
+  ball.x=p.x;
+  ball.y=p.y+(p.r+ball.r)*0.6;
+  ball.vx=0; ball.vy=vy;
+  ball.grav=V_B_GRAV_BASE;
+
+  // Come un tocco: impedisce che il battitore, se ha gia' AZIONE premuto,
+  // colpisca subito la palla appena lanciata (deve prima uscire dal
+  // raggio di tiro — cosa che avviene quasi subito data la velocita'
+  // verso l'alto). Il vero colpo di battuta e' il tocco normale successivo,
+  // quando la palla ricade.
   p.kickCooldown=true;
 
-  // Stessa contabilita' di un tocco normale (coerente con vTick)
-  room.vLastToucherId=p.id; room.vLastToucherTeam=p.team;
-  const opp=p.team===0?1:0;
-  room.vTouches[opp]=0; room.vTouches[p.team]=1;
-  room.vServePhase=false;
-  bcastAll(room,{type:'v_serve',serveTeam:room.vServeTeam,servePhase:false});
+  // NOTA: qui NON si incrementa vTouches, NON si aggiorna vLastToucher* e
+  // NON si chiude vServePhase — il lancio non e' un tocco valido secondo
+  // le regole della pallavolo (la battuta vera e propria e' solo il colpo
+  // che segue): tutta quella contabilita' resta a carico del prossimo
+  // tocco normale, gia' gestita da vTick.
 }
 
 // ── TICK CALCIO ───────────────────────────────────────────

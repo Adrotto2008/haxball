@@ -70,15 +70,15 @@ const CHAT_COMMANDS = {
     run() { _adminStopCommand(); }
   },
   '/a': {
-    desc: '(pallavolo, solo in battuta) Battuta tesa e veloce',
+    desc: '(pallavolo, solo in battuta) Lancio di battuta potente (medio-alto)',
     run() { _volleyServeCommand('a'); }
   },
   '/q': {
-    desc: '(pallavolo, solo in battuta) Battuta a parabola alta',
+    desc: '(pallavolo, solo in battuta) Lancio di battuta alto (molto alto, più tempo)',
     run() { _volleyServeCommand('q'); }
   },
   '/z': {
-    desc: '(pallavolo, solo in battuta) Battuta corta e morbida',
+    desc: '(pallavolo, solo in battuta) Lancio di battuta rapido (basso, ricade subito)',
     run() { _volleyServeCommand('z'); }
   }
 };
