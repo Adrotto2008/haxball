@@ -4,6 +4,27 @@ Versione più recente sempre in cima. Ad ogni modifica aggiornare `VERSION` in `
 
 ---
 
+## v2.33.0 — Fix trasferimento admin su disconnessione + regola doppio tocco pallavolo
+
+Due fix indipendenti su richiesta. Riletti `server.js`, `js/network-core.js`, `js/admin.js`, `js/menu.js`, `js/lobby.js` e i file `js/modes/volley/{physics,game}.js` prima di ogni modifica.
+
+### 🐛 Fix — l'host che si disconnette non passava correttamente i poteri admin
+- **Il problema**: quando l'host lasciava la stanza (chiusura connessione, non `transfer` esplicito dal menu), `server.js` riassegnava correttamente `room.hostPid` al client rimasto da più tempo nella room (`[...room.clients.values()][0]`, corretto perché una `Map` mantiene l'ordine di inserimento) — ma non inviava mai il messaggio `host_change`, solo `pm_update` (dentro `syncRoster`). Il client aggiornava silenziosamente `isHost`/`hostId` da `pm_update`, ma il bottone "▶ Inizia partita" e l'hint admin nel menu sala d'attesa vengono impostati da `openMenu()`, richiamata solo dall'handler dedicato `host_change` — non da `pm_update`. Risultato: il nuovo host diventava admin lato server, ma nella UI il bottone restava nascosto e non poteva effettivamente avviare la partita.
+- **Fix**: `ws.on('close', ...)` in `server.js` ora invia anche `bcastAll(room,{type:'host_change',hostId:room.hostPid})` quando l'host cambia per disconnessione, riusando lo stesso messaggio già gestito correttamente dal client per il trasferimento volontario (`adminTransfer` in `admin.js`). Nessuna modifica lato client necessaria: l'handler `host_change` in `network-core.js` già riapre/aggiorna il menu con `isHost` corretto.
+- La scelta del nuovo host ("il più vecchio presente") era già corretta prima di questo fix — il bug era solo nella propagazione dell'informazione al client.
+
+### 🏐 Regola doppio tocco pallavolo (fallo di doppio tocco consecutivo)
+- **Prima**: `vTouches` contava solo i tocchi consecutivi per SQUADRA (max 3, `V_TEAM_MAX_TOUCHES`), ma non teneva traccia di quale giocatore avesse toccato per ultimo. Con più di un giocatore per squadra, lo stesso giocatore poteva colpire la palla due (o più) volte di fila senza alcuna penalità.
+- **Ora**: se una squadra ha più di un giocatore attivo in campo, lo stesso giocatore non può toccare la palla due volte consecutive — deve alternarsi con un compagno (tocco A, tocco compagno, tocco A di nuovo → valido; tocco A, tocco A → fallo, punto immediato all'avversario). Con un solo giocatore in squadra la regola non si applica, dato che non c'è nessuno con cui alternarsi. Il limite di 3 tocchi totali per squadra resta invariato e si applica insieme alla nuova regola.
+- Implementato in modo autoritativo lato server (`vTick` in `server.js`, nuovi campi room `vLastToucherId`/`vLastToucherTeam`, resettati ad ogni nuovo scambio in `vResetPositions`) e specularmente lato client per l'allenamento (`vDoKick` in `js/modes/volley/physics.js`, nuova variabile `vLastToucher` in `js/modes/volley/game.js`, resettata in `vGoal()`/`vReset()`) — coerenza fisica mantenuta tra i due path, come da principio guida del progetto.
+
+### 📁 File modificati
+- `server.js` — `ws.on('close', ...)` (broadcast `host_change`), `mkRoom()`/`vResetPositions()` (nuovi campi `vLastToucherId`/`vLastToucherTeam`), `vTick()` (regola doppio tocco)
+- `js/modes/volley/physics.js` — `vDoKick()` (regola doppio tocco)
+- `js/modes/volley/game.js` — nuova variabile `vLastToucher`, reset in `vGoal()`/`vReset()`
+
+---
+
 ## v2.32.0 — Migrazione server Render: Virginia → Frankfurt
 
 La region del servizio Render era **Virginia (US East)**: per utenti in Italia la sola tratta transatlantica pesava 100-150ms+ di RTT, piu' di qualsiasi ottimizzazione software fatta nelle sessioni precedenti (v2.30.0/v2.31.0 nascondono il ritardo, non lo eliminano). Creato un nuovo servizio Render in region **Frankfurt (EU Central)**, stesso repo/build/start command, nessuna env var aggiuntiva necessaria (solo `PORT`, automatica, e l'opzionale `ADMIN_TOKEN`, non impostata nemmeno sul vecchio servizio).

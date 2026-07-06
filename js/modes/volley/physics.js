@@ -91,6 +91,18 @@ function vDoKick(p, advanced) {
   // Palla dentro ma ha già tirato su questo ingresso: ignora
   if (p.kickCooldown) return false;
 
+  // Regola doppio tocco (coerente con server.js): se la squadra ha piu' di
+  // un giocatore attivo in campo, lo stesso giocatore non puo' toccare la
+  // palla due volte di fila — deve alternarsi con un compagno. Con un solo
+  // giocatore in squadra la regola non si applica. Violazione = punto
+  // immediato all'avversario.
+  const teammates = vPlayers.filter(x => x.team === p.team);
+  if (teammates.length > 1 && vLastToucher.id === p.id && vLastToucher.team === p.team) {
+    p.kickCooldown = true;
+    vGoal(p.team === 0 ? 1 : 0);
+    return false;
+  }
+
   const nx = d > 0.01 ? dx / d : 0;
   const ny = d > 0.01 ? dy / d : -1;
 
@@ -108,6 +120,7 @@ function vDoKick(p, advanced) {
 
   p.kickCooldown = true; // un solo tiro per ingresso della palla
 
+  vLastToucher = { id: p.id, team: p.team };
   vIncrementTouch(p.team);
   spawnP(vBall.x, vBall.y, 6, V_TEAM_COLS[p.team], force * 0.4, 12);
   return true;

@@ -6,6 +6,9 @@ let vGoalCD = 0, vLastFrameTime = 0, vSecondAccum = 0;
 let vPlayers = [], vBall;
 let vTouches = { 0: 0, 1: 0 };
 let vBallLastSide = null;
+// Ultimo giocatore che ha toccato la palla in allenamento (regola doppio
+// tocco, coerente con server.js): { id, team } oppure null a inizio scambio.
+let vLastToucher = { id: null, team: null };
 let vRemoteState = null;
 
 // ── STATO BATTUTA ───────────────────────────────────────
@@ -113,6 +116,7 @@ function vGoal(scoringTeam) {
   vGoalCD = V_GOAL_CD;
   vTouches = { 0: 0, 1: 0 };
   vBallLastSide = null;
+  vLastToucher = { id: null, team: null };
 
   // Il prossimo serve va alla squadra che ha fatto punto
   vServeTeam  = scoringTeam;
@@ -178,6 +182,7 @@ function vReset(full) {
   vRemoteState = null; particles = [];
   vSnapshotBuffer = [];
   vTouches = { 0: 0, 1: 0 }; vBallLastSide = null;
+  vLastToucher = { id: null, team: null };
   if (vPlayers.length > 0) {
     const byTeam = [[], []];
     for (const p of vPlayers) if (p.team === 0 || p.team === 1) byTeam[p.team].push(p);

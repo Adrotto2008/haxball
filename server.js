@@ -258,6 +258,10 @@ function mkRoom(code,name,password,mode){
     gameOver:false, goalCD:0, started:false, hostPid:null, roster:[],
     inputs:{}, afkSet:new Set(), skins:{},
     vTouches:{0:0,1:0}, vBallLastSide:null,
+    // Ultimo giocatore che ha toccato la palla (regola doppio tocco):
+    // se la squadra ha piu' di un giocatore attivo, lo stesso giocatore
+    // non puo' toccare la palla due volte di fila.
+    vLastToucherId:null, vLastToucherTeam:null,
     // ── Battuta ──
     vServeTeam:0,    // 0 = rossi battono, 1 = blu battono
     vServePhase:true, // true = fase battuta (restrizione attiva)
@@ -318,6 +322,7 @@ function vResetPositions(room,full,nextServeTeam){
   room.vServePhase=true;
   room.ball=mkVolleyBall(room.vconfig, room.vServeTeam);
   room.vTouches={0:0,1:0}; room.vBallLastSide=null;
+  room.vLastToucherId=null; room.vLastToucherTeam=null;
   const vcfg=room.vconfig;
   if(full){room.score=[0,0];room.timeLeft=vcfg.V_MATCH_TIME;room.gameOver=false;room.secondAccum=0;}
   room.goalCD=vcfg.V_GOAL_CD;
@@ -421,6 +426,18 @@ function vTick(room){
     if(kicked){
       kickedThisTick.add(p.id);
       const opp=p.team===0?1:0;
+
+      // Regola doppio tocco: se la squadra ha piu' di un giocatore attivo
+      // in campo, lo stesso giocatore non puo' toccare la palla due volte
+      // di fila (deve alternarsi con un compagno). Con un solo giocatore in
+      // squadra la regola non si applica (nessuno con cui alternarsi).
+      // Punto immediato all'avversario in caso di violazione.
+      const teamCount=players.reduce((n,x)=>x.team===p.team?n+1:n,0);
+      if(teamCount>1 && room.vLastToucherId===p.id && room.vLastToucherTeam===p.team){
+        vHandlePoint(room,opp);return;
+      }
+      room.vLastToucherId=p.id; room.vLastToucherTeam=p.team;
+
       room.vTouches[opp]=0;
       room.vTouches[p.team]++;
       if(room.vTouches[p.team]>V_TEAM_MAX_TOUCHES){vHandlePoint(room,opp);return;}
@@ -603,9 +620,22 @@ wss.on('connection',ws=>{
     const c=myRoom.clients.get(ws);const ln=c?.name||myPid?.slice(0,6)||'?';
     myRoom.clients.delete(ws);delete myRoom.inputs[myPid];delete _lastMeta[myRoom.code];
     myRoom.afkSet.delete(myPid);myRoom.players=myRoom.players.filter(p=>p.id!==myPid);
-    if(myPid===myRoom.hostPid){const nx=[...myRoom.clients.values()][0];if(nx)myRoom.hostPid=nx.pid;}
+    // Se l'host se ne va, l'admin passa automaticamente al client rimasto
+    // da piu' tempo nella room: clients e' una Map, l'ordine di iterazione
+    // e' l'ordine di inserimento, quindi il primo rimasto e' il piu' vecchio.
+    let hostChanged=false;
+    if(myPid===myRoom.hostPid){
+      const nx=[...myRoom.clients.values()][0];
+      if(nx){myRoom.hostPid=nx.pid;hostChanged=true;}
+    }
     if(myRoom.clients.size===0){cleanRoom(myRoom);return;}
-    syncRoster(myRoom);bcastAll(myRoom,{type:'player_left',pid:myPid,name:ln});
+    syncRoster(myRoom);
+    // Messaggio dedicato host_change (oltre a pm_update dentro syncRoster):
+    // e' l'unico messaggio che il client sa gestire per riaprire/aggiornare
+    // subito il menu (bottone "Inizia partita", hint admin, ecc.) sul nuovo
+    // host — pm_update da solo aggiorna isHost ma non l'UI del menu gia' aperto.
+    if(hostChanged)bcastAll(myRoom,{type:'host_change',hostId:myRoom.hostPid});
+    bcastAll(myRoom,{type:'player_left',pid:myPid,name:ln});
   });
   ws.on('error',()=>ws.close());
 });
