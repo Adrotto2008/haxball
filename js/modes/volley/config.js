@@ -6,7 +6,10 @@ const V_PR = 20, V_BR = 10;             // raggio player / palla
 
 const V_P_SPEED_MAX = 10.0;
 const V_P_START     = 1.4;
-const V_P_ACCEL     = 0.01;
+// v2.38.0: era 0.01 (di fatto inefficace, l'attrito annullava la rampa ad
+// ogni frame prima che potesse accumularsi — vedi js/modes/soccer/config.js
+// per la spiegazione completa, identica per le due modalità).
+const V_P_ACCEL     = 0.2;
 const V_P_FRIC      = 0.78;
 
 const V_FL = { l: 40, r: W-40, t: 40, b: H-40 };  // limiti campo
@@ -59,7 +62,7 @@ const V_GOAL_CD    = 120;
 let V_CONFIG = {
   V_P_START:    1.4,
   V_P_SPEED_MAX:10.0,
-  V_P_ACCEL:    0.01,
+  V_P_ACCEL:    0.2,
   V_P_FRIC:     0.78,
   V_B_FRIC:     0.99,
   V_B_BOUNCE:   0.35,

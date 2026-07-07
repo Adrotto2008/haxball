@@ -48,16 +48,30 @@ function vApplyInput(p, inp) {
     }
   }
 
-  if (inp.up) { if (p.vy > -cfg.V_P_START) p.vy = -cfg.V_P_START; p.vy -= cfg.V_P_ACCEL; }
-  if (inp.dn) { if (p.vy <  cfg.V_P_START) p.vy =  cfg.V_P_START; p.vy += cfg.V_P_ACCEL; }
-  if (inp.lt) { if (p.vx > -cfg.V_P_START) p.vx = -cfg.V_P_START; p.vx -= cfg.V_P_ACCEL; }
-  if (inp.rt) { if (p.vx <  cfg.V_P_START) p.vx =  cfg.V_P_START; p.vx += cfg.V_P_ACCEL; }
+  // ── MOVIMENTO: accelerazione a rampa + decelerazione via attrito ──
+  // Stessa logica del calcio (vedi js/modes/soccer/physics.js, v2.38.0):
+  // per asse, se l'input e' premuto la velocita' parte da V_P_START
+  // (kick-start) e sale di V_P_ACCEL per frame fino a topSpd, senza che
+  // l'attrito la riporti indietro nel frattempo. L'attrito si applica solo
+  // sull'asse senza input: e' la decelerazione al rilascio.
+  if (inp.up || inp.dn) {
+    if (inp.up) { if (p.vy > -cfg.V_P_START) p.vy = -cfg.V_P_START; p.vy = Math.max(p.vy - cfg.V_P_ACCEL, -topSpd); }
+    if (inp.dn) { if (p.vy <  cfg.V_P_START) p.vy =  cfg.V_P_START; p.vy = Math.min(p.vy + cfg.V_P_ACCEL,  topSpd); }
+  } else {
+    p.vy *= cfg.V_P_FRIC;
+  }
+  if (inp.lt || inp.rt) {
+    if (inp.lt) { if (p.vx > -cfg.V_P_START) p.vx = -cfg.V_P_START; p.vx = Math.max(p.vx - cfg.V_P_ACCEL, -topSpd); }
+    if (inp.rt) { if (p.vx <  cfg.V_P_START) p.vx =  cfg.V_P_START; p.vx = Math.min(p.vx + cfg.V_P_ACCEL,  topSpd); }
+  } else {
+    p.vx *= cfg.V_P_FRIC;
+  }
 
-  // Cap post-accelerazione (impedisce di superare topSpd anche con accel)
+  // Cap sul modulo (movimento diagonale: non deve superare topSpd combinato)
   const spd = Math.hypot(p.vx, p.vy);
   if (spd > topSpd) { p.vx = p.vx/spd*topSpd; p.vy = p.vy/spd*topSpd; }
 
-  p.x += p.vx; p.y += p.vy; p.vx *= cfg.V_P_FRIC; p.vy *= cfg.V_P_FRIC;
+  p.x += p.vx; p.y += p.vy;
   if (p.x < V_FL.l + p.r) { p.x = V_FL.l + p.r; p.vx *= -.4; }
   if (p.x > V_FL.r - p.r) { p.x = V_FL.r - p.r; p.vx *= -.4; }
   if (p.y < V_FL.t + p.r) { p.y = V_FL.t + p.r; p.vy *= -.4; }

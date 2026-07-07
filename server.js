@@ -4,7 +4,7 @@ const http = require('http');
 const crypto = require('crypto');
 
 const CONFIG_DEFAULT = {
-  P_START:1.4, P_SPEED_MAX:10.0, P_ACCEL:0.01, P_FRIC:0.78,
+  P_START:1.4, P_SPEED_MAX:10.0, P_ACCEL:0.2, P_FRIC:0.78,
   B_FRIC:0.984, B_BOUNCE:0.80, B_HIT_R:0.82,
   KICK_MIN:3.8, KICK_MAX:14.0, KICK_CHG_F:50, KICK_DIST_X:12,
   GOAL_CD:140, MATCH_TIME:180,
@@ -13,7 +13,7 @@ const CONFIG_DEFAULT = {
 
 // Costanti pallavolo — modificabili per room tramite set_vconfig
 const V_CONFIG_DEFAULT = {
-  V_P_START:1.4, V_P_SPEED_MAX:10.0, V_P_ACCEL:0.01, V_P_FRIC:0.78,
+  V_P_START:1.4, V_P_SPEED_MAX:10.0, V_P_ACCEL:0.2, V_P_FRIC:0.78,
   V_B_FRIC:0.99, V_B_BOUNCE:0.35,
   V_KICK_MIN:4.0, V_KICK_MAX:14.0, V_KICK_CHG_F:50,
   V_MATCH_TIME:180, V_GOAL_CD:120,
@@ -89,12 +89,20 @@ function applyInput(p,inp,ball,cfg){
     const curSpd=Math.hypot(p.vx,p.vy);
     if(curSpd>topSpd){p.vx=p.vx/curSpd*topSpd;p.vy=p.vy/curSpd*topSpd;}
   }
-  if(inp.up){if(p.vy>-P_START)p.vy=-P_START;p.vy-=P_ACCEL;}
-  if(inp.dn){if(p.vy< P_START)p.vy= P_START;p.vy+=P_ACCEL;}
-  if(inp.lt){if(p.vx>-P_START)p.vx=-P_START;p.vx-=P_ACCEL;}
-  if(inp.rt){if(p.vx< P_START)p.vx= P_START;p.vx+=P_ACCEL;}
+  // Movimento: rampa di accelerazione per asse (fino a v2.38.0 l'attrito
+  // era applicato sempre, anche sull'asse in accelerazione, e annullava la
+  // rampa riportando la velocita' sotto P_START ogni frame). Ora l'attrito
+  // agisce solo sull'asse senza input: e' la decelerazione al rilascio.
+  if(inp.up||inp.dn){
+    if(inp.up){if(p.vy>-P_START)p.vy=-P_START;p.vy=Math.max(p.vy-P_ACCEL,-topSpd);}
+    if(inp.dn){if(p.vy< P_START)p.vy= P_START;p.vy=Math.min(p.vy+P_ACCEL, topSpd);}
+  } else { p.vy*=P_FRIC; }
+  if(inp.lt||inp.rt){
+    if(inp.lt){if(p.vx>-P_START)p.vx=-P_START;p.vx=Math.max(p.vx-P_ACCEL,-topSpd);}
+    if(inp.rt){if(p.vx< P_START)p.vx= P_START;p.vx=Math.min(p.vx+P_ACCEL, topSpd);}
+  } else { p.vx*=P_FRIC; }
   const spd=Math.hypot(p.vx,p.vy);if(spd>topSpd){p.vx=p.vx/spd*topSpd;p.vy=p.vy/spd*topSpd;}
-  p.x+=p.vx;p.y+=p.vy;p.vx*=P_FRIC;p.vy*=P_FRIC;
+  p.x+=p.vx;p.y+=p.vy;
   if(p.x<FL.l+p.r){p.x=FL.l+p.r;p.vx*=-.4;}if(p.x>FL.r-p.r){p.x=FL.r-p.r;p.vx*=-.4;}
   if(p.y<FL.t+p.r){p.y=FL.t+p.r;p.vy*=-.4;}if(p.y>FL.b-p.r){p.y=FL.b-p.r;p.vy*=-.4;}
 }
@@ -165,16 +173,23 @@ function vApplyInputSrv(p, inp, ball, vcfg) {
     }
   }
 
-  if(inp.up){if(p.vy>-vcfg.V_P_START)p.vy=-vcfg.V_P_START;p.vy-=vcfg.V_P_ACCEL;}
-  if(inp.dn){if(p.vy< vcfg.V_P_START)p.vy= vcfg.V_P_START;p.vy+=vcfg.V_P_ACCEL;}
-  if(inp.lt){if(p.vx>-vcfg.V_P_START)p.vx=-vcfg.V_P_START;p.vx-=vcfg.V_P_ACCEL;}
-  if(inp.rt){if(p.vx< vcfg.V_P_START)p.vx= vcfg.V_P_START;p.vx+=vcfg.V_P_ACCEL;}
+  // Movimento: rampa di accelerazione per asse + decelerazione via attrito
+  // sull'asse senza input (stessa logica del calcio, vedi applyInput sopra;
+  // v2.38.0, prima l'attrito annullava la rampa ad ogni frame).
+  if(inp.up||inp.dn){
+    if(inp.up){if(p.vy>-vcfg.V_P_START)p.vy=-vcfg.V_P_START;p.vy=Math.max(p.vy-vcfg.V_P_ACCEL,-topSpd);}
+    if(inp.dn){if(p.vy< vcfg.V_P_START)p.vy= vcfg.V_P_START;p.vy=Math.min(p.vy+vcfg.V_P_ACCEL, topSpd);}
+  } else { p.vy*=vcfg.V_P_FRIC; }
+  if(inp.lt||inp.rt){
+    if(inp.lt){if(p.vx>-vcfg.V_P_START)p.vx=-vcfg.V_P_START;p.vx=Math.max(p.vx-vcfg.V_P_ACCEL,-topSpd);}
+    if(inp.rt){if(p.vx< vcfg.V_P_START)p.vx= vcfg.V_P_START;p.vx=Math.min(p.vx+vcfg.V_P_ACCEL, topSpd);}
+  } else { p.vx*=vcfg.V_P_FRIC; }
 
-  // Cap post-accelerazione
+  // Cap sul modulo (movimento diagonale)
   const spd=Math.hypot(p.vx,p.vy);
   if(spd>topSpd){p.vx=p.vx/spd*topSpd;p.vy=p.vy/spd*topSpd;}
 
-  p.x+=p.vx;p.y+=p.vy;p.vx*=vcfg.V_P_FRIC;p.vy*=vcfg.V_P_FRIC;
+  p.x+=p.vx;p.y+=p.vy;
   if(p.x<V_FL.l+p.r){p.x=V_FL.l+p.r;p.vx*=-.4;}
   if(p.x>V_FL.r-p.r){p.x=V_FL.r-p.r;p.vx*=-.4;}
   if(p.y<V_FL.t+p.r){p.y=V_FL.t+p.r;p.vy*=-.4;}

@@ -4,7 +4,7 @@
 let CONFIG = {
   P_START:     1.4,
   P_SPEED_MAX: 10.0,
-  P_ACCEL:     0.01,
+  P_ACCEL:     0.2,
   P_FRIC:      0.78,
   B_FRIC:      0.984,
   B_BOUNCE:    0.80,

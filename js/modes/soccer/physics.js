@@ -46,13 +46,32 @@ function applyInput(p, inp) {
     if(curSpd > topSpd) { p.vx = p.vx/curSpd*topSpd; p.vy = p.vy/curSpd*topSpd; }
   }
 
-  if(inp.up) { if(p.vy >  -P_START) p.vy = -P_START; p.vy -= P_ACCEL; }
-  if(inp.dn) { if(p.vy <   P_START) p.vy =  P_START; p.vy += P_ACCEL; }
-  if(inp.lt) { if(p.vx >  -P_START) p.vx = -P_START; p.vx -= P_ACCEL; }
-  if(inp.rt) { if(p.vx <   P_START) p.vx =  P_START; p.vx += P_ACCEL; }
+  // ── MOVIMENTO: accelerazione a rampa + decelerazione via attrito ──
+  // Per asse: se l'input e' premuto la velocita' parte subito da P_START
+  // (kick-start, risposta immediata) e poi sale di P_ACCEL per frame fino
+  // a topSpd — rampa di accelerazione vera, non piu' azzerata dall'attrito
+  // ad ogni frame come prima di v2.38.0 (P_FRIC era applicato sempre, anche
+  // mentre si accelerava, e riportava la velocita' sotto P_START prima che
+  // potesse crescere). Quando l'input sull'asse non e' premuto, l'attrito
+  // decelera gradualmente verso zero: le due fasi non si sovrappongono piu'
+  // sullo stesso asse, restando entrambe pienamente configurabili ed
+  // effettive.
+  if(inp.up || inp.dn) {
+    if(inp.up) { if(p.vy >  -P_START) p.vy = -P_START; p.vy = Math.max(p.vy - P_ACCEL, -topSpd); }
+    if(inp.dn) { if(p.vy <   P_START) p.vy =  P_START; p.vy = Math.min(p.vy + P_ACCEL,  topSpd); }
+  } else {
+    p.vy *= P_FRIC;
+  }
+  if(inp.lt || inp.rt) {
+    if(inp.lt) { if(p.vx >  -P_START) p.vx = -P_START; p.vx = Math.max(p.vx - P_ACCEL, -topSpd); }
+    if(inp.rt) { if(p.vx <   P_START) p.vx =  P_START; p.vx = Math.min(p.vx + P_ACCEL,  topSpd); }
+  } else {
+    p.vx *= P_FRIC;
+  }
+  // Cap sul modulo (movimento diagonale: non deve superare topSpd combinato)
   const spd = Math.hypot(p.vx, p.vy);
   if(spd > topSpd) { p.vx = p.vx/spd*topSpd; p.vy = p.vy/spd*topSpd; }
-  p.x += p.vx; p.y += p.vy; p.vx *= P_FRIC; p.vy *= P_FRIC;
+  p.x += p.vx; p.y += p.vy;
   if(p.x < FL.l+p.r)  { p.x=FL.l+p.r;  p.vx*=-.4; }
   if(p.x > FL.r-p.r)  { p.x=FL.r-p.r;  p.vx*=-.4; }
   if(p.y < FL.t+p.r)  { p.y=FL.t+p.r;  p.vy*=-.4; }

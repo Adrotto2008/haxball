@@ -238,12 +238,51 @@ function vDrawPlayer(p) {
 // anelli pulsanti in vDrawPlayer() fin dalla v2.11.0 ("Rimossa freccia"),
 // ma la funzione era rimasta nel file senza che nessuno la richiamasse più.
 
+// ── INDICATORE PALLA FUORI SCHERMO (in alto) ─────────────
+// Dalla v2.36.0 la palla non ha piu' collisione col soffitto e puo'
+// volare oltre il bordo superiore visibile: mostra un piccolo indicatore
+// triangolare sul bordo del campo, alla stessa X della palla, cosi' si
+// sa sempre da che parte sta per ricadere anche quando non e' a schermo.
+function _vDrawOffscreenBallIndicator() {
+  const br = vBall.r;
+  if (vBall.y + br >= V_FL.t) return; // palla visibile: nessun indicatore
+
+  const x = Math.max(V_FL.l + 12, Math.min(V_FL.r - 12, vBall.x));
+  const y = V_FL.t + 13;
+  const pulse = 0.65 + 0.35 * Math.sin(Date.now() * 0.008);
+
+  ctx.save();
+  ctx.globalAlpha = pulse;
+  ctx.fillStyle = '#f5f0e8';
+  ctx.strokeStyle = 'rgba(100,80,40,0.6)';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(x, y - 8);
+  ctx.lineTo(x - 7, y + 6);
+  ctx.lineTo(x + 7, y + 6);
+  ctx.closePath();
+  ctx.fill(); ctx.stroke();
+  ctx.restore();
+
+  // quanto e' alta sopra il bordo, come riferimento numerico
+  const height = Math.round(V_FL.t - (vBall.y + br));
+  ctx.save();
+  ctx.font = '700 10px Inter,sans-serif';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillStyle = 'rgba(255,255,255,0.9)';
+  ctx.shadowColor = 'rgba(0,0,0,0.7)'; ctx.shadowBlur = 3;
+  ctx.fillText('↑' + height, x, y + 17);
+  ctx.shadowBlur = 0;
+  ctx.restore();
+}
+
 // ── DRAW PRINCIPALE ──────────────────────────────────────
 function vDraw() {
   ctx.fillStyle = '#7a5c30'; ctx.fillRect(0, 0, W, H);
   vDrawField();
   drawParticles();
   vDrawBall();
+  _vDrawOffscreenBallIndicator();
   for (const p of vPlayers) vDrawPlayer(p);
 
   if (vGoalCD > 0) {

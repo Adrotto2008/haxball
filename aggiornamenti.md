@@ -4,6 +4,45 @@ Versione più recente sempre in cima. Ad ogni modifica aggiornare `VERSION` in `
 
 ---
 
+## v2.38.0 — Fix accelerazione/decelerazione player (calcio + pallavolo)
+
+Analisi completa su richiesta ("migliora il movimento di tutti, giocatori e palla, in tutte le modalità — assicurati che accelerazione e decelerazione esistano e funzionino, rendendole realistiche e configurabili"). Riletti tutti i file del progetto: `js/config.js`, `js/state.js`, `js/modes/{soccer,volley}/config.js`, `js/modes/{soccer,volley}/physics.js`, `js/modes/{soccer,volley}/sync.js`, `js/modes/{soccer,volley}/game.js`, `server.js`, `js/menu.js`, `js/input.js`.
+
+### 🐛 Il bug — l'accelerazione dei player era di fatto inerte
+- **Sintomo**: `P_ACCEL`/`V_P_ACCEL` esistevano già come variabili configurabili (pannello Variabili, host-only), ma non avevano alcun effetto pratico: tenendo premuta una direzione, la velocità del player restava sempre bloccata attorno al solo kick-start (`P_START`≈1.4), senza mai avvicinarsi al tetto massimo `P_SPEED_MAX`=10 — indipendentemente da quanto a lungo si teneva premuto il tasto.
+- **Causa**: l'attrito (`P_FRIC`=0.78) veniva applicato **incondizionatamente ad ogni frame**, anche sull'asse in cui si stava attivamente accelerando. Ad ogni frame la sequenza era: (1) se sotto `P_START` → snap istantaneo a `P_START` ("kick-start"), (2) `+= P_ACCEL` (+0.01, minuscolo), (3) attrito `×0.78` applicato comunque. Il risultato del passo 3 scendeva quasi sempre di nuovo sotto `P_START`, quindi al frame successivo scattava di nuovo lo snap del passo 1: la velocità oscillava per sempre fra ~1.41 e ~1.10, mai oltre — un ciclo infinito che annullava completamente la rampa di accelerazione. La decelerazione al rilascio invece **funzionava già correttamente** (l'attrito lì non ha nulla contro cui "lottare"): il bug riguardava solo la fase di accelerazione attiva.
+- Bug identico e replicato in tutti e 3 i path fisici di entrambe le modalità (bug "storico", presente probabilmente fin dall'introduzione della rampa): `applyInput()`/`vApplyInputSrv()` in `server.js` (autoritativo), `applyInput()` in `js/modes/soccer/physics.js` e `vApplyInput()` in `js/modes/volley/physics.js` (allenamento + prediction locale, richiamate anche da `sync.js`).
+
+### ✅ Il fix — attrito e accelerazione non si contendono più lo stesso asse
+- Per ciascun asse (verticale/orizzontale), la logica ora è: **se l'input è premuto** → kick-start istantaneo a `P_START` (invariato, risposta immediata) **poi** rampa vera di `P_ACCEL` per frame fino al tetto corrente (`P_SPEED_MAX`, ridotto proporzionalmente durante la carica del tiro come già prima); **se l'input NON è premuto** → solo in quel caso l'attrito `P_FRIC` decelera gradualmente verso zero. Le due fasi non si sovrappongono più sullo stesso asse: l'accelerazione ora costruisce velocità realmente, e la decelerazione al rilascio (già corretta) resta invariata e diventa finalmente percepibile su un range di velocità reale invece che su un valore quasi costante.
+- Il cap sul modulo della velocità (per il movimento diagonale, e la riduzione immediata quando si inizia a caricare un tiro) resta invariato: si applica dopo l'aggiornamento per asse, esattamente come prima.
+- **Ricalibrato il default di `P_ACCEL`/`V_P_ACCEL`: da 0.01 (inefficace) a 0.2** — con questo valore e `P_FRIC`=0.78 invariato, un player raggiunge il top speed (`P_SPEED_MAX`=10) in circa 0.7s da fermo, e si ferma da piena velocità in circa 0.3-0.4s al rilascio: una curva di accelerazione/decelerazione percepibile e "realistica" per un gioco sportivo arcade, non istantanea né immobile. Resta **interamente configurabile** dall'host in tempo reale dal pannello Variabili (calcio e pallavolo separatamente), nessun cambiamento ai range degli slider (`P_ACCEL`/`V_P_ACCEL`: min 0, max 1, step 0.005 — il nuovo default ci rientra comodamente).
+- **Palla**: nessun bug analogo trovato. La palla non si autopropelle (nessun "input" proprio): ha solo attrito (`B_FRIC`/`V_B_FRIC`, decadimento esponenziale ad ogni frame — già corretto e realistico per un rotolamento/aria), rimbalzi (`B_BOUNCE`/`V_B_BOUNCE`) e gravità (pallavolo). Attrito applicato incondizionatamente ogni frame in tutti e 3 i path (server/client training/dead-reckoning) senza alcuna logica di kick-start a contendersi il valore: funzionava già come previsto, nessuna modifica necessaria.
+
+### 📁 File modificati
+- `server.js` — `CONFIG_DEFAULT.P_ACCEL` e `V_CONFIG_DEFAULT.V_P_ACCEL` (0.01→0.2); `applyInput()` (calcio) e `vApplyInputSrv()` (pallavolo): logica movimento per asse riscritta (accelerazione senza attrito concorrente, attrito solo sull'asse senza input)
+- `js/modes/soccer/physics.js` — `applyInput()`: stessa riscrittura (allenamento + prediction locale)
+- `js/modes/volley/physics.js` — `vApplyInput()`: stessa riscrittura (allenamento + prediction locale)
+- `js/state.js` — `CONFIG.P_ACCEL` default (0.01→0.2)
+- `js/modes/soccer/config.js` — const `P_ACCEL` (0.01→0.2) + commento esplicativo aggiornato
+- `js/modes/volley/config.js` — const `V_P_ACCEL` e `V_CONFIG.V_P_ACCEL` default (0.01→0.2) + commento
+
+---
+
+## v2.37.0 — Indicatore palla fuori schermo (pallavolo)
+
+Riletto `js/modes/volley/draw.js` prima della modifica.
+
+### 🏐 Piccolo indicatore quando la palla vola oltre il bordo superiore
+- Da quando (v2.36.0) la palla non ha piu' collisione col soffitto, poteva sparire completamente dallo schermo durante le battute/schiacciate piu' alte, senza modo di sapere da che parte sarebbe ricaduta.
+- Aggiunto un piccolo indicatore triangolare pulsante sul bordo superiore del campo, posizionato alla stessa coordinata X della palla (agganciato ai bordi del campo se la X e' vicina ai muri laterali), visibile solo quando la palla e' effettivamente sopra il bordo visibile. Sotto al triangolo un numero (`↑123`) indica di quanto la palla e' sopra il bordo, come riferimento di quanto manca prima che ricada in vista.
+- Puramente visivo lato client: nessuna modifica alla fisica o allo stato di gioco.
+
+### 📁 File modificati
+- `js/modes/volley/draw.js` — nuova funzione `_vDrawOffscreenBallIndicator()`, chiamata da `vDraw()` subito dopo `vDrawBall()`
+
+---
+
 ## v2.36.0 — Pallavolo: il soffitto blocca solo i player, non la palla
 
 Riletti `server.js`, `js/modes/volley/physics.js` e `js/modes/volley/sync.js` prima della modifica.
