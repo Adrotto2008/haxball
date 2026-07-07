@@ -150,6 +150,7 @@ function vTickRemotePhysics() {
   const bw = V_CONFIG.V_B_BOUNCE, br = vBall.r;
   if (vBall.x - br < V_FL.l) { vBall.x = V_FL.l + br; vBall.vx *= -bw; }
   if (vBall.x + br > V_FL.r) { vBall.x = V_FL.r - br; vBall.vx *= -bw; }
-  if (vBall.y - br < V_FL.t) { vBall.y = V_FL.t + br; vBall.vy *= -bw; vBall.grav = V_B_GRAV_BASE; }
+  // NIENTE collisione con il soffitto per la palla (coerente con server.js
+  // e physics.js): puo' volare altissima, anche fuori schermo.
   if (vBall.y + br > V_FL.b) { vBall.y = V_FL.b - br; vBall.vy *= -bw * 0.5; }
 }

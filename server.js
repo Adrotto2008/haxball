@@ -232,7 +232,10 @@ function vTickBallSrv(ball, vcfg){
   vBallCollidePostSrv(ball, vcfg);
   if(ball.x-vBR<V_FL.l){ball.x=V_FL.l+vBR;ball.vx*=-vcfg.V_B_BOUNCE;}
   if(ball.x+vBR>V_FL.r){ball.x=V_FL.r-vBR;ball.vx*=-vcfg.V_B_BOUNCE;}
-  if(ball.y-vBR<V_FL.t){ball.y=V_FL.t+vBR;ball.vy*=-vcfg.V_B_BOUNCE;ball.grav=V_B_GRAV_BASE;}
+  // NIENTE collisione con il soffitto per la palla (solo i player la
+  // hanno, vedi vApplyInputSrv): puo' volare altissima, anche fuori
+  // schermo, e' l'unica direzione in cui puo' andare quasi all'infinito.
+  // La gravita' la riporta comunque giu' da sola, prima o poi.
 }
 
 // ── ROOM ─────────────────────────────────────────────────

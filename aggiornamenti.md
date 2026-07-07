@@ -4,6 +4,22 @@ Versione più recente sempre in cima. Ad ogni modifica aggiornare `VERSION` in `
 
 ---
 
+## v2.36.0 — Pallavolo: il soffitto blocca solo i player, non la palla
+
+Riletti `server.js`, `js/modes/volley/physics.js` e `js/modes/volley/sync.js` prima della modifica.
+
+### 🏐 La palla ora puo' volare altissima, fuori schermo
+- **Prima**: la palla rimbalzava contro il bordo superiore del campo (`V_FL.t`) esattamente come contro i muri laterali, quindi non poteva mai salire oltre una certa altezza visibile.
+- **Ora**: rimossa la collisione palla↔soffitto in tutti i punti dove la fisica della palla viene simulata (server autoritativo, allenamento, prediction/dead-reckoning multiplayer). La palla puo' quindi volare ben oltre il bordo superiore visibile, uscendo di schermo verso l'alto — l'unica direzione in cui puo' andare quasi all'infinito. Non serve un limite artificiale: la gravita' (gia' esistente, con la rampa che aumenta fino a `V_B_GRAV_MAX`) la fa comunque sempre rallentare e ricadere prima o poi, semplicemente il tragitto puo' portarla momentaneamente fuori dall'area visibile.
+- **Invariato**: i player continuano a essere bloccati dal soffitto come sempre (`V_FL.t + p.r`, in `vApplyInputSrv`/`vApplyInput`) — solo la palla ne e' esente.
+
+### 📁 File modificati
+- `server.js` — `vTickBallSrv()`: rimossa collisione soffitto per la palla
+- `js/modes/volley/physics.js` — `vTickBall()` (allenamento): stessa rimozione
+- `js/modes/volley/sync.js` — `vTickRemotePhysics()` (dead-reckoning/prediction multiplayer): stessa rimozione, per coerenza fisica fra i tre path
+
+---
+
 ## v2.35.0 — Fix direzione battute pallavolo: ora sono un LANCIO verso l'alto (self-toss), non un tiro verso l'avversario
 
 Riletti `server.js` e `js/modes/volley/physics.js` prima della modifica (le battute erano state introdotte nella sessione precedente, v2.34.0).

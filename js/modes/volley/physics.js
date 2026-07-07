@@ -192,10 +192,10 @@ function vTickBall() {
   const bw = cfg.V_B_BOUNCE, br = vBall.r;
   if (vBall.x - br < V_FL.l) { vBall.x = V_FL.l + br; vBall.vx *= -bw; }
   if (vBall.x + br > V_FL.r) { vBall.x = V_FL.r - br; vBall.vx *= -bw; }
-  // Parete superiore: mancava del tutto in allenamento (la palla poteva
-  // uscire dal campo verso l'alto senza rimbalzare), a differenza del
-  // multiplayer dove sia la prediction client che il server la applicano.
-  if (vBall.y - br < V_FL.t) { vBall.y = V_FL.t + br; vBall.vy *= -bw; vBall.grav = V_B_GRAV_BASE; }
+  // NIENTE collisione con il soffitto per la palla (solo i player la
+  // hanno, vedi vApplyInput): puo' volare altissima, anche fuori
+  // schermo, e' l'unica direzione in cui puo' andare quasi all'infinito.
+  // La gravita' la riporta comunque giu' da sola, prima o poi.
 }
 
 // ── COLLISIONE PALLA ↔ MURETTO CENTRALE ─────────────────
