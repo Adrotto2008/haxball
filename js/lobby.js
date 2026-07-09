@@ -240,7 +240,7 @@ $('btn-restart').onclick    = () => {
   if (isHost) {
     wsSend({type:'restart',payload:{}});
   } else if (netMode === 'train') {
-    if (currentGameMode === 'volley') { vScore=[0,0]; vTimeLeft=V_MATCH_TIME; vGameOver=false; vSecondAccum=0; vReset(false); vUpdateHUD(); setMsg(''); }
+    if (currentGameMode === 'volley') { vScore=[0,0]; vTimeLeft=V_CONFIG.V_MATCH_TIME; vGameOver=false; vSecondAccum=0; vReset(false); vUpdateHUD(); setMsg(''); }
     else { resetLocal(true); updateHUD(); }
   }
 };

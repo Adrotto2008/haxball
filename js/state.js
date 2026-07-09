@@ -16,7 +16,8 @@ let CONFIG = {
   GOAL_CD:     140,
   MATCH_TIME:  180,
   P_RADIUS:    18,
-  B_RADIUS:    11
+  B_RADIUS:    11,
+  P_WALL_BOUNCE: 0.4
 };
 
 // Descrizioni per il pannello Variabili nel menu
@@ -35,6 +36,7 @@ const CONFIG_META = [
   { key:'KICK_CHG_F',  label:'Frame carica tiro',     min:10,  max:120,   step:5    },
   { key:'MATCH_TIME',  label:'Durata partita (sec)',   min:30,  max:600,   step:30   },
   { key:'GOAL_CD',     label:'Pausa dopo gol (frame)', min:30, max:300,   step:10   },
+  { key:'P_WALL_BOUNCE', label:'Rimbalzo player-muro', min:0,   max:1,     step:0.05 },
 ];
 
 // NOTA: V_CONFIG e V_CONFIG_META sono definiti in js/modes/volley/config.js

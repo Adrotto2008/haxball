@@ -141,7 +141,7 @@ function handleServerMsg(msg) {
           for (const r of msg.roster) {
             if (!vPlayers.find(p => p.id === r.id)) {
               const col = r.team === 0 ? V_TEAM_COLS[0] : r.team === 1 ? V_TEAM_COLS[1] : '#555';
-              vPlayers.push({ id: r.id, team: r.team, col, x: -9999, y: -9999, vx: 0, vy: 0, r: V_CONFIG.V_PR || V_PR, held: false });
+              vPlayers.push({ id: r.id, team: r.team, col, x: -9999, y: -9999, vx: 0, vy: 0, r: V_CONFIG.V_PR || V_PR, charge: 0, held: false, kickCooldown: false });
             }
           }
           vPlayers = vPlayers.filter(p => msg.roster.find(r => r.id === p.id));
@@ -296,7 +296,7 @@ function handleServerMsg(msg) {
         goalBurst(msg.team===0 ? V_FL.l : V_FL.r, H/2);
         const gfv = $('goal-flash');
         gfv.style.opacity = '1'; setTimeout(() => gfv.style.opacity = '0', 140);
-        vGoalCD = V_GOAL_CD;
+        vGoalCD = V_CONFIG.V_GOAL_CD;
         vTouches[0] = 0; vTouches[1] = 0; vBallLastSide = null;
       } else {
         score = msg.score;
@@ -305,7 +305,7 @@ function handleServerMsg(msg) {
         goalBurst(msg.team===0 ? FL.l : FL.r, H/2);
         const gf = $('goal-flash');
         gf.style.opacity = '1'; setTimeout(() => gf.style.opacity = '0', 140);
-        goalCD = 140;
+        goalCD = CONFIG.GOAL_CD;
       }
       break;
 

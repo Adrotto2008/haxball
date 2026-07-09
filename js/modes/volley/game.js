@@ -114,7 +114,7 @@ function vGoal(scoringTeam) {
   setMsg(`🏐 PUNTO! ${scoringTeam === 0 ? '🔴 ROSSI' : '🔵 BLU'}! (${vScore[0]}\u2013${vScore[1]})`);
   goalBurst(scoringTeam === 0 ? V_FL.l : V_FL.r, H / 2);
   const gf = $('goal-flash'); gf.style.opacity = '1'; setTimeout(() => gf.style.opacity = '0', 140);
-  vGoalCD = V_GOAL_CD;
+  vGoalCD = V_CONFIG.V_GOAL_CD;
   vTouches = { 0: 0, 1: 0 };
   vBallLastSide = null;
   vLastToucher = { id: null, team: null };
@@ -145,7 +145,7 @@ function vHandleGameOverLocal() {
               `🤝 Pareggio! (${vScore[0]}\u2013${vScore[1]})`;
   setMsg(msg);
   setTimeout(() => {
-    vScore = [0, 0]; vTimeLeft = V_MATCH_TIME; vGameOver = false; vSecondAccum = 0;
+    vScore = [0, 0]; vTimeLeft = V_CONFIG.V_MATCH_TIME; vGameOver = false; vSecondAccum = 0;
     vReset(false); vUpdateHUD();
     setMsg('🏐 Pallavolo — WASD muovi · AZIONE (Ctrl/Spazio/0) per tirare');
   }, 3000);
@@ -196,8 +196,8 @@ function vReset(full) {
       });
     }
   }
-  if (full) { vScore = [0, 0]; vTimeLeft = V_MATCH_TIME; vGameOver = false; vSecondAccum = 0; }
-  vGoalCD = V_GOAL_CD;
+  if (full) { vScore = [0, 0]; vTimeLeft = V_CONFIG.V_MATCH_TIME; vGameOver = false; vSecondAccum = 0; }
+  vGoalCD = V_CONFIG.V_GOAL_CD;
   if (full) setMsg('');
 }
 

@@ -25,8 +25,8 @@ function update(dt) {
     ball.vx *= CONFIG.B_FRIC; ball.vy *= CONFIG.B_FRIC;
     const bR = ball.r;
     const inGoal = ball.y > GY && ball.y < GY + GH;
-    if(ball.x - bR < FL.l) { if(inGoal){ score[1]++; updateHUD(); setMsg(`⚽ BLU! (${score[0]}–${score[1]})`); goalBurst(FL.l,H/2); goalCD=90; resetLocal(false); } else { ball.x=FL.l+bR; ball.vx*=-CONFIG.B_BOUNCE; } }
-    if(ball.x + bR > FL.r) { if(inGoal){ score[0]++; updateHUD(); setMsg(`⚽ ROSSO! (${score[0]}–${score[1]})`); goalBurst(FL.r,H/2); goalCD=90; resetLocal(false); } else { ball.x=FL.r-bR; ball.vx*=-CONFIG.B_BOUNCE; } }
+    if(ball.x - bR < FL.l) { if(inGoal){ score[1]++; updateHUD(); setMsg(`⚽ BLU! (${score[0]}–${score[1]})`); goalBurst(FL.l,H/2); goalCD=CONFIG.GOAL_CD; resetLocal(false); } else { ball.x=FL.l+bR; ball.vx*=-CONFIG.B_BOUNCE; } }
+    if(ball.x + bR > FL.r) { if(inGoal){ score[0]++; updateHUD(); setMsg(`⚽ ROSSO! (${score[0]}–${score[1]})`); goalBurst(FL.r,H/2); goalCD=CONFIG.GOAL_CD; resetLocal(false); } else { ball.x=FL.r-bR; ball.vx*=-CONFIG.B_BOUNCE; } }
     if(ball.y - bR < FL.t){ ball.y=FL.t+bR; ball.vy*=-CONFIG.B_BOUNCE; }
     if(ball.y + bR > FL.b){ ball.y=FL.b-bR; ball.vy*=-CONFIG.B_BOUNCE; }
     if(timeLeft>0){ secondAccum+=dt; if(secondAccum>=1000){secondAccum-=1000;timeLeft--;updateHUD();} }
@@ -43,7 +43,7 @@ function update(dt) {
 
   tickParticles();
   const myP = players.find(p=>p.id===myPlayerId);
-  if(myP && isTouchDev()) drawKickArc(myP.charge/KICK_CHG_F);
+  if(myP && isTouchDev()) drawKickArc(myP.charge/CONFIG.KICK_CHG_F);
 }
 
 // ── GOL / FINE ─────────────────────────────────────────
@@ -84,8 +84,8 @@ function updateHUD() {
 // ── RESET CLIENT-SIDE (solo allenamento) ───────────────
 function resetLocal(full) {
   ball = mkBall();
-  if(full) { score=[0,0]; timeLeft=MATCH_TIME; gameOver=false; secondAccum=0; }
-  goalCD = 90;
+  if(full) { score=[0,0]; timeLeft=CONFIG.MATCH_TIME; gameOver=false; secondAccum=0; }
+  goalCD = CONFIG.GOAL_CD;
   const p = players[0];
   if(p) { p.x=FL.l+(FL.r-FL.l)*0.25; p.y=H/2; p.vx=0; p.vy=0; p.charge=0; p.held=false; }
   setMsg('🎯 Allenamento — WASD/Frecce · 0/Ctrl/Spazio tiro');
@@ -132,8 +132,8 @@ function reset(full) {
       });
     }
   }
-  if(full) { score=[0,0]; timeLeft=MATCH_TIME; gameOver=false; ticker=0; secondAccum=0; }
-  goalCD=90;
+  if(full) { score=[0,0]; timeLeft=CONFIG.MATCH_TIME; gameOver=false; ticker=0; secondAccum=0; }
+  goalCD=CONFIG.GOAL_CD;
   if(full) setMsg('');
   else setMsg('');
 }

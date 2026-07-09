@@ -4,6 +4,48 @@ Versione più recente sempre in cima. Ad ogni modifica aggiornare `VERSION` in `
 
 ---
 
+## v2.39.0 — Rimbalzo player configurabile + audit bug su tutto il progetto
+
+Su richiesta ("miglioralo, rendi migliore il movement e dopo cerca dei bug nel codice riguardo a tutto"). Riletti TUTTI i file rimasti non ancora letti nella sessione precedente: `input.js`, `helpers.js`, `particles.js`, `views.js`, `roster.js`, `admin.js`, `chat.js`, `lobby.js`, `network-core.js`, `auth.js`, entrambi i `draw.js`, `index.html` — oltre a rileggere `server.js` e i `game.js` già noti con occhio specifico da bug-hunt.
+
+### 🏃 Movimento — rimbalzo player contro muri/rete ora configurabile
+- Il coefficiente di rimbalzo quando un player tocca il bordo del campo (o, in pallavolo, la rete centrale) era un numero fisso `-.4` scritto letteralmente in 6 punti diversi (calcio client+server, pallavolo client+server × muro e rete). Non era mai stato esposto come variabile, a differenza di quasi tutti gli altri coefficienti fisici del progetto.
+- Aggiunte **`P_WALL_BOUNCE`** (calcio) e **`V_P_WALL_BOUNCE`** (pallavolo), default `0.4` (comportamento invariato di default), regolabili in tempo reale dal pannello Variabili come tutte le altre. Sostituiti tutti e 6 i punti hardcoded nei 4 path fisici (server autoritativo ×2, client training/prediction ×2).
+
+### 🐛 Bug più importante — "Pausa dopo gol" inefficace in TUTTE le partite calcio multiplayer
+- **`resetPositions()`** in `server.js` (chiamata sia dopo ogni gol sia all'avvio partita) impostava incondizionatamente `room.goalCD=90`, un valore hardcoded **diverso anche dal default stesso di `GOAL_CD` (140)**. Il problema: `handleGoal()` imposta correttamente `room.goalCD=room.config.GOAL_CD` (il valore configurato dall'host) **un'istruzione prima** di chiamare `resetPositions(room,false)` — che subito dopo lo sovrascriveva col valore fisso. Risultato: lo slider host "Pausa dopo gol" nel calcio non ha **mai** avuto alcun effetto reale in una partita multiplayer, qualunque valore venisse impostato. La pallavolo non aveva questo bug: `vResetPositions()` legge già correttamente `vcfg.V_GOAL_CD` — proprio il confronto con l'equivalente pallavolo (corretto) ha reso evidente che quello del calcio era un bug e non una scelta voluta. **Fix**: `resetPositions()` ora legge `room.config.GOAL_CD` come la sua controparte pallavolo.
+- **Stessa classe di bug, impatto minore (solo allenamento/training, corretto anche lì per coerenza)**: in allenamento (calcio e pallavolo), diverse funzioni di reset leggevano le costanti fisse `MATCH_TIME`/`GOAL_CD`/`V_MATCH_TIME`/`V_GOAL_CD` invece dei valori live `CONFIG.MATCH_TIME`/`CONFIG.GOAL_CD`/`V_CONFIG.V_MATCH_TIME`/`V_CONFIG.V_GOAL_CD` — quindi cambiare "Durata partita" o "Pausa dopo gol/punto" dal pannello Variabili in allenamento (dove non c'è un server a correggere il valore) non aveva alcun effetto reale sul timer o sulla pausa dopo gol. Corretto in `resetLocal()`/`reset()`/`update()` (calcio) e `vReset()`/`vGoal()`/`vHandleGameOverLocal()` (pallavolo), più i due pulsanti "Riavvia" duplicati in `lobby.js` e `menu.js` che facevano lo stesso reset inline per la pallavolo.
+- **Stessa classe di bug, impatto trascurabile (multiplayer, guest)**: l'handler `'goal'` in `network-core.js` impostava un valore ottimistico locale (`goalCD=140` calcio, `V_GOAL_CD` bare pallavolo) invece di leggere `CONFIG`/`V_CONFIG` — corretto per coerenza anche se la differenza durava al massimo un broadcast di stato (~33ms), già corretta automaticamente subito dopo.
+
+### 🐛 Indicatore di carica tiro desincronizzato (solo calcio)
+- `drawShotArrow()` e `drawPlayer()` in `js/modes/soccer/draw.js` calcolavano la percentuale di carica del tiro (`p.charge/KICK_CHG_F`) leggendo la costante fissa `KICK_CHG_F` (=50) invece di `CONFIG.KICK_CHG_F` (il valore live, configurabile dall'host come "Frame carica tiro"). Se l'host personalizzava questo valore, l'indicatore visivo (anello attorno al player, freccia di tiro) mostrava "carica al 100%" nel momento sbagliato, mentre la fisica reale (già corretta, legge `CONFIG.KICK_CHG_F`) continuava a caricare. Bug solo visivo, nessun impatto sulla fisica reale. Corretto anche un terzo punto identico nell'indicatore touch (`update()` in `game.js`, chiamata a `drawKickArc`). La pallavolo non aveva questo bug (già corretta).
+
+### 🧹 Robustezza minore
+- **`team_change`** (server, spostamento host di un player fra squadre/spettatori a partita in corso): resettava posizione e velocità ma non `charge`/`held`/`kickCooldown` — in un caso limite (player spostato mentre stava caricando un tiro) poteva lasciare uno stato di carica "congelato" che riprendeva da dove si era interrotto una volta rientrato in campo. Ora azzerati insieme al resto, come già avviene dopo ogni gol.
+- **`pm_update`** (client, aggiunta di un giocatore pallavolo apparso a partita già iniziata): l'oggetto player creato non inizializzava `charge`/`kickCooldown` (il ramo calcio equivalente lo fa già). Impatto pratico nullo (sovrascritto dal prossimo `state` entro un frame), corretto per coerenza.
+- **Codice morto rimosso**: il `Set` `kickedThisTick` in `vTick()` (server) veniva creato e popolato ad ogni tick ma non era mai letto da nessuna parte — rimosso.
+
+### ✅ Verificato, nessun problema trovato
+- `input.js`, `helpers.js`, `particles.js`, `views.js`, `roster.js`, `admin.js`, `chat.js`, `auth.js`: nessun bug identificato in questa lettura.
+- Ordine di caricamento script in `index.html`: coerente, nessuna dipendenza violata.
+- Regola doppio tocco, restrizione battuta, sistema pausa/stop: rivisti, già corretti dalle sessioni precedenti.
+
+### 📁 File modificati
+- `server.js` — `CONFIG_DEFAULT.P_WALL_BOUNCE`/`V_CONFIG_DEFAULT.V_P_WALL_BOUNCE` (nuovi, default 0.4); `applyInput()`/`vApplyInputSrv()` usano il rimbalzo configurabile; **`resetPositions()`: fix `goalCD` hardcoded → `room.config.GOAL_CD`**; `team_change`: reset `charge`/`held`/`kickCooldown`; rimosso `kickedThisTick` (dead code)
+- `js/state.js` — `CONFIG.P_WALL_BOUNCE` + voce `CONFIG_META`
+- `js/modes/volley/config.js` — const `V_P_WALL_BOUNCE`, `V_CONFIG.V_P_WALL_BOUNCE`, voce `V_CONFIG_META`
+- `js/modes/soccer/config.js` — const `P_WALL_BOUNCE` (documentazione)
+- `js/modes/soccer/physics.js` — `applyInput()`: rimbalzo configurabile
+- `js/modes/volley/physics.js` — `vApplyInput()`: rimbalzo configurabile (muro + rete)
+- `js/modes/soccer/draw.js` — `drawShotArrow()`/`drawPlayer()`: fix `KICK_CHG_F` → `CONFIG.KICK_CHG_F`
+- `js/modes/soccer/game.js` — fix `GOAL_CD`/`MATCH_TIME`/`KICK_CHG_F` hardcoded in `update()`, `resetLocal()`, `reset()`
+- `js/modes/volley/game.js` — fix `V_GOAL_CD`/`V_MATCH_TIME` hardcoded in `vGoal()`, `vHandleGameOverLocal()`, `vReset()`
+- `js/lobby.js` — fix `V_MATCH_TIME` hardcoded nel pulsante Riavvia (allenamento pallavolo)
+- `js/menu.js` — fix `V_MATCH_TIME` hardcoded nel pulsante Riavvia del menu di pausa (allenamento pallavolo)
+- `js/network-core.js` — fix `goalCD`/`V_GOAL_CD` hardcoded nell'handler `'goal'`; `pm_update`: inizializza `charge`/`kickCooldown` per player pallavolo aggiunti dinamicamente
+
+---
+
 ## v2.38.0 — Fix accelerazione/decelerazione player (calcio + pallavolo)
 
 Analisi completa su richiesta ("migliora il movimento di tutti, giocatori e palla, in tutte le modalità — assicurati che accelerazione e decelerazione esistano e funzionino, rendendole realistiche e configurabili"). Riletti tutti i file del progetto: `js/config.js`, `js/state.js`, `js/modes/{soccer,volley}/config.js`, `js/modes/{soccer,volley}/physics.js`, `js/modes/{soccer,volley}/sync.js`, `js/modes/{soccer,volley}/game.js`, `server.js`, `js/menu.js`, `js/input.js`.

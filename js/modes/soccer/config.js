@@ -18,6 +18,7 @@ const P_START    = 1.4;   // velocità minima istantanea al primo frame di input
 const P_SPEED_MAX = 10.0; // velocità massima assoluta
 const P_ACCEL    = 0.2;   // rampa dopo il kick-start (v2.38.0: era 0.01, inefficace)
 const P_FRIC     = 0.78;
+const P_WALL_BOUNCE = 0.4; // elasticita' rimbalzo player contro i muri campo
 const P_SPEED    = P_SPEED_MAX; // alias usato da codice legacy
 
 const B_FRIC = 0.984, B_BOUNCE = 0.80, B_HIT_R = 0.82;

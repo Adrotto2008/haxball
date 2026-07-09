@@ -347,7 +347,7 @@ $('esc-resume').onclick   = () => closeMenu();
 $('esc-restart').onclick  = () => {
   closeMenu();
   if (netMode === 'train') {
-    if (currentGameMode === 'volley') { vScore = [0,0]; vTimeLeft = V_MATCH_TIME; vGameOver = false; vSecondAccum = 0; vReset(false); vUpdateHUD(); setMsg(''); }
+    if (currentGameMode === 'volley') { vScore = [0,0]; vTimeLeft = V_CONFIG.V_MATCH_TIME; vGameOver = false; vSecondAccum = 0; vReset(false); vUpdateHUD(); setMsg(''); }
     else { resetLocal(true); updateHUD(); }
   } else if (isHost) {
     wsSend({ type: 'restart', payload: {} });

@@ -65,7 +65,7 @@ function drawShotArrow(p) {
   const d = Math.hypot(ball.x-p.x, ball.y-p.y);
   const kickDist = p.r + ball.r + CONFIG.KICK_DIST_X;
   if(d > kickDist) return;
-  const cr = p.charge/KICK_CHG_F;
+  const cr = p.charge/CONFIG.KICK_CHG_F;
   const dx = ball.x-p.x, dy = ball.y-p.y, len = Math.hypot(dx,dy)||1;
   const nx = dx/len, ny = dy/len;
   const sx = ball.x+nx*ball.r, sy = ball.y+ny*ball.r;
@@ -103,7 +103,7 @@ function lerpHex(h1, h2, t) {
 function drawPlayer(p) {
   if(p.team === -1) return;
   const isAfk = afkPlayers.has(p.id);
-  const cr=p.charge/KICK_CHG_F, charging=p.held;
+  const cr=p.charge/CONFIG.KICK_CHG_F, charging=p.held;
   const ga = isAfk ? 0.06 : (charging ? 0.07+cr*.18 : 0.04);
   const grc = isAfk ? `rgba(150,150,150,${ga})` : (p.team===0 ? `rgba(255,80,80,${ga})` : `rgba(80,140,255,${ga})`);
   const glowR = p.r+14+(charging&&!isAfk?cr*16:0);

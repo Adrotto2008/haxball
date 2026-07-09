@@ -8,7 +8,7 @@ const CONFIG_DEFAULT = {
   B_FRIC:0.984, B_BOUNCE:0.80, B_HIT_R:0.82,
   KICK_MIN:3.8, KICK_MAX:14.0, KICK_CHG_F:50, KICK_DIST_X:12,
   GOAL_CD:140, MATCH_TIME:180,
-  P_RADIUS:18, B_RADIUS:11
+  P_RADIUS:18, B_RADIUS:11, P_WALL_BOUNCE:0.4
 };
 
 // Costanti pallavolo — modificabili per room tramite set_vconfig
@@ -17,7 +17,7 @@ const V_CONFIG_DEFAULT = {
   V_B_FRIC:0.99, V_B_BOUNCE:0.35,
   V_KICK_MIN:4.0, V_KICK_MAX:14.0, V_KICK_CHG_F:50,
   V_MATCH_TIME:180, V_GOAL_CD:120,
-  V_PR:20, V_BR:10,
+  V_PR:20, V_BR:10, V_P_WALL_BOUNCE:0.4,
 };
 
 const ADMIN_TOKEN = process.env.ADMIN_TOKEN || crypto.randomBytes(24).toString('hex');
@@ -79,7 +79,8 @@ function doKick(p,ball,force,cfg){
   ball.vx=nx*force+p.vx*0.28; ball.vy=ny*force+p.vy*0.28;
 }
 function applyInput(p,inp,ball,cfg){
-  const {P_START,P_SPEED_MAX,P_ACCEL,P_FRIC,KICK_MIN,KICK_MAX,KICK_CHG_F}=cfg;
+  const {P_START,P_SPEED_MAX,P_ACCEL,P_FRIC,KICK_MIN,KICK_MAX,KICK_CHG_F,P_WALL_BOUNCE}=cfg;
+  const wb=(P_WALL_BOUNCE!==undefined)?P_WALL_BOUNCE:0.4;
   const charging=inp.kick,topSpd=charging?P_SPEED_MAX*0.45:P_SPEED_MAX;
   if(charging){if(!p.held){p.vx*=0.3;p.vy*=0.3;}p.charge=Math.min(p.charge+1,KICK_CHG_F);}
   else{if(p.held&&p.charge>0)doKick(p,ball,KICK_MIN+(p.charge/KICK_CHG_F)*(KICK_MAX-KICK_MIN),cfg);p.charge=0;}
@@ -103,8 +104,8 @@ function applyInput(p,inp,ball,cfg){
   } else { p.vx*=P_FRIC; }
   const spd=Math.hypot(p.vx,p.vy);if(spd>topSpd){p.vx=p.vx/spd*topSpd;p.vy=p.vy/spd*topSpd;}
   p.x+=p.vx;p.y+=p.vy;
-  if(p.x<FL.l+p.r){p.x=FL.l+p.r;p.vx*=-.4;}if(p.x>FL.r-p.r){p.x=FL.r-p.r;p.vx*=-.4;}
-  if(p.y<FL.t+p.r){p.y=FL.t+p.r;p.vy*=-.4;}if(p.y>FL.b-p.r){p.y=FL.b-p.r;p.vy*=-.4;}
+  if(p.x<FL.l+p.r){p.x=FL.l+p.r;p.vx*=-wb;}if(p.x>FL.r-p.r){p.x=FL.r-p.r;p.vx*=-wb;}
+  if(p.y<FL.t+p.r){p.y=FL.t+p.r;p.vy*=-wb;}if(p.y>FL.b-p.r){p.y=FL.b-p.r;p.vy*=-wb;}
 }
 
 // ── FISICA PALLAVOLO ─────────────────────────────────────
@@ -190,16 +191,17 @@ function vApplyInputSrv(p, inp, ball, vcfg) {
   if(spd>topSpd){p.vx=p.vx/spd*topSpd;p.vy=p.vy/spd*topSpd;}
 
   p.x+=p.vx;p.y+=p.vy;
-  if(p.x<V_FL.l+p.r){p.x=V_FL.l+p.r;p.vx*=-.4;}
-  if(p.x>V_FL.r-p.r){p.x=V_FL.r-p.r;p.vx*=-.4;}
-  if(p.y<V_FL.t+p.r){p.y=V_FL.t+p.r;p.vy*=-.4;}
-  if(p.y>V_FL.b-p.r){p.y=V_FL.b-p.r;p.vy*=-.4;}
+  { const vwb=(vcfg.V_P_WALL_BOUNCE!==undefined)?vcfg.V_P_WALL_BOUNCE:0.4;
+  if(p.x<V_FL.l+p.r){p.x=V_FL.l+p.r;p.vx*=-vwb;}
+  if(p.x>V_FL.r-p.r){p.x=V_FL.r-p.r;p.vx*=-vwb;}
+  if(p.y<V_FL.t+p.r){p.y=V_FL.t+p.r;p.vy*=-vwb;}
+  if(p.y>V_FL.b-p.r){p.y=V_FL.b-p.r;p.vy*=-vwb;}
   // Muro centrale (rete): SEMPRE bloccato per entrambe le squadre. La palla
   // ferma sulla rete e' gia' raggiungibile da chi e' appoggiato al muro
   // (distanza dal centro palla = p.r, sempre entro il raggio di tiro
   // p.r+V_BR): non serve disattivare il muro per chi batte.
-  if(p.team===0&&p.x+p.r>V_NET_X){p.x=V_NET_X-p.r;p.vx*=-.4;}
-  if(p.team===1&&p.x-p.r<V_NET_X){p.x=V_NET_X+p.r;p.vx*=-.4;}
+  if(p.team===0&&p.x+p.r>V_NET_X){p.x=V_NET_X-p.r;p.vx*=-vwb;}
+  if(p.team===1&&p.x-p.r<V_NET_X){p.x=V_NET_X+p.r;p.vx*=-vwb;} }
   return kicked;
 }
 
@@ -329,7 +331,7 @@ function buildPlayers(roster,mode,cfg,vcfg){
 function resetPositions(room,full){
   room.ball=mkBall(room.config);
   if(full){room.score=[0,0];room.timeLeft=room.config.MATCH_TIME;room.gameOver=false;room.secondAccum=0;}
-  room.goalCD=90;
+  room.goalCD=room.config.GOAL_CD;
   const bt=[[],[]];
   for(const p of room.players)if(p.team===0||p.team===1)bt[p.team].push(p);
   for(const t of[0,1]){const g=bt[t],n=g.length;g.forEach((p,i)=>{p.x=FL.l+(FL.r-FL.l)*(t===0?.22:.78);p.y=FL.t+(FL.b-FL.t)*(i+1)/(n+1);p.vx=0;p.vy=0;p.charge=0;p.held=false;});}
@@ -484,7 +486,6 @@ function vTick(room){
   const ball=room.ball, players=room.players;
 
   // 1. Input player
-  const kickedThisTick = new Set();
   for(const p of players){
     if(p.team===-1)continue;
 
@@ -493,7 +494,6 @@ function vTick(room){
 
     const kicked=vApplyInputSrv(p, room.inputs[p.id]||{}, ball, vcfg);
     if(kicked){
-      kickedThisTick.add(p.id);
       const opp=p.team===0?1:0;
 
       // Regola doppio tocco: se la squadra ha piu' di un giocatore attivo
@@ -707,7 +707,7 @@ wss.on('connection',ws=>{
       if(myPid!==myRoom.hostPid)return;
       const{pid,team}=payload;const c=[...myRoom.clients.values()].find(x=>x.pid===pid);if(!c)return;
       c.team=team;
-      if(myRoom.started){const p=myRoom.players.find(x=>x.id===pid);if(p){p.team=team;if(team===-1){p.x=-9999;p.y=-9999;p.vx=0;p.vy=0;}else{p.x=team===0?W*0.25:W*0.75;p.y=H/2+(Math.random()-.5)*80;p.vx=0;p.vy=0;}}}
+      if(myRoom.started){const p=myRoom.players.find(x=>x.id===pid);if(p){p.team=team;p.charge=0;p.held=false;p.kickCooldown=false;if(team===-1){p.x=-9999;p.y=-9999;p.vx=0;p.vy=0;}else{p.x=team===0?W*0.25:W*0.75;p.y=H/2+(Math.random()-.5)*80;p.vx=0;p.vy=0;}}}
       myRoom.roster=buildRoster(myRoom);bcastAll(myRoom,{type:'team_change',pid,team});return;
     }
     if(type==='kick'){if(myPid!==myRoom.hostPid)return;for(const[kws,kc] of myRoom.clients)if(kc.pid===payload.pid){send(kws,{type:'kicked'});kws.close();break;}return;}

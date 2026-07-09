@@ -22,7 +22,8 @@ function doKick(p, force) {
 }
 
 function applyInput(p, inp) {
-  const { P_START, P_SPEED_MAX, P_ACCEL, P_FRIC, KICK_MIN, KICK_MAX, KICK_CHG_F } = CONFIG;
+  const { P_START, P_SPEED_MAX, P_ACCEL, P_FRIC, KICK_MIN, KICK_MAX, KICK_CHG_F, P_WALL_BOUNCE } = CONFIG;
+  const wb = (P_WALL_BOUNCE !== undefined) ? P_WALL_BOUNCE : 0.4;
   const charging = inp.kick, topSpd = charging ? P_SPEED_MAX*0.45 : P_SPEED_MAX;
   if(charging) {
     if(!p.held) { p.vx*=0.3; p.vy*=0.3; }
@@ -72,8 +73,8 @@ function applyInput(p, inp) {
   const spd = Math.hypot(p.vx, p.vy);
   if(spd > topSpd) { p.vx = p.vx/spd*topSpd; p.vy = p.vy/spd*topSpd; }
   p.x += p.vx; p.y += p.vy;
-  if(p.x < FL.l+p.r)  { p.x=FL.l+p.r;  p.vx*=-.4; }
-  if(p.x > FL.r-p.r)  { p.x=FL.r-p.r;  p.vx*=-.4; }
-  if(p.y < FL.t+p.r)  { p.y=FL.t+p.r;  p.vy*=-.4; }
-  if(p.y > FL.b-p.r)  { p.y=FL.b-p.r;  p.vy*=-.4; }
+  if(p.x < FL.l+p.r)  { p.x=FL.l+p.r;  p.vx*=-wb; }
+  if(p.x > FL.r-p.r)  { p.x=FL.r-p.r;  p.vx*=-wb; }
+  if(p.y < FL.t+p.r)  { p.y=FL.t+p.r;  p.vy*=-wb; }
+  if(p.y > FL.b-p.r)  { p.y=FL.b-p.r;  p.vy*=-wb; }
 }

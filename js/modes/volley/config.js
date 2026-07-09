@@ -58,6 +58,9 @@ const V_TEAM_HI   = ['#ff7777', '#77bbff'];
 const V_MATCH_TIME = 180;
 const V_GOAL_CD    = 120;
 
+// ── RIMBALZO PLAYER SU MURO/RETE ────────────────────────
+const V_P_WALL_BOUNCE = 0.4;
+
 // ── CONFIG LIVE VOLLEY (specchio server, modificabile da host) ──
 let V_CONFIG = {
   V_P_START:    1.4,
@@ -73,6 +76,7 @@ let V_CONFIG = {
   V_GOAL_CD:    120,
   V_PR:         20,
   V_BR:         10,
+  V_P_WALL_BOUNCE: 0.4,
 };
 
 const V_CONFIG_META = [
@@ -89,4 +93,5 @@ const V_CONFIG_META = [
   { key:'V_KICK_CHG_F', label:'Frame carica tiro',      min:10,  max:120, step:5    },
   { key:'V_MATCH_TIME', label:'Durata partita (sec)',    min:30,  max:600, step:30   },
   { key:'V_GOAL_CD',    label:'Pausa dopo punto (frame)',min:30,  max:300, step:10   },
+  { key:'V_P_WALL_BOUNCE', label:'Rimbalzo player-muro', min:0,   max:1,   step:0.05 },
 ];

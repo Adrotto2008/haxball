@@ -72,18 +72,19 @@ function vApplyInput(p, inp) {
   if (spd > topSpd) { p.vx = p.vx/spd*topSpd; p.vy = p.vy/spd*topSpd; }
 
   p.x += p.vx; p.y += p.vy;
-  if (p.x < V_FL.l + p.r) { p.x = V_FL.l + p.r; p.vx *= -.4; }
-  if (p.x > V_FL.r - p.r) { p.x = V_FL.r - p.r; p.vx *= -.4; }
-  if (p.y < V_FL.t + p.r) { p.y = V_FL.t + p.r; p.vy *= -.4; }
-  if (p.y > V_FL.b - p.r) { p.y = V_FL.b - p.r; p.vy *= -.4; }
+  const vwb = (cfg.V_P_WALL_BOUNCE !== undefined) ? cfg.V_P_WALL_BOUNCE : 0.4;
+  if (p.x < V_FL.l + p.r) { p.x = V_FL.l + p.r; p.vx *= -vwb; }
+  if (p.x > V_FL.r - p.r) { p.x = V_FL.r - p.r; p.vx *= -vwb; }
+  if (p.y < V_FL.t + p.r) { p.y = V_FL.t + p.r; p.vy *= -vwb; }
+  if (p.y > V_FL.b - p.r) { p.y = V_FL.b - p.r; p.vy *= -vwb; }
   // Muro centrale (rete): SEMPRE bloccato per entrambe le squadre. La palla
   // ferma sulla rete durante la battuta e' gia' raggiungibile da chi e'
   // appoggiato al muro (distanza dal centro palla = p.r, sempre entro il
   // raggio di tiro p.r+V_BR): non serve disattivare il muro per chi batte.
   // Chi NON batte viene tenuto indietro da vApplyServeRestriction, ben
   // oltre il raggio di tiro (vedi sotto).
-  if (p.team === 0 && p.x + p.r > V_NET_X) { p.x = V_NET_X - p.r; p.vx *= -.4; }
-  if (p.team === 1 && p.x - p.r < V_NET_X) { p.x = V_NET_X + p.r; p.vx *= -.4; }
+  if (p.team === 0 && p.x + p.r > V_NET_X) { p.x = V_NET_X - p.r; p.vx *= -vwb; }
+  if (p.team === 1 && p.x - p.r < V_NET_X) { p.x = V_NET_X + p.r; p.vx *= -vwb; }
 }
 
 // ── TIRO (AZIONE) ───────────────────────────────────────
