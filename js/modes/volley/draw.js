@@ -75,24 +75,38 @@ function _vDrawTouchIndicators() {
   }
 }
 
-// ── LINEA E BADGE FASE BATTUTA ───────────────────────────
-// Mostra dove la squadra NON battente non può avvicinarsi, e chi
-// deve servire. La linea è dalla parte del campo della squadra
-// che NON sta battendo (la respinge lontano dalla rete).
+// ── LINEE E BADGE FASE BATTUTA ───────────────────────────
+// v2.40.0: la restrizione vale per ENTRAMBE le squadre. v2.41.0: margini
+// ASIMMETRICI — la linea di chi batte è più lontana dalla rete (area più
+// piccola) di quella di chi non batte (più vicina alla rete). Le due linee
+// dipendono quindi da chi sta servendo (vServeTeam), non sono più fisse.
 function _vDrawServeRestriction() {
-  if (typeof V_SERVE_RESTRICT_X_L === 'undefined' || typeof V_SERVE_RESTRICT_X_R === 'undefined') return;
-  const lineX = vServeTeam === 0 ? V_SERVE_RESTRICT_X_R : V_SERVE_RESTRICT_X_L;
-  const col = V_TEAM_COLS[vServeTeam === 0 ? 1 : 0]; // colore della squadra che NON può avvicinarsi
+  if (typeof V_SERVE_RESTRICT_MARGIN_SERVER === 'undefined' || typeof V_SERVE_RESTRICT_MARGIN_RECEIVER === 'undefined') return;
+  if (typeof vServeTeam !== 'number') return;
+  const pulse = 0.55 + 0.25 * Math.sin(Date.now() * 0.004);
+
+  const margin0 = (vServeTeam === 0) ? V_SERVE_RESTRICT_MARGIN_SERVER : V_SERVE_RESTRICT_MARGIN_RECEIVER;
+  const margin1 = (vServeTeam === 1) ? V_SERVE_RESTRICT_MARGIN_SERVER : V_SERVE_RESTRICT_MARGIN_RECEIVER;
+  const lineX0 = V_NET_X - margin0; // limite ROSSI (team 0)
+  const lineX1 = V_NET_X + margin1; // limite BLU  (team 1)
 
   ctx.save();
   ctx.setLineDash([8, 6]);
-  ctx.strokeStyle = col;
-  ctx.globalAlpha = 0.55 + 0.25 * Math.sin(Date.now() * 0.004);
+  ctx.globalAlpha = pulse;
   ctx.lineWidth = 2.5;
+
+  ctx.strokeStyle = V_TEAM_COLS[0];
   ctx.beginPath();
-  ctx.moveTo(lineX, V_FL.t);
-  ctx.lineTo(lineX, V_FL.b);
+  ctx.moveTo(lineX0, V_FL.t);
+  ctx.lineTo(lineX0, V_FL.b);
   ctx.stroke();
+
+  ctx.strokeStyle = V_TEAM_COLS[1];
+  ctx.beginPath();
+  ctx.moveTo(lineX1, V_FL.t);
+  ctx.lineTo(lineX1, V_FL.b);
+  ctx.stroke();
+
   ctx.restore();
 
   // Badge "chi batte" sopra al campo

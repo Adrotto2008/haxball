@@ -46,7 +46,9 @@ const TEAM_COLS=['#ff3333','#3388ff'];
 const V_PR=20, V_BR=10;
 const V_FL={l:40,r:W-40,t:40,b:H-40};
 const V_NET_X=W/2;
-const V_POST_W=8, V_POST_H=(V_FL.b-V_FL.t)/8;
+// v2.40.0: rete leggermente più alta (+15%), stesso moltiplicatore del client (config.js)
+const V_NET_HEIGHT_MULT=1.15;
+const V_POST_W=8, V_POST_H=(V_FL.b-V_FL.t)/8*V_NET_HEIGHT_MULT;
 const V_POST_X1=V_NET_X-V_POST_W/2, V_POST_X2=V_NET_X+V_POST_W/2;
 const V_POST_Y1=V_FL.b-V_POST_H,    V_POST_Y2=V_FL.b;
 const V_B_GRAV_BASE=0.015, V_B_GRAV_MAX=0.06, V_B_GRAV_RAMP=0.0008;
@@ -54,13 +56,14 @@ const V_TEAM_MAX_TOUCHES=3;
 const TICK_MS=1000/60, BCAST_MS=1000/30;
 
 // Linee di restrizione battuta (stessa logica del client, vedi physics.js).
-// La palla e' ferma sulla rete: chi batte la raggiunge gia' stando
-// appoggiato al muro normale. Chi NON batte resta indietro, sul PROPRIO
-// campo, ben oltre il raggio di tiro: la linea sta dalla propria parte
-// della rete, mai oltre.
-const V_SERVE_RESTRICT_MARGIN = 70;
-const V_SERVE_RESTRICT_X_L = V_NET_X - V_SERVE_RESTRICT_MARGIN; // limite ROSSI (team 0) quando NON battono
-const V_SERVE_RESTRICT_X_R = V_NET_X + V_SERVE_RESTRICT_MARGIN; // limite BLU  (team 1) quando NON battono
+// v2.41.0: margini ASIMMETRICI — chi batte ha un'area di campo piu'
+// piccola (margine maggiore, linea piu' lontana dalla rete) di chi non
+// batte (margine minore, linea piu' vicina alla rete). Prima il margine
+// era lo stesso (70) per entrambi. Dipende da chi sta servendo in quel
+// momento, quindi va calcolato per-player in vApplyServeRestrictionSrv
+// (non piu' precalcolabile in due costanti fisse per team).
+const V_SERVE_RESTRICT_MARGIN_SERVER   = 140; // chi batte: area piu' piccola
+const V_SERVE_RESTRICT_MARGIN_RECEIVER = 40;  // chi non batte: puo' avvicinarsi di piu'
 
 // ── FISICA CALCIO ─────────────────────────────────────────
 function circleCollide(a,b,res){
@@ -206,19 +209,24 @@ function vApplyInputSrv(p, inp, ball, vcfg) {
 }
 
 // ── RESTRIZIONE RETE (fase battuta) ─────────────────────
+// v2.40.0: vale per ENTRAMBE le squadre. v2.41.0: margine diverso a
+// seconda che il player sia il battitore o meno (vedi costanti sopra).
 function vApplyServeRestrictionSrv(p, serveTeam) {
   if (serveTeam === null || serveTeam === undefined) return;
-  if (p.team === serveTeam || p.team === -1) return; // riguarda solo chi NON batte
+  if (p.team === -1) return; // gli spettatori non sono mai coinvolti
+  const margin = (p.team === serveTeam) ? V_SERVE_RESTRICT_MARGIN_SERVER : V_SERVE_RESTRICT_MARGIN_RECEIVER;
   if (p.team === 0) {
-    // Rossi (campo sx): non possono avvicinarsi oltre V_SERVE_RESTRICT_X_L
-    if (p.x + p.r > V_SERVE_RESTRICT_X_L) {
-      p.x = V_SERVE_RESTRICT_X_L - p.r;
+    // Rossi (campo sx)
+    const limit = V_NET_X - margin;
+    if (p.x + p.r > limit) {
+      p.x = limit - p.r;
       if (p.vx > 0) p.vx *= -0.3;
     }
   } else if (p.team === 1) {
-    // Blu (campo dx): non possono avvicinarsi oltre V_SERVE_RESTRICT_X_R
-    if (p.x - p.r < V_SERVE_RESTRICT_X_R) {
-      p.x = V_SERVE_RESTRICT_X_R + p.r;
+    // Blu (campo dx)
+    const limit = V_NET_X + margin;
+    if (p.x - p.r < limit) {
+      p.x = limit + p.r;
       if (p.vx < 0) p.vx *= -0.3;
     }
   }
@@ -286,6 +294,11 @@ function mkRoom(code,name,password,mode){
     // ── Battuta ──
     vServeTeam:0,    // 0 = rossi battono, 1 = blu battono
     vServePhase:true, // true = fase battuta (restrizione attiva)
+    // v2.41.0: true quando il servizio in corso ha gia' attraversato la
+    // rete verso il campo avversario almeno una volta. Finche' e' false,
+    // la squadra che serve puo' toccare la palla una sola volta (vedi
+    // vTick): un secondo tocco prima che il servizio "passi" e' fallo.
+    vServeRallyLive:false,
     ticker:null, secondAccum:0, lastBcast:0
   };
 }
@@ -341,6 +354,7 @@ function vResetPositions(room,full,nextServeTeam){
   // Decidi chi batte (all'inizio sempre team 0; dopo un punto: la squadra che ha subito)
   if(nextServeTeam===0||nextServeTeam===1) room.vServeTeam=nextServeTeam;
   room.vServePhase=true;
+  room.vServeRallyLive=false;
   room.ball=mkVolleyBall(room.vconfig, room.vServeTeam);
   room.vTouches={0:0,1:0}; room.vBallLastSide=null;
   room.vLastToucherId=null; room.vLastToucherTeam=null;
@@ -509,6 +523,14 @@ function vTick(room){
 
       room.vTouches[opp]=0;
       room.vTouches[p.team]++;
+      // Regola battuta (v2.41.0): finche' il servizio non ha ancora
+      // attraversato la rete (room.vServeRallyLive===false), la squadra
+      // che serve puo' toccare la palla una sola volta. Un secondo tocco
+      // suo prima che il servizio "passi" e' un fallo: punto immediato
+      // all'avversario, piu' severo del normale limite di 3 tocchi.
+      if(!room.vServeRallyLive && p.team===room.vServeTeam && room.vTouches[p.team]>1){
+        vHandlePoint(room,opp);return;
+      }
       if(room.vTouches[p.team]>V_TEAM_MAX_TOUCHES){vHandlePoint(room,opp);return;}
       // Se la squadra che batteva ha toccato la palla: fine fase battuta
       if(room.vServePhase && p.team===room.vServeTeam){
@@ -549,7 +571,10 @@ function vTick(room){
 
   // 5. Cambio lato → reset tocchi
   const side=ball.x<V_NET_X?0:1;
-  if(room.vBallLastSide!==null&&side!==room.vBallLastSide)room.vTouches={0:0,1:0};
+  if(room.vBallLastSide!==null&&side!==room.vBallLastSide){
+    room.vTouches={0:0,1:0};
+    room.vServeRallyLive=true; // il servizio ha attraversato la rete: e' "passato"
+  }
   room.vBallLastSide=side;
 
   // 6. Pavimento → punto

@@ -250,6 +250,12 @@ function vIncrementTouch(team) {
   const opp = team === 0 ? 1 : 0;
   vTouches[opp] = 0;
   vTouches[team]++;
+  // Regola battuta (v2.41.0): finche' il servizio non ha ancora attraversato
+  // la rete (vServeRallyLive===false), la squadra che serve puo' toccare la
+  // palla una sola volta. Un secondo tocco suo prima che il servizio
+  // "passi" e' un fallo: punto immediato all'avversario, piu' severo del
+  // normale limite di 3 tocchi.
+  if (!vServeRallyLive && team === vServeTeam && vTouches[team] > 1) { vGoal(opp); return; }
   if (vTouches[team] > V_TEAM_MAX_TOUCHES) vGoal(opp);
 }
 
@@ -258,33 +264,43 @@ function vCheckSideChange() {
   const side = vBall.x < V_NET_X ? 0 : 1;
   if (vBallLastSide !== null && side !== vBallLastSide) {
     vTouches[0] = 0; vTouches[1] = 0;
+    vServeRallyLive = true; // il servizio ha attraversato la rete: e' "passato"
   }
   vBallLastSide = side;
 }
 
 // ── RESTRIZIONE RETE (fase battuta) ─────────────────────
-// La palla e' ferma sulla linea centrale (rete). Chi batte puo' gia'
-// raggiungerla stando appoggiato al muro normale (vedi vApplyInput).
-// Chi NON batte deve restare BEN INDIETRO, sul PROPRIO campo, fuori dal
-// raggio di tiro: la linea di restrizione sta quindi dalla propria parte
-// della rete (mai oltre la rete stessa, altrimenti si sconfina).
-const V_SERVE_RESTRICT_MARGIN = 70; // distanza dalla rete oltre la quale chi non batte non puo' avvicinarsi
-const V_SERVE_RESTRICT_X_L = V_NET_X - V_SERVE_RESTRICT_MARGIN; // limite per i ROSSI (team 0, campo sx) quando NON battono
-const V_SERVE_RESTRICT_X_R = V_NET_X + V_SERVE_RESTRICT_MARGIN; // limite per i BLU  (team 1, campo dx) quando NON battono
+// v2.40.0: la restrizione ora vale per ENTRAMBE le squadre durante la fase
+// di battuta, non solo per chi non deve servire. Prima, chi doveva battere
+// poteva camminare fino alla rete e toccare direttamente la palla ferma
+// sulla linea centrale, saltando di fatto la battuta vera e propria (i
+// comandi /a /q /z). Ora anche il battitore resta fuori dal raggio di
+// tiro rispetto alla palla ferma sulla rete: l'unico modo di rimetterla in
+// gioco e' lanciarla con una battuta (vApplyServeVariantLocal), che la fa
+// comparire vicino a se stesso indipendentemente dalla posizione in campo.
+// v2.41.0: margini ASIMMETRICI. Chi batte ha un'area di campo ancora piu'
+// piccola (margine maggiore, linea piu' lontana dalla rete); chi non batte
+// puo' invece avvicinarsi di piu' (margine minore, linea piu' vicina alla
+// rete). Prima il margine era identico (70) per entrambi.
+const V_SERVE_RESTRICT_MARGIN_SERVER   = 140; // chi batte: area piu' piccola, linea piu' lontana dalla rete
+const V_SERVE_RESTRICT_MARGIN_RECEIVER = 40;  // chi non batte: puo' avvicinarsi di piu' alla rete
 
 function vApplyServeRestriction(p, serveTeam) {
   if (serveTeam === null || serveTeam === undefined) return;
-  if (p.team === serveTeam || p.team === -1) return; // riguarda solo chi NON batte
+  if (p.team === -1) return; // gli spettatori non sono mai coinvolti
+  const margin = (p.team === serveTeam) ? V_SERVE_RESTRICT_MARGIN_SERVER : V_SERVE_RESTRICT_MARGIN_RECEIVER;
   if (p.team === 0) {
-    // Rossi (campo sx): non possono avvicinarsi oltre V_SERVE_RESTRICT_X_L
-    if (p.x + p.r > V_SERVE_RESTRICT_X_L) {
-      p.x = V_SERVE_RESTRICT_X_L - p.r;
+    // Rossi (campo sx)
+    const limit = V_NET_X - margin;
+    if (p.x + p.r > limit) {
+      p.x = limit - p.r;
       if (p.vx > 0) p.vx *= -0.3;
     }
   } else if (p.team === 1) {
-    // Blu (campo dx): non possono avvicinarsi oltre V_SERVE_RESTRICT_X_R
-    if (p.x - p.r < V_SERVE_RESTRICT_X_R) {
-      p.x = V_SERVE_RESTRICT_X_R + p.r;
+    // Blu (campo dx)
+    const limit = V_NET_X + margin;
+    if (p.x - p.r < limit) {
+      p.x = limit + p.r;
       if (p.vx < 0) p.vx *= -0.3;
     }
   }

@@ -4,6 +4,50 @@ Versione più recente sempre in cima. Ad ogni modifica aggiornare `VERSION` in `
 
 ---
 
+## v2.41.0 — Pallavolo: battuta a tocco singolo + margini asimmetrici
+
+Su richiesta: "quando uno deve fare la battuta, non può fare più di un tocco senò è punto dell'avversario" e "durante la battuta [...] quello che batte ha un'area del campo ancora più piccola [...] mentre chi non batte ha la linea più vicina al centro".
+
+### 🚫 Tocco singolo obbligatorio in battuta
+- Nuovo stato `vServeRallyLive` (client: `game.js`/`physics.js`; server: `room.vServeRallyLive`): parte `false` ad ogni nuova battuta, diventa `true` la prima volta che la palla attraversa la rete verso il campo avversario (stesso punto in cui gia' si azzeravano i tocchi al cambio lato).
+- Finche' `vServeRallyLive` e' `false`, la squadra che deve servire (`vServeTeam`) puo' toccare la palla **una sola volta**: un secondo tocco suo prima che il servizio abbia effettivamente passato la rete e' un fallo con punto immediato all'avversario — regola distinta e piu' severa del normale limite di 3 tocchi a scambio, che resta invariato per il resto del punto.
+- Non copre solo il "vero" colpo di battuta: se il servizio rimbalza sul muretto centrale e torna sul campo di chi ha servito, un secondo tocco della stessa squadra e' comunque fallo (il servizio non e' mai "passato").
+- Il lancio della battuta (`/a /q /z`, `vApplyServeVariantLocal`/`vApplyServeVariant`) resta — come già prima — un non-tocco: non incrementa `vTouches` e non influenza questa regola.
+
+### 🎮 Margini di restrizione asimmetrici (battitore vs ricevitore)
+- Prima (v2.40.0): un solo margine di 70px dalla rete, identico per entrambe le squadre durante la battuta.
+- Ora: due margini distinti — `V_SERVE_RESTRICT_MARGIN_SERVER = 140` per chi batte (area di campo piu' piccola, linea spinta piu' indietro rispetto a prima) e `V_SERVE_RESTRICT_MARGIN_RECEIVER = 40` per chi non batte (puo' avvicinarsi alla rete piu' di prima). Il margine applicato a ciascun player dipende da chi sta servendo in quel momento (`p.team === serveTeam`), quindi non e' piu' precalcolabile in due costanti fisse per team come prima.
+- Indicatore visivo aggiornato di conseguenza: `_vDrawServeRestriction()` ora disegna le due linee a distanze diverse dalla rete invece che simmetriche.
+
+### 📁 File modificati
+- `js/modes/volley/physics.js` — `vIncrementTouch()`: regola tocco singolo in battuta; `vCheckSideChange()`: imposta `vServeRallyLive=true` al cambio lato; `vApplyServeRestriction()`: margine dinamico battitore/ricevitore con le nuove costanti `V_SERVE_RESTRICT_MARGIN_SERVER`/`RECEIVER`
+- `js/modes/volley/game.js` — nuova variabile `vServeRallyLive`, resettata in `vGoal()` e `vReset()`
+- `js/modes/volley/draw.js` — `_vDrawServeRestriction()`: due linee a margini diversi in base a chi serve
+- `server.js` — stessa logica autoritativa: `room.vServeRallyLive` (in `mkRoom`, `vResetPositions`, aggiornato in `vTick` al cambio lato); regola tocco singolo nel blocco tocchi di `vTick`; `vApplyServeRestrictionSrv()` con margine dinamico
+
+---
+
+## v2.40.0 — Pallavolo: rete leggermente più alta + battuta obbligatoria per entrambe le squadre
+
+Su richiesta ("nella pallavolo fai che la rete è leggermente più alta, proprio di poco, e che uno può battere solo usando i servizi").
+
+### 🏐 Rete leggermente più alta
+- `V_POST_H` (altezza del muretto/rete centrale) aumentata del +15% rispetto al valore precedente (1/8 dell'altezza campo), tramite un nuovo moltiplicatore esplicito `V_NET_HEIGHT_MULT = 1.15` invece di cambiare il divisore originale — più facile da ritoccare in futuro. Applicato in modo identico su client e server (parità fisica): stesso muretto, stessa collisione palla, stesso limite di attraversamento per i player.
+
+### 🚫 Battuta obbligatoria: la restrizione ora vale anche per chi deve servire
+- **Prima**: durante la fase di battuta, solo la squadra che NON doveva servire era tenuta lontana dalla rete (margine 70px); chi doveva battere poteva camminare fino alla rete e toccare direttamente la palla ferma sulla linea centrale, saltando di fatto la battuta vera e propria (i comandi `/a /q /z`).
+- **Ora**: `vApplyServeRestriction()` (client) e `vApplyServeRestrictionSrv()` (server) applicano il margine di 70px a ENTRAMBE le squadre durante `vServePhase`/`room.vServePhase`, non solo a chi non batte. La palla ferma sulla rete non è più raggiungibile da nessuno semplicemente avvicinandosi: l'unico modo di rimetterla in gioco è una battuta vera (`/a` `/q` `/z`), che la fa comparire vicino al battitore indipendentemente dalla sua posizione in campo — quindi il flusso di battuta resta invariato per chi usa i comandi, cambia solo il fatto che non si può più bypassarli.
+- Indicatore visivo aggiornato di conseguenza: `_vDrawServeRestriction()` ora disegna DUE linee tratteggiate (una per lato, ciascuna del colore della squadra che non può oltrepassarla) invece di una sola.
+- Nessun impatto sulla validazione dei comandi `/a /q /z` (`chat.js`): già corretta, verifica solo che il player appartenga a `vServeTeam`, indipendente dalla posizione.
+
+### 📁 File modificati
+- `js/modes/volley/config.js` — nuovo `V_NET_HEIGHT_MULT` (1.15), `V_POST_H` moltiplicato
+- `server.js` — stesso `V_NET_HEIGHT_MULT`/`V_POST_H` (parità fisica); `vApplyServeRestrictionSrv()`: rimossa l'eccezione per la squadra che batte
+- `js/modes/volley/physics.js` — `vApplyServeRestriction()`: rimossa l'eccezione per la squadra che batte; commenti aggiornati
+- `js/modes/volley/draw.js` — `_vDrawServeRestriction()`: disegna la linea di restrizione per entrambe le squadre invece che per una sola
+
+---
+
 ## v2.39.0 — Rimbalzo player configurabile + audit bug su tutto il progetto
 
 Su richiesta ("miglioralo, rendi migliore il movement e dopo cerca dei bug nel codice riguardo a tutto"). Riletti TUTTI i file rimasti non ancora letti nella sessione precedente: `input.js`, `helpers.js`, `particles.js`, `views.js`, `roster.js`, `admin.js`, `chat.js`, `lobby.js`, `network-core.js`, `auth.js`, entrambi i `draw.js`, `index.html` — oltre a rileggere `server.js` e i `game.js` già noti con occhio specifico da bug-hunt.

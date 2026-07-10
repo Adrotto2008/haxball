@@ -16,6 +16,11 @@ let vRemoteState = null;
 // vServePhase: true = in fase di battuta (restrizione attiva), false = palla in gioco
 let vServeTeam  = 0;    // all'inizio battono i rossi (squadra sx)
 let vServePhase = true; // inizia sempre in fase di battuta
+// v2.41.0: true quando il servizio in corso ha gia' attraversato la rete
+// verso il campo avversario almeno una volta. Finche' e' false, la
+// squadra che serve puo' toccare la palla una sola volta (vedi
+// vIncrementTouch): un secondo tocco prima che il servizio "passi" e' fallo.
+let vServeRallyLive = false;
 
 // ── COSTANTI LOOP ────────────────────────────────────────
 const V_PHYS_TICK = 1000 / 60;
@@ -122,6 +127,7 @@ function vGoal(scoringTeam) {
   // Il prossimo serve va alla squadra che ha fatto punto
   vServeTeam  = scoringTeam;
   vServePhase = true;
+  vServeRallyLive = false;
 
   vBall = vMkBall();
   // La palla e' ferma sulla linea centrale (rete): solo la squadra che
@@ -175,6 +181,7 @@ function vUpdateHUD() {
 function vReset(full) {
   vServeTeam  = 0;   // i rossi battono sempre all'inizio
   vServePhase = true;
+  vServeRallyLive = false;
   vBall = vMkBall();
   // Palla ferma sulla linea centrale (rete) per la prima battuta
   vBall.x = V_NET_X;

@@ -17,9 +17,12 @@ const V_FL = { l: 40, r: W-40, t: 40, b: H-40 };  // limiti campo
 // ── RETE e MURETTO CENTRALE ─────────────────────────────
 const V_NET_X    = W / 2;
 
-// Muretto fisico centrale: base al pavimento, alto 1/8 campo
+// Muretto fisico centrale: base al pavimento, alto 1/8 campo.
+// v2.40.0: rete leggermente più alta (+15%, su richiesta) — moltiplicatore
+// esplicito invece di cambiare il divisore, per restare facile da ritoccare.
 const V_POST_W   = 8;
-const V_POST_H   = (V_FL.b - V_FL.t) / 8;
+const V_NET_HEIGHT_MULT = 1.15;
+const V_POST_H   = (V_FL.b - V_FL.t) / 8 * V_NET_HEIGHT_MULT;
 const V_POST_X1  = V_NET_X - V_POST_W / 2;
 const V_POST_X2  = V_NET_X + V_POST_W / 2;
 const V_POST_Y1  = V_FL.b - V_POST_H;
