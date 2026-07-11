@@ -6,7 +6,7 @@ const crypto = require('crypto');
 const CONFIG_DEFAULT = {
   P_START:1.4, P_SPEED_MAX:10.0, P_ACCEL:0.2, P_FRIC:0.78,
   B_FRIC:0.984, B_BOUNCE:0.80, B_HIT_R:0.82,
-  KICK_MIN:3.8, KICK_MAX:14.0, KICK_CHG_F:50, KICK_DIST_X:12,
+  KICK_MIN:3.8, KICK_MAX:14.0, KICK_CHG_F:50, KICK_DIST_X:0,
   GOAL_CD:140, MATCH_TIME:180,
   P_RADIUS:18, B_RADIUS:11, P_WALL_BOUNCE:0.4
 };
@@ -76,6 +76,10 @@ function circleCollide(a,b,res){
   }
 }
 function doKick(p,ball,force,cfg){
+  // KICK_DIST_X ora di default 0 (v2.42.0, era 12): il tiro richiede un
+  // overlap reale fra player e palla, non piu' un margine di tolleranza
+  // che lo faceva scattare prima del tocco vero. Vedi commento gemello in
+  // js/modes/soccer/physics.js.
   const dx=ball.x-p.x,dy=ball.y-p.y,d=Math.hypot(dx,dy);
   if(d>p.r+ball.r+cfg.KICK_DIST_X)return;
   const nx=d>0.01?dx/d:1,ny=d>0.01?dy/d:0;
@@ -243,7 +247,16 @@ function vBallCollidePostSrv(ball, vcfg){
   const nx=dx/dist,ny=dy/dist;
   ball.x+=nx*(br-dist);ball.y+=ny*(br-dist);
   const dot=ball.vx*nx+ball.vy*ny;
-  if(dot<0){ball.vx-=2*dot*nx*vcfg.V_B_BOUNCE;ball.vy-=2*dot*ny*vcfg.V_B_BOUNCE;}
+  // v2.42.0: appoggio inelastico per urti deboli, vedi commento gemello in
+  // js/modes/volley/physics.js (evita che la palla "fluttui" sulla rete).
+  if(dot<0){
+    const V_POST_REST_THRESHOLD=0.6;
+    if(Math.abs(dot)<V_POST_REST_THRESHOLD){
+      ball.vx-=dot*nx; ball.vy-=dot*ny;
+    } else {
+      ball.vx-=2*dot*nx*vcfg.V_B_BOUNCE; ball.vy-=2*dot*ny*vcfg.V_B_BOUNCE;
+    }
+  }
   if(ny<-0.5) ball.grav=V_B_GRAV_BASE;
 }
 

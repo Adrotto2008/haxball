@@ -228,9 +228,22 @@ function vBallCollidePost() {
   vBall.y += ny * (br - dist);
   const dot = vBall.vx * nx + vBall.vy * ny;
   if (dot < 0) {
-    const bw = V_CONFIG.V_B_BOUNCE;
-    vBall.vx -= 2 * dot * nx * bw;
-    vBall.vy -= 2 * dot * ny * bw;
+    // v2.42.0: se l'urto e' debole (palla che si appoggia in cima alla
+    // rete, non una vera schiacciata), NON rimbalzare: annulla solo la
+    // componente di velocita' entrante (appoggio inelastico). Prima si
+    // rimbalzava sempre al 2*dot*bw, e con la gravita' che la spingeva di
+    // nuovo dentro ogni frame la palla oscillava all'infinito con micro-
+    // rimbalzi visibili invece di appoggiarsi ferma ("fluttuava" sulla
+    // rete). Con un urto forte (vera schiacciata) il rimbalzo resta invariato.
+    const V_POST_REST_THRESHOLD = 0.6;
+    if (Math.abs(dot) < V_POST_REST_THRESHOLD) {
+      vBall.vx -= dot * nx;
+      vBall.vy -= dot * ny;
+    } else {
+      const bw = V_CONFIG.V_B_BOUNCE;
+      vBall.vx -= 2 * dot * nx * bw;
+      vBall.vy -= 2 * dot * ny * bw;
+    }
   }
   if (ny < -0.5) vBall.grav = V_B_GRAV_BASE;
 }

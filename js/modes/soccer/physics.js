@@ -13,6 +13,11 @@ function circleCollide(a, b, res) {
 }
 
 function doKick(p, force) {
+  // KICK_DIST_X (default 0, v2.42.0): margine extra oltre il tocco reale
+  // (p.r+ball.r). Prima era 12 di default: il tiro scattava fino a 12px
+  // PRIMA che la palla toccasse davvero il player ("la tocco prima di
+  // toccarla veramente"). Ora il tiro richiede overlap reale; il margine
+  // resta configurabile dall'host per chi vuole un po' di tolleranza.
   const KICK_DIST = p.r + ball.r + CONFIG.KICK_DIST_X;
   const dx = ball.x-p.x, dy = ball.y-p.y, d = Math.hypot(dx,dy);
   if(d > KICK_DIST) return;

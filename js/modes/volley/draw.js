@@ -90,10 +90,23 @@ function _vDrawServeRestriction() {
   const lineX0 = V_NET_X - margin0; // limite ROSSI (team 0)
   const lineX1 = V_NET_X + margin1; // limite BLU  (team 1)
 
+  // v2.42.0: oltre alla linea tratteggiata, una fascia colorata semi-
+  // trasparente riempie tutta la zona vietata (dalla linea fino alla
+  // rete) su ENTRAMBI i lati — prima si vedeva solo un tratteggio
+  // sottile, facile da non notare. Ora la zona vietata e' inequivocabile
+  // per entrambe le squadre.
+  ctx.save();
+  ctx.fillStyle = V_TEAM_COLS[0];
+  ctx.globalAlpha = 0.16;
+  ctx.fillRect(lineX0, V_FL.t, V_NET_X - lineX0, V_FL.b - V_FL.t);
+  ctx.fillStyle = V_TEAM_COLS[1];
+  ctx.fillRect(V_NET_X, V_FL.t, lineX1 - V_NET_X, V_FL.b - V_FL.t);
+  ctx.restore();
+
   ctx.save();
   ctx.setLineDash([8, 6]);
   ctx.globalAlpha = pulse;
-  ctx.lineWidth = 2.5;
+  ctx.lineWidth = 3;
 
   ctx.strokeStyle = V_TEAM_COLS[0];
   ctx.beginPath();
@@ -107,6 +120,21 @@ function _vDrawServeRestriction() {
   ctx.lineTo(lineX1, V_FL.b);
   ctx.stroke();
 
+  ctx.restore();
+
+  // Etichetta "non oltre" su ciascuna linea (in alto), cosi' e' chiaro a
+  // COLPO D'OCCHIO che il limite vale per entrambe le squadre, non solo
+  // per chi batte.
+  ctx.save();
+  ctx.font = '700 10px Inter,sans-serif';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillStyle = 'rgba(0,0,0,0.6)';
+  ctx.fillRect(lineX0 - 20, V_FL.t + 6, 40, 14);
+  ctx.fillRect(lineX1 - 20, V_FL.t + 6, 40, 14);
+  ctx.fillStyle = V_TEAM_COLS[0];
+  ctx.fillText('🚫', lineX0, V_FL.t + 13);
+  ctx.fillStyle = V_TEAM_COLS[1];
+  ctx.fillText('🚫', lineX1, V_FL.t + 13);
   ctx.restore();
 
   // Badge "chi batte" sopra al campo

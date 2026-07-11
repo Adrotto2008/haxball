@@ -4,6 +4,41 @@ Versione più recente sempre in cima. Ad ogni modifica aggiornare `VERSION` in `
 
 ---
 
+## v2.42.0 — Fix reali su richiesta: collisioni palla in multiplayer, tiro anticipato nel calcio, linea di battuta piu' visibile
+
+Su richiesta ("le cose che hai fatto non sono fatte bene [...] vedo la palla che fluttua sulla rete al posto di appoggiarsi [...] in calcio se inseguo la palla la tocco prima di toccarla veramente"). A differenza delle sessioni precedenti, qui non si tratta di nuove regole ma di **bug reali** trovati rileggendo `server.js`, entrambi i `physics.js` e entrambi i `sync.js` da zero.
+
+### 🐛 BUG PRINCIPALE — la palla in multiplayer non collideva affatto con la rete/muretto centrale
+- **Causa**: `vTickRemotePhysics()` (`js/modes/volley/sync.js`), il path che muove la palla in dead-reckoning/prediction lato client durante una partita multiplayer, non chiamava mai `vBallCollidePost()` — a differenza di `vTickBall()` (allenamento) e `vTickBallSrv()` (server), che l'hanno sempre chiamata. Violava il principio di parita' fisica del progetto.
+- **Effetto visibile**: la palla passava attraverso il muretto/rete localmente (nessun rimbalzo, nessun appoggio) finche' non arrivava la correzione dal prossimo stato del server, che la "risistemava" di scatto sulla posizione vera (gia' appoggiata) — percepito esattamente come "la palla fluttua sulla rete invece di appoggiarsi". **Fix**: aggiunta la chiamata mancante, stessa posizione nel ciclo fisico di `vTickBall()`/`vTickBallSrv()`.
+- **Bug gemello nel calcio**: `tickRemotePhysics()` (`js/modes/soccer/sync.js`) non applicava mai la collisione fisica passiva palla↔player (quella sempre attiva, non il tiro con AZIONE) che invece il server applica ad ogni tick a tutti i player (`circleCollide(p,ball,cfg.B_HIT_R)` in `tick()`). Stesso sintomo: la palla poteva attraversare i player nella prediction locale prima della correzione server. Aggiunta la chiamata mancante per coerenza.
+
+### 🐛 Fix — la palla "fluttuava"/vibrava anche quando si appoggiava davvero sulla rete (pallavolo)
+- Anche a collisione presente, un urto debole (palla che si posa in cima al muretto, non una vera schiacciata) veniva comunque rimbalzato al 30% della velocita' (`V_B_BOUNCE`) e la gravita' la spingeva subito dentro di nuovo il frame dopo: risultato, una serie di micro-rimbalzi visibili all'infinito invece di un appoggio stabile.
+- **Fix**: sotto una soglia di urto minima (`V_POST_REST_THRESHOLD = 0.6`), la componente di velocita' entrante viene annullata invece di rimbalzata (appoggio inelastico) — urti forti (vere schiacciate) continuano a rimbalzare normalmente. Applicato identicamente in `vBallCollidePost()` (client) e `vBallCollidePostSrv()` (server).
+
+### 🐛 Fix — calcio: il tiro scattava fino a 12px PRIMA del tocco reale
+- `KICK_DIST_X` (default 12, non esposto nel pannello Variabili) veniva sommato al raggio combinato player+palla nella soglia di tiro (`doKick()`, sia client sia server): il tiro poteva scattare con la palla ancora visibilmente separata dal player — esattamente "la tocco prima di toccarla veramente".
+- **Fix**: default portato a **0** (il tiro richiede overlap reale) in `server.js` e `js/state.js`. Aggiunta anche una voce nel pannello Variabili ("Margine extra tiro", 0–30) cosi' un host che vuole un po' di tolleranza (es. per compensare lag) puo' reimpostarla, invece di essere un valore nascosto e non regolabile come prima.
+
+### 🎮 Linea di restrizione battuta ancora piu' visibile
+- Prima: solo una sottile linea tratteggiata pulsante — facile da non notare a colpo d'occhio, specie con due margini ora diversi tra le due squadre (v2.41.0).
+- Ora: una **fascia colorata semi-trasparente** riempie l'intera zona vietata (dalla linea fino alla rete) su ENTRAMBI i lati, col colore della squadra a cui e' vietata, piu' un'etichetta 🚫 in alto su ciascuna linea. La zona/limite e' ora inequivocabile per entrambe le squadre, non solo un tratteggio sottile.
+
+### 📁 File modificati
+- `js/modes/volley/sync.js` — `vTickRemotePhysics()`: aggiunta chiamata mancante a `vBallCollidePost()`
+- `js/modes/soccer/sync.js` — `tickRemotePhysics()`: aggiunta collisione fisica palla↔player mancante
+- `js/modes/volley/physics.js` — `vBallCollidePost()`: appoggio inelastico per urti deboli (no piu' micro-rimbalzi)
+- `server.js` — `vBallCollidePostSrv()`: stesso fix appoggio inelastico; `CONFIG_DEFAULT.KICK_DIST_X` 12→0; commenti `doKick()`
+- `js/state.js` — `CONFIG.KICK_DIST_X` 12→0; nuova voce in `CONFIG_META` ("Margine extra tiro")
+- `js/modes/soccer/physics.js` — commento esplicativo `doKick()`
+- `js/modes/volley/draw.js` — `_vDrawServeRestriction()`: fascia colorata + etichette 🚫, oltre alla linea tratteggiata gia' presente
+
+### ⚠️ Deploy
+Modifiche server-side incluse (`server.js`): serve `git push` + deploy Render perche' i fix abbiano effetto in multiplayer online. Le modifiche client (`sync.js`, `physics.js`, `draw.js`, `state.js`) sono attive subito al reload del browser.
+
+---
+
 ## v2.41.0 — Pallavolo: battuta a tocco singolo + margini asimmetrici
 
 Su richiesta: "quando uno deve fare la battuta, non può fare più di un tocco senò è punto dell'avversario" e "durante la battuta [...] quello che batte ha un'area del campo ancora più piccola [...] mentre chi non batte ha la linea più vicina al centro".

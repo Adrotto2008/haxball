@@ -1,5 +1,5 @@
 // ── CONFIG — costanti davvero globali (mode-agnostiche) ──
-const VERSION = '2.41.0';
+const VERSION = '2.42.0';
 let currentGameMode = 'soccer'; // 'soccer' | 'volley' — dichiarata qui per essere disponibile da subito in tutti gli script
 const W = 1020, H = 600;
 const DPR = Math.min(window.devicePixelRatio||1, 2);

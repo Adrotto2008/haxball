@@ -167,6 +167,17 @@ function tickRemotePhysics() {
   // continuo e non frenano davvero; applicarla localmente causava undershoot.
   ball.x += ball.vx; ball.y += ball.vy;
   ball.vx *= CONFIG.B_FRIC; ball.vy *= CONFIG.B_FRIC;
+  // v2.42.0 FIX PARITA' FISICA: mancava qui la collisione fisica
+  // palla<->player (quella passiva, sempre attiva, non il tiro con
+  // AZIONE) che il server invece applica OGNI tick a tutti i player
+  // (vedi tick() in server.js: circleCollide(p,ball,cfg.B_HIT_R)). Senza
+  // di questa, la palla passava attraverso i player nella prediction
+  // locale finche' non arrivava la correzione dal server. Per i player
+  // remoti l'eventuale spostamento che questa collisione applica alla
+  // loro posizione viene comunque sovrascritto subito dopo da
+  // interpolateRemotePlayers() (chiamata dopo in loop()): qui conta solo
+  // l'effetto sulla palla, corretto per il player locale predetto.
+  for (const p of players) { if (p.team !== -1) circleCollide(p, ball, CONFIG.B_HIT_R); }
   const bR = ball.r;
   if (ball.x - bR < FL.l) { ball.x = FL.l + bR; ball.vx *= -CONFIG.B_BOUNCE; }
   if (ball.x + bR > FL.r) { ball.x = FL.r - bR; ball.vx *= -CONFIG.B_BOUNCE; }

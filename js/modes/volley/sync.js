@@ -147,6 +147,14 @@ function vTickRemotePhysics() {
   vBall.grav = Math.min(vBall.grav + V_B_GRAV_RAMP, V_B_GRAV_MAX);
   vBall.vx *= V_CONFIG.V_B_FRIC; vBall.vy *= V_CONFIG.V_B_FRIC;
   vBall.x += vBall.vx; vBall.y += vBall.vy;
+  // v2.42.0 FIX PARITA' FISICA: mancava la collisione palla<->muretto
+  // centrale in questo path (prediction multiplayer) — a differenza del
+  // server e dell'allenamento, che la hanno sempre avuta. La palla passava
+  // quindi attraverso la rete localmente finche' non arrivava la
+  // correzione dal server (snap secco), dando l'impressione di "fluttuare"
+  // sulla rete invece di appoggiarsi. Ora chiamata qui esattamente come
+  // in vTickBall()/vTickBallSrv().
+  vBallCollidePost();
   const bw = V_CONFIG.V_B_BOUNCE, br = vBall.r;
   if (vBall.x - br < V_FL.l) { vBall.x = V_FL.l + br; vBall.vx *= -bw; }
   if (vBall.x + br > V_FL.r) { vBall.x = V_FL.r - br; vBall.vx *= -bw; }
