@@ -12,7 +12,7 @@ let CONFIG = {
   KICK_MIN:    3.8,
   KICK_MAX:    14.0,
   KICK_CHG_F:  50,
-  KICK_DIST_X: 0,
+  KICK_DIST_X: 2,
   GOAL_CD:     140,
   MATCH_TIME:  180,
   P_RADIUS:    18,

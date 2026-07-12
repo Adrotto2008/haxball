@@ -13,11 +13,19 @@ function circleCollide(a, b, res) {
 }
 
 function doKick(p, force) {
-  // KICK_DIST_X (default 0, v2.42.0): margine extra oltre il tocco reale
-  // (p.r+ball.r). Prima era 12 di default: il tiro scattava fino a 12px
-  // PRIMA che la palla toccasse davvero il player ("la tocco prima di
-  // toccarla veramente"). Ora il tiro richiede overlap reale; il margine
-  // resta configurabile dall'host per chi vuole un po' di tolleranza.
+  // KICK_DIST_X (default 2, v2.45.0 - era 0 in v2.42.0, prima ancora 12):
+  // margine minimo oltre il tocco reale (p.r+ball.r). A 0 il tiro era
+  // diventato INAFFIDABILE: la collisione passiva palla<->player (sempre
+  // attiva, vedi tick() lato server) risolve ogni sovrapposizione
+  // spingendo la palla esattamente a distanza p.r+ball.r dal player, MAI
+  // realmente dentro quel raggio nel momento in cui doKick() la controlla
+  // (che usa le posizioni di fine tick precedente). Per via del rumore di
+  // virgola mobile in quella spinta (divisione per 2, hypot), la distanza
+  // risultante e' quasi sempre di un pelo sopra o sotto 29 in modo
+  // imprevedibile: con soglia ESATTA (0) il tiro falliva quasi sempre,
+  // dando l'impressione "la palla si allontana appena la tocco". 2px di
+  // margine assorbono questo rumore senza reintrodurre il problema
+  // originale (tiro che scattava fino a 12px PRIMA del tocco vero).
   const KICK_DIST = p.r + ball.r + CONFIG.KICK_DIST_X;
   const dx = ball.x-p.x, dy = ball.y-p.y, d = Math.hypot(dx,dy);
   if(d > KICK_DIST) return;

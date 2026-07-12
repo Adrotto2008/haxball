@@ -6,7 +6,7 @@ const crypto = require('crypto');
 const CONFIG_DEFAULT = {
   P_START:1.4, P_SPEED_MAX:10.0, P_ACCEL:0.2, P_FRIC:0.78,
   B_FRIC:0.984, B_BOUNCE:0.80, B_HIT_R:0.82,
-  KICK_MIN:3.8, KICK_MAX:14.0, KICK_CHG_F:50, KICK_DIST_X:0,
+  KICK_MIN:3.8, KICK_MAX:14.0, KICK_CHG_F:50, KICK_DIST_X:2,
   GOAL_CD:140, MATCH_TIME:180,
   P_RADIUS:18, B_RADIUS:11, P_WALL_BOUNCE:0.4
 };
@@ -76,10 +76,11 @@ function circleCollide(a,b,res){
   }
 }
 function doKick(p,ball,force,cfg){
-  // KICK_DIST_X ora di default 0 (v2.42.0, era 12): il tiro richiede un
-  // overlap reale fra player e palla, non piu' un margine di tolleranza
-  // che lo faceva scattare prima del tocco vero. Vedi commento gemello in
-  // js/modes/soccer/physics.js.
+  // KICK_DIST_X ora di nuovo 2 di default (v2.45.0, era 0 dal v2.42.0):
+  // a 0 il tiro era inaffidabile per rumore di virgola mobile nella
+  // collisione passiva palla<->player (vedi commento gemello in
+  // js/modes/soccer/physics.js). 2px bastano ad assorbirlo senza
+  // reintrodurre la vecchia tolleranza eccessiva di 12px.
   const dx=ball.x-p.x,dy=ball.y-p.y,d=Math.hypot(dx,dy);
   if(d>p.r+ball.r+cfg.KICK_DIST_X)return;
   const nx=d>0.01?dx/d:1,ny=d>0.01?dy/d:0;

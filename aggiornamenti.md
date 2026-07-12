@@ -4,6 +4,29 @@ Versione più recente sempre in cima. Ad ogni modifica aggiornare `VERSION` in `
 
 ---
 
+## v2.45.0 — Fix regressione: il tiro nel calcio era diventato inaffidabile (KICK_DIST_X=0 rotto dal fix v2.42.0)
+
+Su segnalazione ("non funziona il tiro, continuo a non poter toccare il pallone [...] e' come se lo toccassi prima").
+
+### 🐛 Il bug — effetto collaterale del fix v2.42.0
+- v2.42.0 aveva portato `KICK_DIST_X` (margine di tiro) a **0**, per far scattare il tiro solo a vero contatto invece che fino a 12px prima. Sensato in teoria, ma ha reso il tiro **inaffidabile**:
+- La collisione passiva palla↔player (`circleCollide`, sempre attiva ogni tick indipendentemente da AZIONE) risolve ogni sovrapposizione spingendo la palla esattamente a distanza `p.r+ball.r` dal player — MAI realmente dentro quel raggio nel momento in cui `doKick()` la controlla (che usa le posizioni di fine tick precedente, dato che il tiro scatta al RILASCIO di AZIONE dopo la carica).
+- Per il rumore di virgola mobile intrinseco in quella spinta (divisione per 2, `Math.hypot`), la distanza risultante e' quasi sempre di un pelo sopra o sotto il valore esatto in modo imprevedibile: con soglia ESATTA (margine 0), il confronto `d > soglia` falliva a caso, e il tiro non scattava quasi mai — "come se la toccassi prima" era letteralmente quello che succedeva: la palla veniva sempre respinta a distanza limite dalla collisione passiva PRIMA che il tiro vero potesse registrare un tocco valido.
+
+### ✅ Il fix
+- `KICK_DIST_X` di default riportato a **2** (non piu' 0, ma nemmeno i 12 originali) in `server.js` e `js/state.js`. Questo margine minimo assorbe il rumore di virgola mobile della collisione passiva senza reintrodurre il problema originale (tiro che scattava con la palla visibilmente staccata dal player).
+- La freccia di tiro (`SHOT_ARROW_VISUAL_MARGIN`, v2.43.0) resta invariata: era gia' scorporata da `KICK_DIST_X` e non era la causa di questo problema.
+
+### 📁 File modificati
+- `server.js` — `CONFIG_DEFAULT.KICK_DIST_X` 0→2; commento `doKick()` aggiornato con la causa reale
+- `js/state.js` — `CONFIG.KICK_DIST_X` 0→2
+- `js/modes/soccer/physics.js` — commento `doKick()` aggiornato con la causa reale
+
+### ⚠️ Deploy
+Modifica server-side inclusa (`server.js`): serve `git push` + deploy Render perche' il fix abbia effetto in multiplayer online. Le modifiche client sono attive subito al reload.
+
+---
+
 ## v2.44.0 — Fix: la regola del tocco singolo in battuta (v2.41.0) non scattava mai per le battute dei ROSSI
 
 Su segnalazione ("non funziona bene il fatto che [...] tocchi due volte nella battuta [...] a volte non funziona").
