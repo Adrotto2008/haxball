@@ -4,6 +4,50 @@ Versione più recente sempre in cima. Ad ogni modifica aggiornare `VERSION` in `
 
 ---
 
+## v2.44.0 — Fix: la regola del tocco singolo in battuta (v2.41.0) non scattava mai per le battute dei ROSSI
+
+Su segnalazione ("non funziona bene il fatto che [...] tocchi due volte nella battuta [...] a volte non funziona").
+
+### 🐛 Il bug — trovato e confermato
+- I comandi di battuta `/a` `/q` `/z` **teletrasportano** la palla dal centro rete alla posizione del battitore (per poi lanciarla verso l'alto) — un salto istantaneo di posizione, non un vero movimento fisico.
+- Il rilevamento "la palla ha attraversato la rete" (che decide quando disattivare la regola del tocco singolo, impostando `vServeRallyLive`/`room.vServeRallyLive = true`) confronta pero' solo la coordinata X della palla prima/dopo ogni tick, senza distinguere un vero movimento da un teletrasporto.
+- La palla ferma sul centro rete (`x = V_NET_X` esatto) veniva sempre classificata come "lato blu" per via del confronto rigoroso `x < V_NET_X` (mai vero esattamente sul centro). Quindi: quando battevano i **BLU**, il teletrasporto della battuta li spostava sullo stesso lato gia' registrato (blu) — nessun falso cambio lato, la regola funzionava. Quando battevano i **ROSSI**, il teletrasporto li spostava sul lato opposto (rosso) rispetto a quello registrato (blu) — il salto veniva scambiato per un vero attraversamento della rete, `vServeRallyLive` diventava `true` **subito dopo il lancio, prima ancora del vero colpo di battuta**: da quel momento la regola del tocco singolo era gia' disattivata, e un secondo tocco veniva giudicato con le regole normali (fino a 3 tocchi), non come fallo.
+- Dato che ogni partita inizia sempre con la battuta dei ROSSI (`vServeTeam:0`), il bug si presentava sistematicamente al primo scambio di ogni partita, poi a fasi alterne a seconda di chi vinceva il punto precedente (chi fa punto serve dopo) — esattamente il comportamento "a volte funziona, a volte no" segnalato.
+
+### ✅ Il fix
+- Subito dopo il teletrasporto della battuta, `vApplyServeVariantLocal()` (client) e `vApplyServeVariant()` (server) risincronizzano immediatamente `vBallLastSide`/`room.vBallLastSide` con la posizione reale appena assegnata alla palla. Il prossimo controllo di cambio lato non vede piu' un salto artificiale: `vServeRallyLive` resta correttamente `false` finche' la palla non attraversa DAVVERO la rete in volo, per entrambe le squadre, in modo simmetrico.
+
+### 🧹 Pulizia minore correlata
+- `vGoal()` (client, allenamento) non azzerava `p.kickCooldown` dopo un punto, a differenza di `vReset()` che lo fa gia': allineato per coerenza (nessun impatto pratico osservabile, la palla riparte lontana dai player, ma teneva lo stato piu' pulito).
+
+### ⚠️ Se il problema persiste
+Questo fix risolve il caso confermato (la regola disattivata silenziosamente per meta' delle battute). Se dopo il deploy capita ancora che un punto venga assegnato/mostrato ma il campo non si resetti, servirebbe sapere: allenamento o multiplayer, quale squadra serviva, e se il punto arriva dal tocco singolo in battuta o da un'altra regola (doppio tocco/3 tocchi) — aiuterebbe a isolare un eventuale secondo problema distinto da questo.
+
+### 📁 File modificati
+- `js/modes/volley/physics.js` — `vApplyServeVariantLocal()`: risincronizza `vBallLastSide` dopo il teletrasporto
+- `server.js` — `vApplyServeVariant()`: risincronizza `room.vBallLastSide` dopo il teletrasporto
+- `js/modes/volley/game.js` — `vGoal()`: azzera anche `p.kickCooldown`
+
+### ⚠️ Deploy
+Modifica server-side inclusa (`server.js`): serve `git push` + deploy Render perche' il fix abbia effetto in multiplayer online. Le modifiche client sono attive subito al reload.
+
+---
+
+## v2.43.0 — Fix regressione: freccia di tiro sparita nel calcio (effetto collaterale del fix v2.42.0)
+
+Su segnalazione ("nel calcio non spunta piu' la freccia di dove tiri, appunto per questo [il fix precedente], e' meno evidente ma c'e' sempre [il tiro]").
+
+### 🐛 Il problema
+- Il fix v2.42.0 (`KICK_DIST_X` default 12→0, per far scattare il tiro solo a contatto reale) era corretto per la fisica, ma `drawShotArrow()` in `js/modes/soccer/draw.js` usava la STESSA soglia (`CONFIG.KICK_DIST_X`) anche per decidere quando mostrare la freccia di direzione/carica del tiro. Risultato: la freccia, che prima appariva con un margine di anticipo (12px) mentre ci si avvicinava alla palla, ora appare solo esattamente a contatto — molto meno utile come guida visiva mentre ci si avvicina.
+
+### ✅ Il fix
+- `drawShotArrow()` ora usa una soglia **separata e puramente estetica** (`SHOT_ARROW_VISUAL_MARGIN = 12`, lo stesso valore di anticipo che c'era prima), indipendente da `CONFIG.KICK_DIST_X`. La freccia torna a comparire con un margine di anticipo come prima del v2.42.0, ma il tiro vero continua a richiedere un overlap reale (nessuna reintroduzione della tolleranza sul tiro, resta corretta come fixata in v2.42.0).
+
+### 📁 File modificati
+- `js/modes/soccer/draw.js` — `drawShotArrow()`: soglia di visibilita' scorporata da `CONFIG.KICK_DIST_X`
+
+---
+
 ## v2.42.0 — Fix reali su richiesta: collisioni palla in multiplayer, tiro anticipato nel calcio, linea di battuta piu' visibile
 
 Su richiesta ("le cose che hai fatto non sono fatte bene [...] vedo la palla che fluttua sulla rete al posto di appoggiarsi [...] in calcio se inseguo la palla la tocco prima di toccarla veramente"). A differenza delle sessioni precedenti, qui non si tratta di nuove regole ma di **bug reali** trovati rileggendo `server.js`, entrambi i `physics.js` e entrambi i `sync.js` da zero.

@@ -142,6 +142,7 @@ function vGoal(scoringTeam) {
     p.x = V_FL.l + (V_FL.r - V_FL.l) * (p.team === 0 ? .22 : .78);
     p.y = V_FL.t + (V_FL.b - V_FL.t) * (i + 1) / (n + 1);
     p.vx = 0; p.vy = 0; p.held = false; p.charge = 0;
+    p.kickCooldown = false; // v2.44.0: mancava qui (vReset() lo fa gia'), per coerenza dopo ogni punto
   }
 }
 

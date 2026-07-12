@@ -63,7 +63,15 @@ function drawBall() {
 function drawShotArrow(p) {
   if(!p.held && p.charge<=0) return;
   const d = Math.hypot(ball.x-p.x, ball.y-p.y);
-  const kickDist = p.r + ball.r + CONFIG.KICK_DIST_X;
+  // v2.43.0: soglia SOLO visiva, staccata da quella del tiro vero. Col fix
+  // v2.42.0 (CONFIG.KICK_DIST_X ora 0 di default) il tiro scatta solo a
+  // contatto reale — corretto per la fisica, ma usare la stessa soglia
+  // anche qui faceva sparire la freccia fino all'ultimo istante, quando
+  // prima (con la vecchia tolleranza di 12px) restava visibile un po'
+  // prima. Questo margine e' puramente estetico: non riattiva nessuna
+  // tolleranza sul tiro reale, la palla si muove solo a overlap vero.
+  const SHOT_ARROW_VISUAL_MARGIN = 12;
+  const kickDist = p.r + ball.r + SHOT_ARROW_VISUAL_MARGIN;
   if(d > kickDist) return;
   const cr = p.charge/CONFIG.KICK_CHG_F;
   const dx = ball.x-p.x, dy = ball.y-p.y, len = Math.hypot(dx,dy)||1;

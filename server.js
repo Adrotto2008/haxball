@@ -458,6 +458,19 @@ function vApplyServeVariant(room,p,variant){
   ball.vx=0; ball.vy=vy;
   ball.grav=V_B_GRAV_BASE;
 
+  // v2.44.0 FIX: e' un TELETRASPORTO (dal centro rete alla posizione del
+  // battitore), non un vero movimento fisico. Il controllo cambio lato in
+  // vTick (step 5) confronta solo la X prima/dopo: la palla ferma sul
+  // centro rete (x=V_NET_X esatto) viene sempre classificata "lato blu"
+  // per via del confronto rigoroso x<V_NET_X, quindi quando battevano i
+  // ROSSI (il cui lancio la sposta sul lato x<V_NET_X) il salto veniva
+  // scambiato per un attraversamento vero della rete, settando
+  // room.vServeRallyLive=true troppo presto — la regola del tocco singolo
+  // in battuta (v2.41.0) non scattava mai per le battute dei rossi.
+  // Risincronizzando qui il lato "conosciuto" con quello reale del lancio,
+  // il prossimo controllo non vede piu' un salto falso.
+  room.vBallLastSide = (ball.x < V_NET_X) ? 0 : 1;
+
   // Come un tocco: impedisce che il battitore, se ha gia' AZIONE premuto,
   // colpisca subito la palla appena lanciata (deve prima uscire dal
   // raggio di tiro — cosa che avviene quasi subito data la velocita'
