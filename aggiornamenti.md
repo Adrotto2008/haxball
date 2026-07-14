@@ -4,6 +4,23 @@ Versione più recente sempre in cima. Ad ogni modifica aggiornare `VERSION` in `
 
 ---
 
+## v2.46.0 — Pallavolo avanzata: animazione di carica "ad arco che si forma", identica al calcio
+
+Su richiesta ("fai che nella pallavolo nella modalita' avanzata il colpo caricato [...] si carica nel tempo come nel calcio [...] fai la stessa animazione che il cerchio si forma mentre tieni premuto").
+
+### 🔍 Cosa c'era gia' e cosa mancava
+- La carica nel tempo in modalita' AVANZATA **esisteva gia'**, identica al calcio: `p.charge` cresce di 1 ogni frame tenendo premuto AZIONE fino a `V_KICK_CHG_F` (50 frame, stesso valore del calcio), e la forza del colpo al rilascio dipende da quella frazione (`V_KICK_MIN` → `V_KICK_MAX`) — sia lato client (`vApplyInput`/`vDoKick`) sia lato server (`vApplyInputSrv`/`vDoKickSrv`).
+- Quello che mancava era la resa VISIVA: l'animazione precedente in `vDrawPlayer()` disegnava due anelli SEMPRE completi (0→2π fin da subito), solo piu' opachi/spessi man mano che la carica saliva — non comunicava un vero "riempimento" nel tempo, dando l'impressione che il colpo fosse gia' pronto al massimo appena premuto, anche se la fisica sotto non lo era.
+
+### ✅ Il fix
+- Sostituita con la stessa identica animazione del calcio (`drawPlayer()` in `js/modes/soccer/draw.js`): un arco parziale che parte da vuoto (appena premuto AZIONE) e cresce in senso orario partendo dall'alto fino a giro completo (carica massima) — un vero indicatore di progresso circolare, non piu' un'aura statica.
+- In modalita' BASE (dove il tiro parte subito, senza attesa) l'arco appare gia' pieno appena si preme, coerente con l'assenza di una vera fase di carica da mostrare in quella modalita'.
+
+### 📁 File modificati
+- `js/modes/volley/draw.js` — `vDrawPlayer()`: nuova animazione ad arco di carica (sezione "ANIMAZIONI AZIONE")
+
+---
+
 ## v2.45.0 — Fix regressione: il tiro nel calcio era diventato inaffidabile (KICK_DIST_X=0 rotto dal fix v2.42.0)
 
 Su segnalazione ("non funziona il tiro, continuo a non poter toccare il pallone [...] e' come se lo toccassi prima").

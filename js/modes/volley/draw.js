@@ -241,17 +241,33 @@ function vDrawPlayer(p) {
     const t = (vControlMode === 'advanced')
       ? Math.min((p.charge || 0) / V_CONFIG.V_KICK_CHG_F, 1)
       : 1;
+    // v2.46.0: arco che si forma (identico al calcio, vedi drawPlayer() in
+    // js/modes/soccer/draw.js) al posto dei due anelli pieni pulsanti di
+    // prima (sempre cerchi completi, solo piu' opachi/spessi con la carica
+    // — non comunicavano un vero progresso). La carica nel tempo esisteva
+    // gia' identica al calcio (p.charge cresce di 1 a frame fino a
+    // V_KICK_CHG_F): mancava solo che si VEDESSE. In BASE non c'e' vera
+    // carica (il tiro parte subito): t resta fisso a 1, arco gia' pieno.
     ctx.beginPath();
     ctx.arc(p.x, p.y, p.r + 6, 0, Math.PI * 2);
-    ctx.strokeStyle = `rgba(255,220,80,${0.6 + t * 0.3})`;
-    ctx.lineWidth = 2 + t * 2;
-    ctx.stroke();
-    const pulse = 0.5 + 0.5 * Math.sin(Date.now() * 0.025);
-    ctx.beginPath();
-    ctx.arc(p.x, p.y, p.r + 10 + t * 6 + pulse * 3, 0, Math.PI * 2);
-    ctx.strokeStyle = `rgba(255,220,80,${(0.2 + t * 0.3) * (0.5 + pulse * 0.5)})`;
+    ctx.strokeStyle = `rgba(255,255,255,${0.12 + t * 0.1})`;
     ctx.lineWidth = 1.5;
     ctx.stroke();
+    if (t > 0.02) {
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.r + 6, -Math.PI / 2, -Math.PI / 2 + t * Math.PI * 2);
+      ctx.strokeStyle = `rgba(255,220,80,${0.55 + t * 0.45})`;
+      ctx.lineWidth = 2 + t * 3;
+      ctx.lineCap = 'round';
+      ctx.stroke();
+      ctx.lineCap = 'butt';
+    }
+    if (t > 0.3) {
+      ctx.fillStyle = `rgba(255,220,80,${(t - 0.3) * 0.5})`;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.r + 4, 0, Math.PI * 2);
+      ctx.fill();
+    }
   }
 
   // indicatore "io"
