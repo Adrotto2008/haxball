@@ -35,7 +35,7 @@ function toggleAfk() {
     // mode-aware: durante una partita di pallavolo l'entità live vive in
     // vPlayers, non in players (bug: il proprio avatar restava visibile
     // in campo finché non arrivava il prossimo state dal server)
-    const list = (currentGameMode === 'volley') ? vPlayers : players;
+    const list = (currentGameMode === 'volley') ? vPlayers : (currentGameMode === 'sniper') ? sPlayers : players;
     const p = list.find(x => x.id === myPlayerId);
     if (p) { p.team = -1; p.x = -9999; p.y = -9999; p.vx = 0; p.vy = 0; }
     pushChatMsg({ pid:'system', name:'Sistema', text: `👻 ${myName} è diventato fantasma` }, false);
@@ -45,7 +45,7 @@ function toggleAfk() {
     afkPlayers.delete(myPlayerId);
     const r = pmRoster.find(x => x.id === myPlayerId);
     if (r) r.team = -1;
-    const list = (currentGameMode === 'volley') ? vPlayers : players;
+    const list = (currentGameMode === 'volley') ? vPlayers : (currentGameMode === 'sniper') ? sPlayers : players;
     const p = list.find(x => x.id === myPlayerId);
     if (p) { p.team = -1; }
     pushChatMsg({ pid:'system', name:'Sistema', text: `👤 ${myName} non è più AFK (spettatore)` }, false);

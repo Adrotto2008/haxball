@@ -20,6 +20,20 @@ const V_CONFIG_DEFAULT = {
   V_PR:20, V_BR:10, V_P_WALL_BOUNCE:0.4,
 };
 
+// Costanti sniper — modificabili per room tramite set_sconfig. S_P_WALL_BOUNCE
+// non e' nella lista variabili del pannello host (nessuno slider lato client,
+// vedi S_CONFIG_META in modes/sniper/config.js) ma resta qui per evitare un
+// coefficiente di rimbalzo hardcoded nel codice fisico (stessa ragione di
+// P_WALL_BOUNCE/V_P_WALL_BOUNCE sopra).
+const S_CONFIG_DEFAULT = {
+  S_P_START:2.0, S_P_SPEED_MAX:12.0, S_P_ACCEL:0.5, S_P_FRIC:0.82, S_P_WALL_BOUNCE:0.4,
+  S_B_FRIC:0.999, S_B_BOUNCE:0.93, S_B_HIT_R:0.82,
+  S_KICK_MIN:9.0, S_KICK_MAX:22.0, S_KICK_CHG_F:40, S_KICK_DIST_X:14,
+  S_GOAL_H:60, S_POST_R:7,
+  S_MATCH_TIME:180, S_GOAL_CD:80,
+  S_PR:18, S_BR:11
+};
+
 const ADMIN_TOKEN = process.env.ADMIN_TOKEN || crypto.randomBytes(24).toString('hex');
 if (!process.env.ADMIN_TOKEN) {
   console.warn('[SECURITY] ADMIN_TOKEN non impostata: generato un token casuale valido solo per questo processo.');
@@ -64,6 +78,15 @@ const TICK_MS=1000/60, BCAST_MS=1000/30;
 // (non piu' precalcolabile in due costanti fisse per team).
 const V_SERVE_RESTRICT_MARGIN_SERVER   = 140; // chi batte: area piu' piccola
 const V_SERVE_RESTRICT_MARGIN_RECEIVER = 40;  // chi non batte: puo' avvicinarsi di piu'
+
+// ── COSTANTI SNIPER (fisse) ───────────────────────
+const S_PR=18, S_BR=11;
+const S_FL={l:40,r:W-40,t:40,b:H-40};
+// Righe di zona (non muri fisici per la palla): limitano solo fin dove puo'
+// avanzare ciascuna squadra, vedi sApplyZoneLimitSrv.
+const S_NET_L=W*0.38, S_NET_R=W*0.62;
+// Centri Y delle 3 mini-porte per lato (identico al client, vedi config.js).
+const S_GOAL_CENTERS=[H*0.283, H*0.500, H*0.717];
 
 // ── FISICA CALCIO ─────────────────────────────────────────
 function circleCollide(a,b,res){
@@ -277,6 +300,106 @@ function vTickBallSrv(ball, vcfg){
   // La gravita' la riporta comunque giu' da sola, prima o poi.
 }
 
+// ── FISICA SNIPER ───────────────────────────
+// Copia dedicata (non riusa circleCollide del calcio): stessa scelta di
+// module-independence gia' fatta dalla pallavolo, vedi le collisioni
+// player<->player inlineate dentro vTick piu' sotto.
+function sCircleCollideSrv(a,b,res){
+  const dx=b.x-a.x,dy=b.y-a.y,d=Math.hypot(dx,dy),md=a.r+b.r;
+  if(d<md&&d>0.01){
+    const nx=dx/d,ny=dy/d,ov=(md-d)/2;
+    a.x-=nx*ov;a.y-=ny*ov;b.x+=nx*ov;b.y+=ny*ov;
+    const rv=(b.vx-a.vx)*nx+(b.vy-a.vy)*ny;
+    if(rv<0){const imp=rv*(res||1);a.vx+=imp*nx;a.vy+=imp*ny;b.vx-=imp*nx;b.vy-=imp*ny;}
+  }
+}
+function sDoKickSrv(p,ball,force,scfg){
+  const dx=ball.x-p.x,dy=ball.y-p.y,d=Math.hypot(dx,dy);
+  if(d>p.r+ball.r+scfg.S_KICK_DIST_X)return;
+  const nx=d>0.01?dx/d:1,ny=d>0.01?dy/d:0;
+  ball.vx=nx*force+p.vx*0.28; ball.vy=ny*force+p.vy*0.28;
+}
+// A differenza del calcio: NESSUN rallentamento durante la carica (topSpd
+// resta sempre S_P_SPEED_MAX), richiesta esplicita della spec sniper.
+function sSApplyInput(p,inp,ball,scfg,sKickoff,sBattingTeam){
+  const topSpd=scfg.S_P_SPEED_MAX;
+  const charging=inp.kick;
+  if(charging){if(!p.held){p.vx*=0.3;p.vy*=0.3;}p.charge=Math.min(p.charge+1,scfg.S_KICK_CHG_F);}
+  else{if(p.held&&p.charge>0)sDoKickSrv(p,ball,scfg.S_KICK_MIN+(p.charge/scfg.S_KICK_CHG_F)*(scfg.S_KICK_MAX-scfg.S_KICK_MIN),scfg);p.charge=0;}
+  p.held=charging;
+  if(inp.up||inp.dn){
+    if(inp.up){if(p.vy>-scfg.S_P_START)p.vy=-scfg.S_P_START;p.vy=Math.max(p.vy-scfg.S_P_ACCEL,-topSpd);}
+    if(inp.dn){if(p.vy< scfg.S_P_START)p.vy= scfg.S_P_START;p.vy=Math.min(p.vy+scfg.S_P_ACCEL, topSpd);}
+  } else { p.vy*=scfg.S_P_FRIC; }
+  if(inp.lt||inp.rt){
+    if(inp.lt){if(p.vx>-scfg.S_P_START)p.vx=-scfg.S_P_START;p.vx=Math.max(p.vx-scfg.S_P_ACCEL,-topSpd);}
+    if(inp.rt){if(p.vx< scfg.S_P_START)p.vx= scfg.S_P_START;p.vx=Math.min(p.vx+scfg.S_P_ACCEL, topSpd);}
+  } else { p.vx*=scfg.S_P_FRIC; }
+  const spd=Math.hypot(p.vx,p.vy);if(spd>topSpd){p.vx=p.vx/spd*topSpd;p.vy=p.vy/spd*topSpd;}
+  p.x+=p.vx;p.y+=p.vy;
+  const wb=(scfg.S_P_WALL_BOUNCE!==undefined)?scfg.S_P_WALL_BOUNCE:0.4;
+  if(p.y<S_FL.t+p.r){p.y=S_FL.t+p.r;p.vy*=-wb;}
+  if(p.y>S_FL.b-p.r){p.y=S_FL.b-p.r;p.vy*=-wb;}
+  if(p.team===0&&p.x<S_FL.l+p.r){p.x=S_FL.l+p.r;p.vx*=-wb;}
+  if(p.team===1&&p.x>S_FL.r-p.r){p.x=S_FL.r-p.r;p.vx*=-wb;}
+  sApplyZoneLimitSrv(p,wb,sKickoff,sBattingTeam);
+}
+// Vedi commento gemello in js/modes/sniper/physics.js (sApplyZoneLimit):
+// stessa logica, richiamata sia da sSApplyInput sia una seconda volta dopo
+// le collisioni player<->player in sTick (stesso problema gia' risolto per
+// la battuta pallavolo, vApplyServeRestrictionSrv piu' sopra).
+function sApplyZoneLimitSrv(p,wb,sKickoff,sBattingTeam){
+  if(p.team===0){
+    const limit=(sKickoff&&sBattingTeam!==0)?S_NET_L:S_NET_R;
+    if(p.x+p.r>limit){p.x=limit-p.r; if(p.vx>0)p.vx*=-wb;}
+  } else if(p.team===1){
+    const limit=(sKickoff&&sBattingTeam!==1)?S_NET_R:S_NET_L;
+    if(p.x-p.r<limit){p.x=limit+p.r; if(p.vx<0)p.vx*=-wb;}
+  }
+}
+function sSGetGoals(scfg){
+  return S_GOAL_CENTERS.map(cy=>({y:cy,h:scfg.S_GOAL_H}));
+}
+function sSGetPoles(scfg){
+  const half=scfg.S_GOAL_H/2, r=scfg.S_POST_R, poles=[];
+  for(const cy of S_GOAL_CENTERS){
+    poles.push({x:S_FL.l,y:cy-half,r}); poles.push({x:S_FL.l,y:cy+half,r});
+    poles.push({x:S_FL.r,y:cy-half,r}); poles.push({x:S_FL.r,y:cy+half,r});
+  }
+  return poles;
+}
+function sCheckPoleSrv(ball,poleX,poleY,poleR,bounce){
+  const dx=ball.x-poleX, dy=ball.y-poleY, d=Math.hypot(dx,dy), minD=ball.r+poleR;
+  if(d<minD&&d>0.01){
+    const nx=dx/d, ny=dy/d;
+    ball.x+=nx*(minD-d); ball.y+=ny*(minD-d);
+    const dot=ball.vx*nx+ball.vy*ny;
+    if(dot<0){ball.vx-=2*dot*nx*bounce; ball.vy-=2*dot*ny*bounce;}
+  }
+}
+function sSCheckPoles(ball,scfg){
+  const poles=sSGetPoles(scfg);
+  for(const p of poles) sCheckPoleSrv(ball,p.x,p.y,p.r,scfg.S_B_BOUNCE);
+}
+// Muro sinistro = porte dei ROSSI -> se la palla entra, segna il BLU.
+// Muro destro = porte dei BLU -> se la palla entra, segnano i ROSSI.
+function sSCheckWalls(ball,scfg){
+  const goals=sSGetGoals(scfg);
+  if(ball.x-ball.r<S_FL.l){
+    let inGoal=false; for(const g of goals){if(ball.y>=g.y-g.h/2&&ball.y<=g.y+g.h/2){inGoal=true;break;}}
+    if(inGoal) return {goal:true,team:1};
+    ball.x=S_FL.l+ball.r; ball.vx*=-scfg.S_B_BOUNCE;
+  }
+  if(ball.x+ball.r>S_FL.r){
+    let inGoal=false; for(const g of goals){if(ball.y>=g.y-g.h/2&&ball.y<=g.y+g.h/2){inGoal=true;break;}}
+    if(inGoal) return {goal:true,team:0};
+    ball.x=S_FL.r-ball.r; ball.vx*=-scfg.S_B_BOUNCE;
+  }
+  if(ball.y-ball.r<S_FL.t){ball.y=S_FL.t+ball.r;ball.vy*=-scfg.S_B_BOUNCE;}
+  if(ball.y+ball.r>S_FL.b){ball.y=S_FL.b-ball.r;ball.vy*=-scfg.S_B_BOUNCE;}
+  return {goal:false,team:null};
+}
+
 // ── ROOM ─────────────────────────────────────────────────
 function mkBall(cfg){ return {x:W/2,y:H/2,vx:0,vy:0,r:cfg?cfg.B_RADIUS:BR}; }
 function mkVolleyBall(vcfg,serveTeam){
@@ -286,17 +409,20 @@ function mkVolleyBall(vcfg,serveTeam){
   const by = V_FL.t + (V_FL.b - V_FL.t) * 0.35;
   return {x:V_NET_X, y:by, vx:0, vy:0, r:vcfg?vcfg.V_BR:V_BR, grav:V_B_GRAV_BASE};
 }
+function mkSniperBall(scfg){ return {x:W/2,y:H/2,vx:0,vy:0,r:scfg?scfg.S_BR:S_BR}; }
 
 function mkRoom(code,name,password,mode){
   const isVolley=(mode==='volley');
+  const isSniper=(mode==='sniper');
   const cfg={...CONFIG_DEFAULT};
   const vcfg={...V_CONFIG_DEFAULT};
+  const scfg={...S_CONFIG_DEFAULT};
   return {
     code, name:name||`Stanza ${code}`, password:password||'',
     mode:mode||'soccer', config:cfg,
-    vconfig:vcfg,
+    vconfig:vcfg, sconfig:scfg,
     clients:new Map(), players:[], ball:null,
-    score:[0,0], timeLeft:isVolley?V_CONFIG_DEFAULT.V_MATCH_TIME:CONFIG_DEFAULT.MATCH_TIME,
+    score:[0,0], timeLeft:isVolley?V_CONFIG_DEFAULT.V_MATCH_TIME:(isSniper?S_CONFIG_DEFAULT.S_MATCH_TIME:CONFIG_DEFAULT.MATCH_TIME),
     gameOver:false, goalCD:0, started:false, hostPid:null, roster:[],
     inputs:{}, afkSet:new Set(), skins:{},
     paused:false,
@@ -313,12 +439,17 @@ function mkRoom(code,name,password,mode){
     // la squadra che serve puo' toccare la palla una sola volta (vedi
     // vTick): un secondo tocco prima che il servizio "passi" e' fallo.
     vServeRallyLive:false,
+    // ── Rimessa sniper (equivalente calcistico del kickoff, non e' una
+    // battuta pallavolistica: la squadra indicata puo' semplicemente
+    // avvicinarsi prima, vedi sApplyZoneLimitSrv) ──
+    sKickoff:true, sBattingTeam:0,
     ticker:null, secondAccum:0, lastBcast:0
   };
 }
 // Inizializza la palla dopo aver creato la room
 function initRoomBall(room){
   if(room.mode==='volley') room.ball=mkVolleyBall(room.vconfig, room.vServeTeam);
+  else if(room.mode==='sniper') room.ball=mkSniperBall(room.sconfig);
   else room.ball=mkBall(room.config);
 }
 
@@ -338,20 +469,31 @@ function bcastAll(room,obj){for(const[ws] of room.clients)send(ws,obj);}
 function buildRoster(room){return[...room.clients.values()].map(c=>({id:c.pid,name:c.name,team:c.team,skin:c.skin||'',afk:c.afk||false}));}
 function syncRoster(room){room.roster=buildRoster(room);bcastAll(room,{type:'pm_update',roster:room.roster,hostId:room.hostPid});}
 
-function buildPlayers(roster,mode,cfg,vcfg){
-  const isV=(mode==='volley'),pr=isV?(vcfg?vcfg.V_PR:V_PR):(cfg?cfg.P_RADIUS:PR),fl=isV?V_FL:FL;
+function buildPlayers(roster,mode,cfg,vcfg,scfg){
+  const isV=(mode==='volley'), isS=(mode==='sniper');
+  const pr=isV?(vcfg?vcfg.V_PR:V_PR):isS?(scfg?scfg.S_PR:S_PR):(cfg?cfg.P_RADIUS:PR);
+  const fl=isV?V_FL:isS?S_FL:FL;
   const result=[],byTeam=[[],[]];
   for(const r of roster)if(r.team===0||r.team===1)byTeam[r.team].push(r);
   for(const team of[0,1]){
     const grp=byTeam[team],n=grp.length;
-    grp.forEach((r,i)=>result.push({id:r.id,team,col:TEAM_COLS[team],
-      x:fl.l+(fl.r-fl.l)*(team===0?.22:.78),y:fl.t+(fl.b-fl.t)*(i+1)/(n+1),
-      vx:0,vy:0,r:pr,charge:0,held:false,
-      vAdvanced:false,kickCooldown:false}));
+    grp.forEach((r,i)=>{
+      // Sniper: posizionamento centrato nella propria zona limitata
+      // (S_FL.l..S_NET_L per i rossi, S_NET_R..S_FL.r per i blu), diverso
+      // dalla formula frazionale .22/.78 di calcio/pallavolo perche' i
+      // limiti di zona sniper non coincidono con i bordi campo.
+      const x = isS
+        ? (team===0 ? S_FL.l+(S_NET_L-S_FL.l)*0.5 : S_NET_R+(S_FL.r-S_NET_R)*0.5)
+        : fl.l+(fl.r-fl.l)*(team===0?.22:.78);
+      result.push({id:r.id,team,col:TEAM_COLS[team],
+        x, y:fl.t+(fl.b-fl.t)*(i+1)/(n+1),
+        vx:0,vy:0,r:pr,charge:0,held:false,
+        vAdvanced:false,kickCooldown:false});
+    });
   }
   for(const r of roster)
     if(r.team===-1||r.afk)
-      result.push({id:r.id,team:-1,col:'#555',x:-9999,y:-9999,vx:0,vy:0,r:isV?(vcfg?vcfg.V_PR:V_PR):(cfg?cfg.P_RADIUS:PR),charge:0,held:false,vAdvanced:false});
+      result.push({id:r.id,team:-1,col:'#555',x:-9999,y:-9999,vx:0,vy:0,r:isV?(vcfg?vcfg.V_PR:V_PR):isS?(scfg?scfg.S_PR:S_PR):(cfg?cfg.P_RADIUS:PR),charge:0,held:false,vAdvanced:false});
   return result;
 }
 
@@ -382,6 +524,28 @@ function vResetPositions(room,full,nextServeTeam){
   bcastAll(room,{type:'v_serve',serveTeam:room.vServeTeam,servePhase:true});
 }
 
+// Rimessa sniper: nextBattingTeam e' il team che ha diritto di avvicinarsi
+// per primo (0/1), oppure undefined per mantenere quello corrente (usato
+// dal restart, dove si vuole sempre ripartire dai rossi tramite full=true).
+function sResetPositions(room,full,nextBattingTeam){
+  if(nextBattingTeam===0||nextBattingTeam===1) room.sBattingTeam=nextBattingTeam;
+  room.sKickoff=true;
+  room.ball=mkSniperBall(room.sconfig);
+  const scfg=room.sconfig;
+  if(full){room.score=[0,0];room.timeLeft=scfg.S_MATCH_TIME;room.gameOver=false;room.secondAccum=0;room.sBattingTeam=0;}
+  room.goalCD=scfg.S_GOAL_CD;
+  const bt=[[],[]];
+  for(const p of room.players)if(p.team===0||p.team===1)bt[p.team].push(p);
+  for(const t of[0,1]){
+    const g=bt[t],n=g.length;
+    g.forEach((p,i)=>{
+      p.x = t===0 ? S_FL.l+(S_NET_L-S_FL.l)*0.5 : S_NET_R+(S_FL.r-S_NET_R)*0.5;
+      p.y = S_FL.t+(S_FL.b-S_FL.t)*(i+1)/(n+1);
+      p.vx=0;p.vy=0;p.charge=0;p.held=false;
+    });
+  }
+}
+
 function serializeState(room){
   return{type:'state',
     // vx/vy dei player non servono mai al rendering (remoti: mai letti;
@@ -403,6 +567,17 @@ function vSerializeState(room){
     serveTeam:room.vServeTeam, servePhase:room.vServePhase?1:0};
 }
 
+// sk/sbt (kickoff/battingTeam) invece dei nomi lunghi come per volley: lo
+// state sniper viaggia a 30Hz come gli altri, un payload compatto conta.
+function sSerializeState(room){
+  return{type:'state',
+    p:room.players.map(p=>p.team===-1?0:[Math.round(p.x),Math.round(p.y),p.charge,p.held?1:0]),
+    b:[Math.round(room.ball.x),Math.round(room.ball.y),Math.round(room.ball.vx*100)/100,Math.round(room.ball.vy*100)/100],
+    gc:room.goalCD,
+    sk:room.sKickoff?1:0,
+    sbt:room.sBattingTeam};
+}
+
 let _lastMeta={};
 function broadcastMeta(room){
   const key=`${room.score}|${room.timeLeft}|${room.gameOver?1:0}`;
@@ -417,6 +592,15 @@ function vHandlePoint(room,scoringTeam){
   // Il prossimo serve va alla squadra che ha fatto punto
   const nextServeTeam = scoringTeam;
   vResetPositions(room, false, nextServeTeam);
+  bcastAll(room,{type:'goal',team:scoringTeam,score:room.score.slice()});
+  if(room.score[0]>99||room.score[1]>99)endMatch(room);
+}
+
+// A differenza della pallavolo (batte chi ha segnato), la rimessa sniper
+// segue la convenzione calcio: batte chi ha SUBITO il gol.
+function sHandleGoal(room,scoringTeam){
+  room.score[scoringTeam]++;
+  sResetPositions(room, false, 1-scoringTeam);
   bcastAll(room,{type:'goal',team:scoringTeam,score:room.score.slice()});
   if(room.score[0]>99||room.score[1]>99)endMatch(room);
 }
@@ -611,21 +795,75 @@ function vTick(room){
   if(now-room.lastBcast>=BCAST_MS){room.lastBcast=now;bcastAll(room,vSerializeState(room));broadcastMeta(room);}
 }
 
+// ── TICK SNIPER ───────────────────────────────────────────
+function sTick(room){
+  if(!room.started||room.gameOver||room.paused)return;
+  if(room.goalCD>0){room.goalCD--;return;}
+  const scfg=room.sconfig;
+  room.secondAccum+=TICK_MS;
+  if(room.secondAccum>=1000){room.secondAccum-=1000;room.timeLeft--;if(room.timeLeft<=0){endMatch(room);return;}}
+
+  const ball=room.ball, players=room.players;
+
+  // 1. Input
+  for(const p of players){
+    if(p.team===-1)continue;
+    sSApplyInput(p, room.inputs[p.id]||{}, ball, scfg, room.sKickoff, room.sBattingTeam);
+  }
+
+  // 2. Collisioni player<->player
+  for(let i=0;i<players.length;i++)
+    for(let j=i+1;j<players.length;j++){
+      if(players[i].team===-1||players[j].team===-1)continue;
+      sCircleCollideSrv(players[i],players[j],0.8);
+    }
+
+  // 2b. Riapplica i limiti di zona DOPO le collisioni: un compagno di
+  // squadra puo' spingere un altro oltre la riga cyan tramite l'urto,
+  // esattamente come per vApplyServeRestrictionSrv piu' sopra.
+  { const wb=(scfg.S_P_WALL_BOUNCE!==undefined)?scfg.S_P_WALL_BOUNCE:0.4;
+    for(const p of players) if(p.team!==-1) sApplyZoneLimitSrv(p, wb, room.sKickoff, room.sBattingTeam); }
+
+  // 3. Fisica palla (nessuna gravita': attrito quasi nullo + posizione)
+  ball.x+=ball.vx; ball.y+=ball.vy; ball.vx*=scfg.S_B_FRIC; ball.vy*=scfg.S_B_FRIC;
+
+  // 4. Collisione passiva palla<->player (come nel calcio)
+  for(const p of players){ if(p.team!==-1) sCircleCollideSrv(p,ball,scfg.S_B_HIT_R); }
+
+  // 5. Pali
+  sSCheckPoles(ball, scfg);
+
+  // 6. Muri laterali/porte -> eventuale gol
+  const wallRes = sSCheckWalls(ball, scfg);
+  if(wallRes.goal){ sHandleGoal(room, wallRes.team); return; }
+
+  // 7. Fine rimessa: la palla e' stata colpita con forza
+  if(room.sKickoff && Math.hypot(ball.vx,ball.vy) > 2.0) room.sKickoff=false;
+
+  // 8. Serializza e trasmetti
+  const now2=Date.now();
+  if(now2-room.lastBcast>=BCAST_MS){room.lastBcast=now2;bcastAll(room,sSerializeState(room));broadcastMeta(room);}
+}
+
 // ── AVVIA MATCH ───────────────────────────────────────────
 function startMatch(room){
   room.roster=buildRoster(room);
-  room.players=buildPlayers(room.roster,room.mode,room.config,room.vconfig);
+  room.players=buildPlayers(room.roster,room.mode,room.config,room.vconfig,room.sconfig);
   room.paused=false;
   if(room.mode==='volley') vResetPositions(room,true,0);  // team 0 (rossi) battono all'inizio
+  else if(room.mode==='sniper') sResetPositions(room,true,0); // team 0 (rossi) battono all'inizio
   else resetPositions(room,true);
   room.started=true;
-  const startMsg={type:'start',roster:room.roster,hostId:room.hostPid,config:room.config,vconfig:room.vconfig,mode:room.mode};
+  const startMsg={type:'start',roster:room.roster,hostId:room.hostPid,config:room.config,vconfig:room.vconfig,sconfig:room.sconfig,mode:room.mode};
   if(room.mode==='volley') {
     startMsg.serveTeam=room.vServeTeam;
     startMsg.servePhase=room.vServePhase;
+  } else if(room.mode==='sniper') {
+    startMsg.sKickoff=room.sKickoff;
+    startMsg.sBattingTeam=room.sBattingTeam;
   }
   bcastAll(room,startMsg);
-  const fn=(room.mode==='volley')?()=>vTick(room):()=>tick(room);
+  const fn=(room.mode==='volley')?()=>vTick(room):(room.mode==='sniper')?()=>sTick(room):()=>tick(room);
   if(!room.ticker)room.ticker=setInterval(fn,TICK_MS);
 }
 
@@ -642,6 +880,13 @@ function applyVConfigPatch(patch,room){
   if(patch.V_PR!==undefined){const r=room.vconfig.V_PR;for(const p of room.players)if(p.team!==-1)p.r=r;}
   if(patch.V_BR!==undefined&&room.ball)room.ball.r=room.vconfig.V_BR;
   bcastAll(room,{type:'vconfig',vconfig:room.vconfig});
+}
+function applySconfigPatch(patch,room){
+  const ok=new Set(Object.keys(S_CONFIG_DEFAULT));
+  for(const[k,v] of Object.entries(patch)){if(!ok.has(k))continue;const n=parseFloat(v);if(!isNaN(n)&&n>=0&&n<=10000)room.sconfig[k]=n;}
+  if(patch.S_PR!==undefined){const r=room.sconfig.S_PR;for(const p of room.players)if(p.team!==-1)p.r=r;}
+  if(patch.S_BR!==undefined&&room.ball)room.ball.r=room.sconfig.S_BR;
+  bcastAll(room,{type:'sconfig',sconfig:room.sconfig});
 }
 
 // ── HTTP ──────────────────────────────────────────────────
@@ -675,7 +920,7 @@ wss.on('connection',ws=>{
       myPid=pid;
       myRoom=getOrCreate(code,clampStr(roomName,32),clampStr(password,24),mode||'soccer');myRoom.hostPid=pid;
       myRoom.clients.set(ws,{pid,name:clampStr(name,20),team:0,skin:clampStr(payload.skin||'',8),afk:false});syncRoster(myRoom);
-      send(ws,{type:'created',code,hostId:pid,roomName:myRoom.name,hasPassword:!!myRoom.password,config:myRoom.config,vconfig:myRoom.vconfig,mode:myRoom.mode});return;
+      send(ws,{type:'created',code,hostId:pid,roomName:myRoom.name,hasPassword:!!myRoom.password,config:myRoom.config,vconfig:myRoom.vconfig,sconfig:myRoom.sconfig,mode:myRoom.mode});return;
     }
     if(type==='join'){
       const{pid,name,code,password}=payload;myPid=pid;myRoom=rooms.get(code);
@@ -684,13 +929,15 @@ wss.on('connection',ws=>{
       let team;
       if(myRoom.started){team=-1;}else{const r=[...myRoom.clients.values()].filter(c=>c.team===0).length,b=[...myRoom.clients.values()].filter(c=>c.team===1).length;team=r<=b?0:1;}
       myRoom.clients.set(ws,{pid,name:clampStr(name,20),team,skin:clampStr(payload.skin||'',8),afk:false});
-      const pr=myRoom.mode==='volley'?V_PR:PR;
+      const pr=myRoom.mode==='volley'?V_PR:(myRoom.mode==='sniper'?S_PR:PR);
       if(myRoom.started){
         myRoom.players.push({id:pid,team:-1,col:'#555',x:-9999,y:-9999,vx:0,vy:0,r:pr,charge:0,held:false,vAdvanced:false});
         bcastAll(myRoom,{type:'chat',pid:'system',name:'Sistema',text:`👋 ${name} è entrato come spettatore`});
-        send(ws,{type:'start',roster:buildRoster(myRoom),hostId:myRoom.hostPid,lateJoin:true,config:myRoom.config,vconfig:myRoom.vconfig,mode:myRoom.mode,serveTeam:myRoom.vServeTeam,servePhase:myRoom.vServePhase});
+        const startPayload={type:'start',roster:buildRoster(myRoom),hostId:myRoom.hostPid,lateJoin:true,config:myRoom.config,vconfig:myRoom.vconfig,sconfig:myRoom.sconfig,mode:myRoom.mode,serveTeam:myRoom.vServeTeam,servePhase:myRoom.vServePhase};
+        if(myRoom.mode==='sniper'){startPayload.sKickoff=myRoom.sKickoff;startPayload.sBattingTeam=myRoom.sBattingTeam;}
+        send(ws,startPayload);
         syncRoster(myRoom);
-      }else{syncRoster(myRoom);send(ws,{type:'joined',code,hostId:myRoom.hostPid,roster:buildRoster(myRoom),config:myRoom.config,vconfig:myRoom.vconfig,mode:myRoom.mode});}
+      }else{syncRoster(myRoom);send(ws,{type:'joined',code,hostId:myRoom.hostPid,roster:buildRoster(myRoom),config:myRoom.config,vconfig:myRoom.vconfig,sconfig:myRoom.sconfig,mode:myRoom.mode});}
       return;
     }
     if(!myRoom||!myPid)return;
@@ -701,6 +948,7 @@ wss.on('connection',ws=>{
       if(myPid!==myRoom.hostPid)return;
       myRoom.paused=false;
       if(myRoom.mode==='volley'){myRoom.gameOver=false;vResetPositions(myRoom,true,0);}
+      else if(myRoom.mode==='sniper'){myRoom.gameOver=false;sResetPositions(myRoom,true,0);}
       else{resetPositions(myRoom,true);myRoom.gameOver=false;}
       bcastAll(myRoom,{type:'restarted'});return;
     }
@@ -739,6 +987,7 @@ wss.on('connection',ws=>{
     if(type==='chat'){bcastAll(myRoom,{type:'chat',pid:myPid,name:clampStr(payload.name,20),text:clampStr(payload.text,150)});return;}
     if(type==='set_config'){if(myPid!==myRoom.hostPid)return;applyConfigPatch(payload.patch,myRoom);return;}
     if(type==='set_vconfig'){if(myPid!==myRoom.hostPid)return;applyVConfigPatch(payload.patch,myRoom);return;}
+    if(type==='set_sconfig'){if(myPid!==myRoom.hostPid)return;applySconfigPatch(payload.patch,myRoom);return;}
     if(type==='vmode'){
       if(myRoom.mode==='volley'){
         const p=myRoom.players.find(x=>x.id===myPid);

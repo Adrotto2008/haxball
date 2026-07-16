@@ -270,7 +270,7 @@ function vStartLoop() {
 
 // ── START GAME VOLLEY ───────────────────────────────────
 function startVolleyGame(mode, roster) {
-  stopLoop();
+  stopLoop(); sStopLoop(); // ferma eventuali loop calcio/sniper attivi
   currentGameMode = 'volley';
   // Sincronizza preferenza controlli per questa modalità
   vControlMode = userSettings.volley.advancedControl ? 'advanced' : 'base';

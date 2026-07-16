@@ -31,6 +31,7 @@ function showLobby() {
   if (codeEl) { codeEl.textContent = ''; codeEl.style.display = 'none'; }
   stopLoop();
   vStopLoop();
+  sStopLoop();
   currentGameMode = 'soccer';
   isHost = false; pmRoster = []; hostId = null;
   chatMessages = []; chatOpen = false; afkPlayers = new Set(); playerSkins = {};
@@ -233,6 +234,7 @@ $('btn-train-go').onclick     = () => {
   const mode = getSelectedMode('mode-picker-train');
   $('card-train-mode').style.display = 'none';
   if (mode === 'volley') startVolleyTraining();
+  else if (mode === 'sniper') startSniperTraining();
   else startTraining(mode);
 };
 $('btn-train-cancel').onclick = () => { $('card-train-mode').style.display = 'none'; };
@@ -241,6 +243,7 @@ $('btn-restart').onclick    = () => {
     wsSend({type:'restart',payload:{}});
   } else if (netMode === 'train') {
     if (currentGameMode === 'volley') { vScore=[0,0]; vTimeLeft=V_CONFIG.V_MATCH_TIME; vGameOver=false; vSecondAccum=0; vReset(false); vUpdateHUD(); setMsg(''); }
+    else if (currentGameMode === 'sniper') { sScore=[0,0]; sTimeLeft=S_CONFIG.S_MATCH_TIME; sGameOver=false; sSecondAccum=0; sReset(false); sUpdateHUD(); setMsg(''); }
     else { resetLocal(true); updateHUD(); }
   }
 };

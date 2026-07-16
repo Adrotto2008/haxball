@@ -67,11 +67,21 @@ function handleServerMsg(msg) {
       _presetApplyPending = false; _updateStartBtnPresetState();
       break;
 
+    case 'sconfig':
+      Object.assign(S_CONFIG, msg.sconfig);
+      // aggiorna raggi live
+      if (msg.sconfig.S_PR !== undefined) { const r = msg.sconfig.S_PR; for (const p of sPlayers) if (p.team !== -1) p.r = r; }
+      if (msg.sconfig.S_BR !== undefined && sBall) sBall.r = msg.sconfig.S_BR;
+      if ($('game-menu').classList.contains('open') && document.getElementById('gm-panel-vars').style.display !== 'none') renderConfigPanel();
+      _presetApplyPending = false; _updateStartBtnPresetState();
+      break;
+
     case 'created':
       hostId = myPlayerId; isHost = true;
       pmRoster = [{ id: myPlayerId, name: myNickname, team: 0, skin: mySkin, afk: false }];
       if (msg.config)  Object.assign(CONFIG,   msg.config);
       if (msg.vconfig) Object.assign(V_CONFIG, msg.vconfig);
+      if (msg.sconfig) Object.assign(S_CONFIG, msg.sconfig);
       if (msg.mode) currentGameMode = msg.mode;
       $('card-create').style.display = 'none';
       $('card-join').style.display = 'none';
@@ -94,6 +104,9 @@ function handleServerMsg(msg) {
           if (_pp.mode === 'volley') {
             Object.assign(V_CONFIG, _pp.config);
             if (_pp.config.V_PR !== undefined) V_CONFIG.V_PR = parseFloat(_pp.config.V_PR);
+          } else if (_pp.mode === 'sniper') {
+            Object.assign(S_CONFIG, _pp.config);
+            if (_pp.config.S_PR !== undefined) S_CONFIG.S_PR = parseFloat(_pp.config.S_PR);
           } else {
             Object.assign(CONFIG, _pp.config);
           }
@@ -102,6 +115,8 @@ function handleServerMsg(msg) {
           if ($('game-menu').classList.contains('open') && document.getElementById('gm-panel-vars').style.display !== 'none') renderConfigPanel();
           if (_pp.mode === 'volley') {
             wsSend({ type: 'set_vconfig', payload: { patch: _pp.config } });
+          } else if (_pp.mode === 'sniper') {
+            wsSend({ type: 'set_sconfig', payload: { patch: _pp.config } });
           } else {
             wsSend({ type: 'set_config', payload: { patch: _pp.config } });
           }
@@ -125,6 +140,7 @@ function handleServerMsg(msg) {
       hostId   = msg.hostId;
       if (msg.config)  Object.assign(CONFIG,   msg.config);
       if (msg.vconfig) Object.assign(V_CONFIG, msg.vconfig);
+      if (msg.sconfig) Object.assign(S_CONFIG, msg.sconfig);
       if (msg.mode) currentGameMode = msg.mode;
       setStatus('');
       $('card-join').style.display  = 'none';
@@ -147,6 +163,18 @@ function handleServerMsg(msg) {
           vPlayers = vPlayers.filter(p => msg.roster.find(r => r.id === p.id));
           for (const r of msg.roster) {
             const p = vPlayers.find(x => x.id === r.id);
+            if (p) p.team = r.team;
+          }
+        } else if (currentGameMode === 'sniper') {
+          for (const r of msg.roster) {
+            if (!sPlayers.find(p => p.id === r.id)) {
+              const col = r.team === 0 ? S_TEAM_COLS[0] : r.team === 1 ? S_TEAM_COLS[1] : '#555';
+              sPlayers.push({ id: r.id, team: r.team, col, x: -9999, y: -9999, vx: 0, vy: 0, r: S_CONFIG.S_PR || S_PR, charge: 0, held: false });
+            }
+          }
+          sPlayers = sPlayers.filter(p => msg.roster.find(r => r.id === p.id));
+          for (const r of msg.roster) {
+            const p = sPlayers.find(x => x.id === r.id);
             if (p) p.team = r.team;
           }
         } else {
@@ -175,13 +203,16 @@ function handleServerMsg(msg) {
       isHost   = (msg.hostId === myPlayerId);
       if (msg.config)  Object.assign(CONFIG,   msg.config);
       if (msg.vconfig) Object.assign(V_CONFIG, msg.vconfig);
+      if (msg.sconfig) Object.assign(S_CONFIG, msg.sconfig);
       if (msg.mode) currentGameMode = msg.mode;
       closeMenu();
       if (msg.lateJoin) {
         wsRoom = wsRoom || msg.code || '';
-        // Imposta stato battuta ricevuto dal server
+        // Imposta stato battuta/rimessa ricevuto dal server
         if (msg.serveTeam !== undefined) vServeTeam  = msg.serveTeam;
         if (msg.servePhase !== undefined) vServePhase = !!msg.servePhase;
+        if (msg.sKickoff !== undefined) sKickoff = !!msg.sKickoff;
+        if (msg.sBattingTeam !== undefined) sBattingTeam = msg.sBattingTeam;
         if (currentGameMode === 'volley') {
           if (!vBall) vBall = vMkBall();
           if (!vPlayers.length) vPlayers = vBuildPlayers(msg.roster);
@@ -198,6 +229,22 @@ function handleServerMsg(msg) {
           vReset(false);
           vUpdateHUD();
           vStartLoop();
+        } else if (currentGameMode === 'sniper') {
+          if (!sBall) sBall = sMkBall();
+          if (!sPlayers.length) sPlayers = sBuildPlayers(msg.roster);
+          if (mySkin && myPlayerId) playerSkins[myPlayerId] = mySkin;
+          netMode = 'guest';
+          $('game-menu').classList.remove('open');
+          $('lobby').style.display = 'none';
+          $('game').style.display  = 'flex';
+          hidePrematch();
+          const badgeS = $('net-badge'); badgeS.textContent='GUEST'; badgeS.className='badge-guest';
+          $('btn-restart').style.display = 'none';
+          if (isTouchDev()) positionTouchLayer(); else hideTouchLayer();
+          applyView();
+          sReset(false);
+          sUpdateHUD();
+          sStartLoop();
         } else {
           if (!ball) ball = mkBall();
           if (!players.length) players = buildPlayers(msg.roster);
@@ -216,10 +263,13 @@ function handleServerMsg(msg) {
         }
         sysMsg('\uD83D\uDC4B Sei entrato come spettatore. L\'host pu\u00F2 spostarti in una squadra.');
       } else {
-        // Imposta stato battuta per partita normale
+        // Imposta stato battuta/rimessa per partita normale
         if (msg.serveTeam !== undefined) vServeTeam  = msg.serveTeam;
         if (msg.servePhase !== undefined) vServePhase = !!msg.servePhase;
+        if (msg.sKickoff !== undefined) sKickoff = !!msg.sKickoff;
+        if (msg.sBattingTeam !== undefined) sBattingTeam = msg.sBattingTeam;
         if (currentGameMode === 'volley') startVolleyGame('guest', pmRoster);
+        else if (currentGameMode === 'sniper') startSniperGame('guest', pmRoster);
         else startGame('guest', pmRoster);
       }
       break;
@@ -227,6 +277,7 @@ function handleServerMsg(msg) {
     case 'restarted':
       matchPaused = false;
       if (currentGameMode === 'volley') { vReset(true); vUpdateHUD(); }
+      else if (currentGameMode === 'sniper') { sReset(true); sUpdateHUD(); }
       else { reset(true); updateHUD(); }
       break;
 
@@ -237,6 +288,11 @@ function handleServerMsg(msg) {
         if (msg.servePhase !== undefined) vServePhase = !!msg.servePhase;
         vRemoteState = msg;
         vApplyRemoteState();
+      } else if (currentGameMode === 'sniper') {
+        // sKickoff/sBattingTeam (campi sk/sbt) sono letti direttamente
+        // dentro sApplyRemoteState(), non serve estrarli qui.
+        sRemoteState = msg;
+        sApplyRemoteState();
       } else {
         remoteState = msg;
         applyRemoteState();
@@ -269,6 +325,9 @@ function handleServerMsg(msg) {
       if (currentGameMode === 'volley') {
         vScore = msg.s; vTimeLeft = msg.t; vUpdateHUD();
         if (msg.g && !vGameOver) { vGameOver = true; }
+      } else if (currentGameMode === 'sniper') {
+        sScore = msg.s; sTimeLeft = msg.t; sUpdateHUD();
+        if (msg.g && !sGameOver) { sGameOver = true; }
       } else {
         score = msg.s; timeLeft = msg.t; updateHUD();
         if (msg.g && !gameOver) { gameOver = true; }
@@ -298,6 +357,15 @@ function handleServerMsg(msg) {
         gfv.style.opacity = '1'; setTimeout(() => gfv.style.opacity = '0', 140);
         vGoalCD = V_CONFIG.V_GOAL_CD;
         vTouches[0] = 0; vTouches[1] = 0; vBallLastSide = null;
+      } else if (currentGameMode === 'sniper') {
+        sScore = msg.score;
+        sUpdateHUD();
+        setMsg(`🎯 GOL! ${msg.team===0?'🔴 ROSSI':'🔵 BLU'}! (${sScore[0]}–${sScore[1]})`);
+        goalBurst(msg.team===0 ? S_FL.r : S_FL.l, H/2);
+        const gfs = $('goal-flash');
+        gfs.style.opacity = '1'; setTimeout(() => gfs.style.opacity = '0', 140);
+        sGoalCD = S_CONFIG.S_GOAL_CD;
+        // sKickoff/sBattingTeam si aggiornano dal prossimo pacchetto 'state' (sk/sbt)
       } else {
         score = msg.score;
         updateHUD();
@@ -313,6 +381,9 @@ function handleServerMsg(msg) {
       if (currentGameMode === 'volley') {
         vScore = msg.score; vUpdateHUD();
         vHandleGameOver();
+      } else if (currentGameMode === 'sniper') {
+        sScore = msg.score; sUpdateHUD();
+        sHandleGameOver();
       } else {
         score = msg.score; updateHUD();
         handleGameOver();
@@ -339,6 +410,9 @@ function handleServerMsg(msg) {
         if (currentGameMode === 'volley') {
           const p = vPlayers.find(x => x.id === msg.pid);
           if (p) p.team = msg.team;
+        } else if (currentGameMode === 'sniper') {
+          const p = sPlayers.find(x => x.id === msg.pid);
+          if (p) p.team = msg.team;
         } else {
           const p = players.find(x => x.id === msg.pid);
           if (p) p.team = msg.team;
@@ -357,6 +431,8 @@ function handleServerMsg(msg) {
       pmRoster = pmRoster.filter(r => r.id !== msg.pid);
       if (currentGameMode === 'volley') {
         vPlayers = vPlayers.filter(p => p.id !== msg.pid);
+      } else if (currentGameMode === 'sniper') {
+        sPlayers = sPlayers.filter(p => p.id !== msg.pid);
       } else {
         players = players.filter(p => p.id !== msg.pid);
       }

@@ -59,6 +59,12 @@ let snapshotBuffer = [];
 // Buffer snapshot pallavolo
 let vSnapshotBuffer = [];
 
+// Buffer snapshot sniper + ultimo pacchetto 'state' ricevuto (sniper e'
+// piu' vicino al calcio per fisica, ma remoteState/snapshotBuffer del
+// calcio sono gia' occupati: serve una coppia dedicata, vedi sync.js).
+let sSnapshotBuffer = [];
+let sRemoteState = null;
+
 // ── STATO — variabili condivise + init canvas ───────────
 const canvas = document.getElementById('c');
 const ctx    = canvas.getContext('2d');
@@ -120,6 +126,9 @@ const SETTINGS_DEFAULT = {
     localPrediction: true,
     advancedControl: false,
   },
+  sniper: {
+    localPrediction: true,
+  },
   hotkeys: {
     togglePrediction: 'KeyQ',
     toggleAdvanced:   'KeyE',
@@ -137,6 +146,7 @@ function _loadSettings() {
     if (saved.keybinds) Object.assign(s.keybinds, saved.keybinds);
     if (saved.soccer)   Object.assign(s.soccer,   saved.soccer);
     if (saved.volley)   Object.assign(s.volley,   saved.volley);
+    if (saved.sniper)   Object.assign(s.sniper,   saved.sniper);
     if (saved.hotkeys)  Object.assign(s.hotkeys,  saved.hotkeys);
     return s;
   } catch(e) {
@@ -148,7 +158,9 @@ function _saveSettings() {
   // sincronizza variabili legacy
   useLocalPrediction = (currentGameMode === 'volley')
     ? userSettings.volley.localPrediction
-    : userSettings.soccer.localPrediction;
+    : (currentGameMode === 'sniper')
+      ? userSettings.sniper.localPrediction
+      : userSettings.soccer.localPrediction;
   vControlMode = userSettings.volley.advancedControl ? 'advanced' : 'base';
   localStorage.setItem('hax_prediction', JSON.stringify(useLocalPrediction));
   localStorage.setItem('hax_vcontrol', vControlMode);
@@ -157,5 +169,7 @@ let userSettings = _loadSettings();
 // Sincronizza variabili legacy all'avvio
 useLocalPrediction = (typeof currentGameMode !== 'undefined' && currentGameMode === 'volley')
   ? userSettings.volley.localPrediction
-  : userSettings.soccer.localPrediction;
+  : (typeof currentGameMode !== 'undefined' && currentGameMode === 'sniper')
+    ? userSettings.sniper.localPrediction
+    : userSettings.soccer.localPrediction;
 vControlMode = userSettings.volley.advancedControl ? 'advanced' : 'base';

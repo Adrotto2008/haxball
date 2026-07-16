@@ -101,6 +101,7 @@ async function authLoadSettings() {
       if (remote.keybinds) Object.assign(s.keybinds, remote.keybinds);
       if (remote.soccer)   Object.assign(s.soccer,   remote.soccer);
       if (remote.volley)   Object.assign(s.volley,   remote.volley);
+      if (remote.sniper)   Object.assign(s.sniper,   remote.sniper);
       if (remote.hotkeys)  Object.assign(s.hotkeys,  remote.hotkeys);
       userSettings = s;
       _saveSettings(); // sincronizza localStorage
@@ -169,7 +170,7 @@ function _populatePresetSelect() {
   sel.innerHTML = '<option value="">\u2014 Nessun preset (stanza vuota) \u2014</option>' +
     _presets.map(function(p) {
       return '<option value="' + p.id + '" data-mode="' + escHtml(p.mode) + '">' +
-             escHtml(p.name) + ' (' + (p.mode === 'volley' ? '\uD83C\uDFD0' : '\u26BD') + ')</option>';
+             escHtml(p.name) + ' (' + (p.mode === 'volley' ? '\uD83C\uDFD0' : (p.mode === 'sniper' ? '\uD83C\uDFAF' : '\u26BD')) + ')</option>';
     }).join('');
 }
 

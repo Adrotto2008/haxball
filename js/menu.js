@@ -80,7 +80,8 @@ function renderSettingsPanel() {
 
   // Prediction: usa la preferenza per la modalità corrente
   const isVolley = currentGameMode === 'volley';
-  const predPref  = isVolley ? userSettings.volley.localPrediction : userSettings.soccer.localPrediction;
+  const isSniper = currentGameMode === 'sniper';
+  const predPref  = isSniper ? userSettings.sniper.localPrediction : (isVolley ? userSettings.volley.localPrediction : userSettings.soccer.localPrediction);
   useLocalPrediction = predPref;
 
   el.innerHTML = `
@@ -123,7 +124,7 @@ function renderSettingsPanel() {
 
   // Toggle prediction
   document.getElementById('toggle-prediction').addEventListener('change', e => {
-    const mode2 = currentGameMode === 'volley' ? 'volley' : 'soccer';
+    const mode2 = currentGameMode === 'volley' ? 'volley' : (currentGameMode === 'sniper' ? 'sniper' : 'soccer');
     userSettings[mode2].localPrediction = e.target.checked;
     useLocalPrediction = e.target.checked;
     _saveSettings();
@@ -233,9 +234,10 @@ function renderConfigPanel() {
   hint.style.display = '';
 
   const isVolley = (currentGameMode === 'volley');
-  const meta   = isVolley ? V_CONFIG_META : CONFIG_META;
-  const source = isVolley ? V_CONFIG      : CONFIG;
-  const modeLabel = isVolley ? '🏐 Variabili Pallavolo' : '⚽ Variabili Calcio';
+  const isSniper = (currentGameMode === 'sniper');
+  const meta   = isSniper ? S_CONFIG_META : (isVolley ? V_CONFIG_META : CONFIG_META);
+  const source = isSniper ? S_CONFIG      : (isVolley ? V_CONFIG      : CONFIG);
+  const modeLabel = isSniper ? '🎯 Variabili Sniper' : (isVolley ? '🏐 Variabili Pallavolo' : '⚽ Variabili Calcio');
 
   let html = '<div class="cfg-mode-label">' + modeLabel + '</div>';
   for (const m of meta) {
@@ -258,7 +260,10 @@ function renderConfigPanel() {
       const key = inp.dataset.key;
       const val = parseFloat(inp.value);
       if (isNaN(val)) return;
-      if (isVolley) {
+      if (isSniper) {
+        S_CONFIG[key] = val;
+        wsSend({ type: 'set_sconfig', payload: { patch: { [key]: val } } });
+      } else if (isVolley) {
         V_CONFIG[key] = val;
         wsSend({ type: 'set_vconfig', payload: { patch: { [key]: val } } });
       } else {
@@ -285,8 +290,8 @@ function renderConfigPanel() {
     document.getElementById('cfg-preset-save').onclick = function() {
       var nameEl = document.getElementById('cfg-preset-name');
       var name = (nameEl && nameEl.value.trim()) || 'Preset';
-      var config = isVolley ? Object.assign({}, V_CONFIG) : Object.assign({}, CONFIG);
-      authSavePreset(name, isVolley ? 'volley' : 'soccer', config).then(function() {
+      var config = isSniper ? Object.assign({}, S_CONFIG) : (isVolley ? Object.assign({}, V_CONFIG) : Object.assign({}, CONFIG));
+      authSavePreset(name, isSniper ? 'sniper' : (isVolley ? 'volley' : 'soccer'), config).then(function() {
         var msgEl = document.getElementById('cfg-preset-msg');
         if (msgEl) { msgEl.textContent = '✓ Salvato!'; msgEl.style.color = '#6ddc7e'; }
         setTimeout(function() {
@@ -348,6 +353,7 @@ $('esc-restart').onclick  = () => {
   closeMenu();
   if (netMode === 'train') {
     if (currentGameMode === 'volley') { vScore = [0,0]; vTimeLeft = V_CONFIG.V_MATCH_TIME; vGameOver = false; vSecondAccum = 0; vReset(false); vUpdateHUD(); setMsg(''); }
+    else if (currentGameMode === 'sniper') { sScore = [0,0]; sTimeLeft = S_CONFIG.S_MATCH_TIME; sGameOver = false; sSecondAccum = 0; sReset(false); sUpdateHUD(); setMsg(''); }
     else { resetLocal(true); updateHUD(); }
   } else if (isHost) {
     wsSend({ type: 'restart', payload: {} });

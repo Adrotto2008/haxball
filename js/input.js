@@ -17,7 +17,7 @@ function handleHotkey(code) {
   const hk = userSettings.hotkeys;
   // Toggle prediction locale
   if (code === hk.togglePrediction) {
-    const mode = currentGameMode === 'volley' ? 'volley' : 'soccer';
+    const mode = currentGameMode === 'volley' ? 'volley' : (currentGameMode === 'sniper' ? 'sniper' : 'soccer');
     userSettings[mode].localPrediction = !userSettings[mode].localPrediction;
     useLocalPrediction = userSettings[mode].localPrediction;
     _saveSettings();

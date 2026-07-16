@@ -87,13 +87,13 @@ const CHAT_COMMANDS = {
 function _adminPauseCommand() {
   if (!isHost) { sysMsg('⛔ Solo l\'host può mettere in pausa la partita.'); return; }
   if (netMode === 'train') { sysMsg('⛔ Non disponibile in allenamento.'); return; }
-  if (!running && !vRunning) { sysMsg('⛔ Nessuna partita in corso.'); return; }
+  if (!running && !vRunning && !sRunning) { sysMsg('⛔ Nessuna partita in corso.'); return; }
   wsSend({ type: 'pause', payload: {} });
 }
 function _adminStopCommand() {
   if (!isHost) { sysMsg('⛔ Solo l\'host può terminare la partita.'); return; }
   if (netMode === 'train') { sysMsg('⛔ Non disponibile in allenamento.'); return; }
-  if (!running && !vRunning) { sysMsg('⛔ Nessuna partita in corso.'); return; }
+  if (!running && !vRunning && !sRunning) { sysMsg('⛔ Nessuna partita in corso.'); return; }
   wsSend({ type: 'stop', payload: {} });
 }
 

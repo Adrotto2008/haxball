@@ -4,6 +4,60 @@ Versione più recente sempre in cima. Ad ogni modifica aggiornare `VERSION` in `
 
 ---
 
+## v2.47.0 — Nuova modalità: 🎯 Sniper (implementazione completa)
+
+Prima implementazione completa della terza modalità di gioco, a partire dallo spec caricato (`sniper.md`): 5 file dedicati sotto `js/modes/sniper/` con prefisso `S_`, integrazione in tutti i file condivisi, fisica server-autoritativa in multiplayer.
+
+### 🎯 La modalità
+- Campo identico per forma a calcio/pallavolo (1020×600, FL 40px di margine), ma senza porta unica: **3 mini-porte per lato** (alte 60px, centrate a 3 altezze diverse), ciascuna con 2 pali fisici circolari con cui la palla collide e rimbalza.
+- Nessuna gravità (vista dall'alto come il calcio). Palla molto scattante: attrito quasi nullo (`S_B_FRIC=0.999`) e rimbalzo molto elastico (`S_B_BOUNCE=0.93`) sia sui muri pieni sia sui pali — rimbalza a lungo, molto diversa dal pallone "pesante" del calcio.
+- **Zone di movimento**: due righe verticali "cyan" (non muri fisici per la palla, solo per i giocatori) dividono il campo in tre fasce — zona rossi, zona condivisa centrale, zona blu. Normalmente ogni squadra può avanzare fino alla riga avversaria (`S_NET_R`/`S_NET_L`); durante la **rimessa** dopo un gol (`sKickoff`), la squadra che NON deve ripartire resta confinata alla propria riga, molto più indietro, finché l'altra squadra non colpisce la palla con forza (soglia `Math.hypot(vx,vy) > 2.0`).
+- A differenza della pallavolo (dove serve chi ha segnato), la rimessa sniper segue la convenzione **calcio**: riparte chi ha *subito* il gol.
+- Tiro identico al calcio come meccanica (carica tenendo AZIONE, rilascio per tirare, stessa formula forza min→max) ma con una differenza voluta dallo spec: **nessun rallentamento della velocità massima durante la carica** (nel calcio si scende a `P_SPEED_MAX*0.45`, qui resta sempre al massimo).
+- Collisioni palla↔player e player↔player passive come nel calcio (nella pallavolo non esistono, solo tocco esplicito).
+
+### 📐 Decisioni prese in autonomia rispetto allo spec originale
+- **Payload di stato ottimizzato**: lo spec proponeva un formato `sSerializeState` con `vx/vy` per player incluso; seguito invece il formato attuale (già ottimizzato in v2.30.0) di calcio/pallavolo — niente `vx/vy` (mai letti dal rendering), spettatori compressi a `0`. Coerenza di banda con le altre 2 modalità, nessuna perdita funzionale.
+- **`S_P_WALL_BOUNCE`**: non elencata nello spec tra le variabili del pannello host, ma necessaria per il rimbalzo dei giocatori sui bordi campo — aggiunta a `S_CONFIG`/`S_CONFIG_DEFAULT` (default 0.4) ma volutamente esclusa da `S_CONFIG_META` (nessuno slider), per non introdurre una costante fissa nel codice fisico (stessa ragione di `P_WALL_BOUNCE`/`V_P_WALL_BOUNCE`).
+- **Riapplicazione dei limiti di zona dopo le collisioni player↔player**: non esplicitata nell'ordine del tick dello spec, ma aggiunta seguendo lo stesso pattern già necessario in pallavolo (`vApplyServeRestrictionSrv` richiamata due volte) — senza, una spinta fra compagni di squadra potrebbe superare la riga cyan per un frame prima della correzione.
+- **Freccia di mira** (`sDrawShotArrow`): non esplicitamente elencata ma inclusa perché lo spec chiede fedeltà visiva al calcio, che la prevede — utile anzi di più qui, vista la precisione richiesta per centrare una porta larga 60px.
+
+### 🧹 Parità cross-modalità: bug preesistenti nel pattern a 2 modalità, emersi aggiungendo la terza
+Diversi punti del codice condiviso distinguevano correttamente calcio/pallavolo ma non erano scritti per generalizzare a N modalità. Estesi tutti allo stesso schema:
+- `js/modes/soccer/game.js` (`startGame`, `startTraining`) e `js/modes/volley/game.js` (`startVolleyGame`): fermavano solo il loop dell'altra modalità (`vStopLoop()`/`stopLoop()`), non quello sniper — un loop RAF sniper sarebbe rimasto attivo in sottofondo passando a calcio/pallavolo. Aggiunto `sStopLoop()`.
+- `js/admin.js` (`toggleAfk`), `js/chat.js` (`/pause`, `/stop`): puntavano all'array player o al flag `running` sbagliato quando la modalità attiva non era calcio né pallavolo.
+- `js/input.js` (hotkey `Q`, toggle prediction), `js/menu.js` (toggle prediction nel pannello impostazioni), `js/state.js`/`js/auth.js` (`SETTINGS_DEFAULT`, merge impostazioni locali/cloud): il sistema di preferenze "prediction locale" distingueva solo `volley`/`soccer` — sniper cadeva silenziosamente nel bucket calcio. Aggiunto bucket `sniper` dedicato in `SETTINGS_DEFAULT` e in tutti i punti che lo leggono/scrivono.
+- `js/auth.js` (`_populatePresetSelect`): i preset salvati in modalità sniper mostravano l'icona ⚽ invece di 🎯.
+
+### 📁 File creati
+- `js/modes/sniper/config.js` — costanti fisiche, campo/porte/pali, `S_CONFIG` live, `S_CONFIG_META` (pannello host)
+- `js/modes/sniper/physics.js` — movimento, tiro, collisioni, limiti di zona, pali, muri con aperture
+- `js/modes/sniper/draw.js` — campo/porte/pali (stile dedicato), player/palla/freccia (fedeli al calcio)
+- `js/modes/sniper/game.js` — stato partita, update loop, gol, reset, build player/palla, avvio training/multiplayer
+- `js/modes/sniper/sync.js` — interpolazione snapshot player remoti, applica stato dal server, dead reckoning + prediction locale
+
+### 📁 File modificati
+- `index.html` — pulsante Sniper nei due mode-picker (crea stanza, allenamento); tag script dei 5 file sniper dopo pallavolo, prima di lobby.js
+- `js/config.js` — VERSION, commento `currentGameMode`
+- `js/state.js` — `sSnapshotBuffer`/`sRemoteState`; bucket `sniper` in `SETTINGS_DEFAULT`, `_loadSettings`, `_saveSettings`, sync all'avvio
+- `js/input.js` — hotkey toggle prediction riconosce anche sniper
+- `js/admin.js` — `toggleAfk()` punta a `sPlayers` in modalità sniper
+- `js/chat.js` — `/pause` `/stop` controllano anche `sRunning`
+- `js/auth.js` — merge `sniper` nelle impostazioni cloud; icona 🎯 nei preset sniper
+- `js/lobby.js` — `showLobby()` ferma il loop sniper; `btn-train-go` avvia `startSniperTraining()`; `btn-restart` gestisce il reset training sniper
+- `js/menu.js` — `renderSettingsPanel()`/toggle prediction e `renderConfigPanel()` (variabili, slider live, salvataggio preset) riconoscono la modalità sniper; `esc-restart` gestisce il reset training sniper
+- `js/network-core.js` — nuovo case `'sconfig'`; sniper integrato in `created`, `joined`, `pm_update`, `start` (normale e late-join), `restarted`, `state`, `meta`, `goal`, `game_over`, `team_change`, `player_left`
+- `js/modes/soccer/game.js`, `js/modes/volley/game.js` — fermano anche il loop sniper all'avvio (vedi sezione parità sopra)
+- `server.js` — `S_CONFIG_DEFAULT`, costanti fisse campo/porte; fisica sniper server-side completa (`sSApplyInput`, `sApplyZoneLimitSrv`, `sSCheckWalls`, `sSCheckPoles`, ecc.); `sTick`; `mkSniperBall`, `sResetPositions`, `sSerializeState`, `sHandleGoal`; `buildPlayers`/`mkRoom`/`initRoomBall`/`startMatch` estesi con il ramo sniper; handler `set_sconfig`; sniper in `create`/`join`/`restart`
+
+### ⚠️ Deploy
+Modifica server-side inclusa (`server.js`): la modalità Sniper in multiplayer online richiede `git push` + deploy Render. Allenamento in locale e menu/UI sono già attivi al reload del client.
+
+### 🔜 Non ancora testato
+Implementazione completa ma non ancora giocata: consigliato un giro di test in allenamento (mira sulle 3 porte, rimbalzi sui pali, rimessa dopo gol) e poi in multiplayer reale prima di considerarla stabile.
+
+---
+
 ## v2.46.0 — Pallavolo avanzata: animazione di carica "ad arco che si forma", identica al calcio
 
 Su richiesta ("fai che nella pallavolo nella modalita' avanzata il colpo caricato [...] si carica nel tempo come nel calcio [...] fai la stessa animazione che il cerchio si forma mentre tieni premuto").
